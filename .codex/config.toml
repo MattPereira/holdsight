@@ -1,0 +1,24 @@
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+network_access = false
+
+[mcp_servers.shadcn]
+command = "npx"
+args = ["shadcn@latest", "mcp"]
+
+[mcp_servers.shadcn.tools.list_items_in_registries]
+approval_mode = "approve"
+
+[mcp_servers.shadcn.tools.search_items_in_registries]
+approval_mode = "approve"
+
+[mcp_servers.shadcn.tools.view_items_in_registries]
+approval_mode = "approve"
+
+[mcp_servers.shadcn.tools.get_add_command_for_items]
+approval_mode = "approve"
+
+[mcp_servers.shadcn.tools.get_audit_checklist]
+approval_mode = "approve"
