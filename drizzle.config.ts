@@ -1,5 +1,8 @@
-import "dotenv/config";
+import { config } from "dotenv";
 import { defineConfig } from "drizzle-kit";
+
+config({ path: ".env.local" });
+config();
 
 const databaseUrl = process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
 
@@ -8,7 +11,7 @@ if (!databaseUrl) {
 }
 
 export default defineConfig({
-  schema: "./src/schema.ts",
+  schema: "./src/db/schema/index.ts",
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
