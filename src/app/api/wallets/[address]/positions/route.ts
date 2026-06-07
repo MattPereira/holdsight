@@ -1,4 +1,6 @@
+import { headers } from "next/headers";
 import { type NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { getWalletPositions } from "@/lib/positions";
 import type { PositionsResult } from "@/lib/types";
 
@@ -19,6 +21,12 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ address: string }> },
 ) {
+  // Privacy-first: no portfolio data leaves the server without a valid session.
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { address } = await params;
   const { searchParams } = request.nextUrl;
 

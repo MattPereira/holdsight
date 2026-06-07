@@ -1,5 +1,8 @@
 "use server";
 
+import { headers } from "next/headers";
+
+import { auth } from "@/lib/auth";
 import { validateConfiguredWallets, wallets } from "@/lib/wallets";
 import { getWalletPositions } from "@/lib/positions";
 import type { PositionsResult } from "@/lib/types";
@@ -13,6 +16,19 @@ import type { PositionsResult } from "@/lib/types";
  * spending more of the limited daily quota on calls that would also fail.
  */
 export async function loadPositions(): Promise<PositionsResult[]> {
+  // Privacy-first: no portfolio data leaves the server without a valid session.
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session) {
+    return [
+      {
+        status: "error",
+        address: "AUTH",
+        message: "You must be signed in to view positions.",
+        httpStatus: 401,
+      },
+    ];
+  }
+
   const walletConfigError = validateConfiguredWallets();
   if (walletConfigError) {
     return [
