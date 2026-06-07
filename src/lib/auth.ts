@@ -12,6 +12,11 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  advanced: {
+    database: {
+      generateId: "uuid",
+    },
+  },
 });
 
 export type Session = typeof auth.$Infer.Session;
