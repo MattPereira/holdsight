@@ -8,6 +8,9 @@ network_access = false
 command = "npx"
 args = ["shadcn@latest", "mcp"]
 
+[mcp_servers.zerion-api]
+url = "https://developers.zerion.io/mcp"
+
 [mcp_servers.shadcn.tools.list_items_in_registries]
 approval_mode = "approve"
 
