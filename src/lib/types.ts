@@ -1,6 +1,9 @@
 export type Position = {
+  sourcePositionId?: string;
   symbol: string; // "HYPE", "BHYP", "VVV", "DIEM", "USDC", "SGOV", ect..
+  name?: string;
   chainId: string;
+  contractAddress?: string;
   amount: number; // the amount of the position in the asset's native unit
   priceUsd: number; // 1 unit of the asset in USD
   valueUsd: number; // total USD value of the position

@@ -56,11 +56,19 @@ function queuedPacedFetch(
 }
 
 type RawPosition = {
+  id?: string;
   attributes: {
     quantity?: { float?: number };
     value?: number | null;
     price?: number | null;
-    fungible_info?: { symbol?: string };
+    fungible_info?: {
+      name?: string;
+      symbol?: string;
+      implementations?: Array<{
+        address?: string | null;
+        chain_id?: string;
+      }>;
+    };
   };
   relationships?: {
     chain?: {
@@ -72,9 +80,17 @@ type RawPosition = {
 };
 
 function toPosition(raw: RawPosition): Position {
+  const chainId = raw.relationships?.chain?.data?.id ?? "unknown";
+  const implementation = raw.attributes.fungible_info?.implementations?.find(
+    (item) => item.chain_id === chainId,
+  );
+
   return {
+    sourcePositionId: raw.id,
     symbol: raw.attributes.fungible_info?.symbol ?? "?",
-    chainId: raw.relationships?.chain?.data?.id ?? "unknown",
+    name: raw.attributes.fungible_info?.name,
+    chainId,
+    contractAddress: implementation?.address ?? undefined,
     amount: raw.attributes.quantity?.float ?? 0,
     priceUsd: raw.attributes.price ?? 0,
     valueUsd: raw.attributes.value ?? 0,

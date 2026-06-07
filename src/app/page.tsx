@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { LoginForm } from "@/components/login-form";
 import { PositionsDisplay } from "@/components/positions-display";
 import { UserMenu } from "@/components/user-menu";
+import { getLatestPositionSnapshots } from "@/lib/position-snapshots";
 
 export default async function Home() {
   // Privacy-first: nothing renders until we know who the user is. The session is
@@ -20,15 +21,14 @@ export default async function Home() {
     );
   }
 
-  // No data fetching here — the page renders instantly with zero Zerion calls.
-  // Positions are fetched only when the user clicks the button in the panel.
+  const positionSnapshots = await getLatestPositionSnapshots(session.user.id);
+
   return (
-    <div className="space-y-6 p-8">
-      <header className="flex items-center justify-between gap-4">
-        <h1 className="text-3xl font-semibold">Holdsight</h1>
+    <div className="flex flex-col gap-5 p-5">
+      <header className="flex items-center justify-end gap-4">
         <UserMenu name={session.user.name} email={session.user.email} />
       </header>
-      <PositionsDisplay />
+      <PositionsDisplay initialResults={positionSnapshots} />
     </div>
   );
 }

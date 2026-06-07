@@ -1,5 +1,6 @@
 "use client";
 
+import { RiRefreshLine } from "@remixicon/react";
 import { useState, useTransition } from "react";
 import { loadPositions } from "@/app/actions";
 import {
@@ -36,9 +37,9 @@ function shortenAddress(address: string): string {
 function statusMessage(result: PositionsResult): string {
   switch (result.status) {
     case "indexing":
-      return "Indexing…";
+      return "Indexing...";
     case "rate_limited":
-      return "Rate limited — wait a moment before reloading.";
+      return "Rate limited. Wait a moment before reloading.";
     case "error":
       return result.message;
     case "ready":
@@ -57,7 +58,7 @@ function grandTotal(results: PositionsResult[]): number {
 }
 
 function positionKey(position: Position, i: number): string {
-  return `${position.symbol}-${position.chainId}-${i}`;
+  return position.sourcePositionId ?? `${position.symbol}-${position.chainId}-${i}`;
 }
 
 /* ------------------------------- desktop ------------------------------- */
@@ -114,7 +115,7 @@ function MobileWalletList({ positions }: { positions: Position[] }) {
   return (
     <ul className="divide-y rounded-lg border sm:hidden">
       {positions.map((position, i) => (
-        <li key={positionKey(position, i)} className="space-y-2 px-4 py-3">
+        <li key={positionKey(position, i)} className="flex flex-col gap-2 px-4 py-3">
           <div className="flex items-baseline justify-between gap-4">
             <span className="font-medium">{position.symbol}</span>
             <span className="text-xs text-muted-foreground">
@@ -169,30 +170,39 @@ function WalletAccordionItem({ result }: { result: PositionsResult }) {
 
 /* ------------------------------ container ------------------------------ */
 
-export function PositionsDisplay() {
-  const [results, setResults] = useState<PositionsResult[] | null>(null);
+export function PositionsDisplay({
+  initialResults,
+}: {
+  initialResults: PositionsResult[];
+}) {
+  const [results, setResults] = useState<PositionsResult[]>(initialResults);
   const [isPending, startTransition] = useTransition();
 
   function handleLoad() {
     startTransition(async () => {
-      const data = await loadPositions(); // the only Zerion trigger
-      console.dir(data, { depth: null }); // logged to the browser console
+      const data = await loadPositions();
       setResults(data);
     });
   }
 
   return (
-    <div className="space-y-6">
-      <Button type="button" onClick={handleLoad} disabled={isPending}>
-        {isPending
-          ? "Loading…"
-          : results
-            ? "Reload positions"
-            : "Load positions"}
-      </Button>
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center gap-2">
+        <h1 className="text-xl font-semibold">Universal Portfolio</h1>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          onClick={handleLoad}
+          disabled={isPending}
+          aria-label={results.length > 0 ? "Refresh positions" : "Load positions"}
+        >
+          <RiRefreshLine />
+        </Button>
+      </div>
 
-      {results && results.length > 0 && (
-        <div className="space-y-4">
+      {results.length > 0 && (
+        <div className="flex flex-col gap-4">
           <Accordion
             type="multiple"
             defaultValue={results.map((result) => result.address)}

@@ -1,11 +1,77 @@
 "use server";
 
 import { headers } from "next/headers";
+import { revalidatePath } from "next/cache";
 
 import { auth } from "@/lib/auth";
-import { validateConfiguredWallets, wallets } from "@/lib/wallets";
 import { getWalletPositions } from "@/lib/positions";
+import {
+  getLatestPositionSnapshots,
+  savePositionSnapshot,
+} from "@/lib/position-snapshots";
+import {
+  addUserWallets,
+  getUserWallets,
+  removeUserWallet,
+  validateUserWallets,
+  type SavedWallet,
+} from "@/lib/wallets";
 import type { PositionsResult } from "@/lib/types";
+
+export type WalletActionResult = {
+  wallets: SavedWallet[];
+  message: string;
+  error: string | null;
+};
+
+async function getSessionUserId(): Promise<string | null> {
+  const session = await auth.api.getSession({ headers: await headers() });
+  return session?.user.id ?? null;
+}
+
+async function unauthorizedWalletResult(): Promise<WalletActionResult> {
+  return {
+    wallets: [],
+    message: "",
+    error: "You must be signed in to manage wallets.",
+  };
+}
+
+export async function addWallets(input: string): Promise<WalletActionResult> {
+  const userId = await getSessionUserId();
+  if (!userId) return unauthorizedWalletResult();
+
+  const result = await addUserWallets(userId, input);
+  const wallets = await getUserWallets(userId);
+  if (result.error) {
+    return { wallets, message: "", error: result.error };
+  }
+
+  revalidatePath("/");
+  return {
+    wallets,
+    message:
+      result.added === 0
+        ? "No new wallets added."
+        : `Added ${result.added} wallet${result.added === 1 ? "" : "s"}.`,
+    error: null,
+  };
+}
+
+export async function removeWallet(address: string): Promise<WalletActionResult> {
+  const userId = await getSessionUserId();
+  if (!userId) return unauthorizedWalletResult();
+
+  await removeUserWallet(userId, address);
+  const wallets = await getUserWallets(userId);
+
+  revalidatePath("/");
+  return {
+    wallets,
+    message: "Wallet removed.",
+    error: null,
+  };
+}
 
 /**
  * Fetch positions for every tracked wallet. Called from the client only on a
@@ -17,8 +83,8 @@ import type { PositionsResult } from "@/lib/types";
  */
 export async function loadPositions(): Promise<PositionsResult[]> {
   // Privacy-first: no portfolio data leaves the server without a valid session.
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) {
+  const userId = await getSessionUserId();
+  if (!userId) {
     return [
       {
         status: "error",
@@ -29,23 +95,23 @@ export async function loadPositions(): Promise<PositionsResult[]> {
     ];
   }
 
-  const walletConfigError = validateConfiguredWallets();
+  const walletConfigError = await validateUserWallets(userId);
   if (walletConfigError) {
     return [
       {
         status: "error",
         address: "WALLETS",
         message: walletConfigError,
-        httpStatus: 500,
+        httpStatus: 400,
       },
     ];
   }
 
-  const results: PositionsResult[] = [];
-  for (const address of wallets) {
-    const result = await getWalletPositions(address);
-    results.push(result);
+  for (const wallet of await getUserWallets(userId)) {
+    const result = await getWalletPositions(wallet.address);
+    await savePositionSnapshot(wallet.id, result);
     if (result.status === "rate_limited") break;
   }
-  return results;
+
+  return getLatestPositionSnapshots(userId);
 }

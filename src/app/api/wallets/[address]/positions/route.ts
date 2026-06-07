@@ -3,6 +3,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getWalletPositions } from "@/lib/positions";
 import type { PositionsResult } from "@/lib/types";
+import {
+  isValidEvmAddress,
+  normalizeWalletAddress,
+  userHasWalletAddress,
+} from "@/lib/wallets";
 
 function statusForResult(result: PositionsResult): number {
   switch (result.status) {
@@ -27,7 +32,17 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { address } = await params;
+  const { address: rawAddress } = await params;
+  const address = normalizeWalletAddress(rawAddress);
+  if (!isValidEvmAddress(address)) {
+    return NextResponse.json({ error: "Invalid wallet address" }, { status: 400 });
+  }
+
+  const isSavedWallet = await userHasWalletAddress(session.user.id, address);
+  if (!isSavedWallet) {
+    return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
+  }
+
   const { searchParams } = request.nextUrl;
 
   try {
