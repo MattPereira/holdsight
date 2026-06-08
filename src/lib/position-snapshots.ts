@@ -8,6 +8,8 @@ import {
   financialAccountPositions,
   financialAccountSyncRuns,
 } from "@/db/schema/financial-accounts";
+import { getUserHyperCoreAccounts } from "@/lib/hyper-core-accounts";
+import { getLatestHyperCoreSpotPositionsByAccountId } from "@/lib/hyper-core-snapshots";
 import type { Position, PositionsResult } from "@/lib/types";
 import { getUserWallets } from "@/lib/wallets";
 
@@ -94,9 +96,18 @@ export async function getLatestPositionSnapshots(
   userId: string,
 ): Promise<PositionsResult[]> {
   const wallets = await getUserWallets(userId);
+  const hyperCoreAccounts = await getUserHyperCoreAccounts(userId);
+  const hyperCoreAccountByAddress = new Map(
+    hyperCoreAccounts.map((account) => [account.address, account]),
+  );
   const results: PositionsResult[] = [];
 
   for (const wallet of wallets) {
+    const hyperCoreAccount = hyperCoreAccountByAddress.get(wallet.address);
+    const hyperCoreSpotPositions = hyperCoreAccount
+      ? await getLatestHyperCoreSpotPositionsByAccountId(hyperCoreAccount.id)
+      : [];
+
     const [syncRun] = await db
       .select({
         id: financialAccountSyncRuns.id,
@@ -110,7 +121,11 @@ export async function getLatestPositionSnapshots(
       .limit(1);
 
     if (!syncRun) {
-      results.push({ status: "ready", address: wallet.address, positions: [] });
+      results.push({
+        status: "ready",
+        address: wallet.address,
+        positions: hyperCoreSpotPositions,
+      });
       continue;
     }
 
@@ -151,7 +166,9 @@ export async function getLatestPositionSnapshots(
     results.push({
       status: "ready",
       address: wallet.address,
-      positions: positions.map(toPosition),
+      positions: [...positions.map(toPosition), ...hyperCoreSpotPositions].sort(
+        (a, b) => b.valueUsd - a.valueUsd,
+      ),
     });
   }
 

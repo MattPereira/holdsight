@@ -9,6 +9,8 @@ import {
   getLatestPositionSnapshots,
   savePositionSnapshot,
 } from "@/lib/position-snapshots";
+import { ensureUserHyperCoreAccounts } from "@/lib/hyper-core-accounts";
+import { syncHyperCoreAccounts } from "@/lib/hyper-core-snapshots";
 import {
   addUserWallets,
   getUserWallets,
@@ -107,11 +109,16 @@ export async function loadPositions(): Promise<PositionsResult[]> {
     ];
   }
 
-  for (const wallet of await getUserWallets(userId)) {
+  const wallets = await getUserWallets(userId);
+
+  for (const wallet of wallets) {
     const result = await getWalletPositions(wallet.address);
     await savePositionSnapshot(wallet.id, result);
     if (result.status === "rate_limited") break;
   }
+
+  const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
+  await syncHyperCoreAccounts(hyperCoreAccounts);
 
   return getLatestPositionSnapshots(userId);
 }

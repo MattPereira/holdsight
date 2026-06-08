@@ -3,6 +3,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   numeric,
   pgEnum,
   pgTable,
@@ -89,13 +90,27 @@ export const evmWalletAccounts = pgTable(
   ],
 );
 
-export const hyperCoreAccounts = pgTable("hyper_core_accounts", {
-  financialAccountId: uuid("financial_account_id")
-    .primaryKey()
-    .references(() => financialAccounts.id, { onDelete: "cascade" }),
-  externalAccountId: text("external_account_id"),
-  address: text("address"),
-});
+export const hyperCoreAccounts = pgTable(
+  "hyper_core_accounts",
+  {
+    financialAccountId: uuid("financial_account_id").primaryKey(),
+    userId: uuid("user_id").notNull(),
+    externalAccountId: text("external_account_id"),
+    address: text("address").notNull(),
+  },
+  (table) => [
+    uniqueIndex("hyper_core_accounts_user_address_idx").on(
+      table.userId,
+      table.address,
+    ),
+    index("hyper_core_accounts_address_idx").on(table.address),
+    foreignKey({
+      name: "hyper_core_accounts_financial_account_user_fk",
+      columns: [table.financialAccountId, table.userId],
+      foreignColumns: [financialAccounts.id, financialAccounts.userId],
+    }).onDelete("cascade"),
+  ],
+);
 
 export const centralizedExchangeAccounts = pgTable(
   "centralized_exchange_accounts",
@@ -192,6 +207,45 @@ export const evmPositionDetails = pgTable("evm_position_details", {
   contractAddress: text("contract_address"),
 });
 
+export const hyperCorePositionDetails = pgTable("hyper_core_position_details", {
+  positionId: uuid("position_id")
+    .primaryKey()
+    .references(() => financialAccountPositions.id, { onDelete: "cascade" }),
+  market: text("market").notNull(),
+  side: text("side").notNull(),
+  signedSize: numeric("signed_size", { precision: 36, scale: 18 }).notNull(),
+  entryPx: numeric("entry_px", { precision: 36, scale: 18 }).notNull(),
+  liquidationPx: numeric("liquidation_px", { precision: 36, scale: 18 }),
+  marginUsed: numeric("margin_used", { precision: 36, scale: 18 }).notNull(),
+  unrealizedPnl: numeric("unrealized_pnl", {
+    precision: 36,
+    scale: 18,
+  }).notNull(),
+  returnOnEquity: numeric("return_on_equity", {
+    precision: 36,
+    scale: 18,
+  }),
+  leverageType: text("leverage_type"),
+  leverageValue: numeric("leverage_value", { precision: 36, scale: 18 }),
+  rawLeverage: jsonb("raw_leverage"),
+});
+
+export const hyperCoreAccountSnapshots = pgTable("hyper_core_account_snapshots", {
+  syncRunId: uuid("sync_run_id")
+    .primaryKey()
+    .references(() => financialAccountSyncRuns.id, { onDelete: "cascade" }),
+  accountValue: numeric("account_value", { precision: 36, scale: 18 }).notNull(),
+  totalMarginUsed: numeric("total_margin_used", {
+    precision: 36,
+    scale: 18,
+  }).notNull(),
+  totalNtlPos: numeric("total_ntl_pos", { precision: 36, scale: 18 }).notNull(),
+  totalRawUsd: numeric("total_raw_usd", { precision: 36, scale: 18 }).notNull(),
+  withdrawable: numeric("withdrawable", { precision: 36, scale: 18 }).notNull(),
+  sourceTime: timestamp("source_time"),
+  raw: jsonb("raw"),
+});
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   authAccounts: many(account),
@@ -234,6 +288,10 @@ export const hyperCoreAccountsRelations = relations(
     financialAccount: one(financialAccounts, {
       fields: [hyperCoreAccounts.financialAccountId],
       references: [financialAccounts.id],
+    }),
+    user: one(user, {
+      fields: [hyperCoreAccounts.userId],
+      references: [user.id],
     }),
   }),
 );
@@ -284,6 +342,7 @@ export const financialAccountPositionsRelations = relations(
       references: [financialAccountSyncRuns.id],
     }),
     evmDetails: one(evmPositionDetails),
+    hyperCoreDetails: one(hyperCorePositionDetails),
   }),
 );
 
@@ -293,6 +352,26 @@ export const evmPositionDetailsRelations = relations(
     position: one(financialAccountPositions, {
       fields: [evmPositionDetails.positionId],
       references: [financialAccountPositions.id],
+    }),
+  }),
+);
+
+export const hyperCorePositionDetailsRelations = relations(
+  hyperCorePositionDetails,
+  ({ one }) => ({
+    position: one(financialAccountPositions, {
+      fields: [hyperCorePositionDetails.positionId],
+      references: [financialAccountPositions.id],
+    }),
+  }),
+);
+
+export const hyperCoreAccountSnapshotsRelations = relations(
+  hyperCoreAccountSnapshots,
+  ({ one }) => ({
+    syncRun: one(financialAccountSyncRuns, {
+      fields: [hyperCoreAccountSnapshots.syncRunId],
+      references: [financialAccountSyncRuns.id],
     }),
   }),
 );
