@@ -3,7 +3,12 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { LoginForm } from "@/components/login-form";
 import { PositionsDisplay } from "@/components/positions-display";
-import { UserMenu } from "@/components/user-menu";
+import { AppSidebar } from "@/components/app-sidebar";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { getLatestPositionSnapshots } from "@/lib/position-snapshots";
 
 export default async function Home() {
@@ -24,11 +29,16 @@ export default async function Home() {
   const positionSnapshots = await getLatestPositionSnapshots(session.user.id);
 
   return (
-    <div className="flex flex-col gap-5 p-5">
-      <header className="flex items-center justify-end gap-4">
-        <UserMenu name={session.user.name} email={session.user.email} />
-      </header>
-      <PositionsDisplay initialResults={positionSnapshots} />
-    </div>
+    <SidebarProvider>
+      <AppSidebar name={session.user.name} email={session.user.email} />
+      <SidebarInset>
+        <header className="flex h-14 items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ml-1" />
+        </header>
+        <div className="flex flex-col gap-5 p-5">
+          <PositionsDisplay initialResults={positionSnapshots} />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }

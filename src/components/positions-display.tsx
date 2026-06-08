@@ -1,8 +1,12 @@
 "use client";
 
 import { RiRefreshLine } from "@remixicon/react";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { loadPositions } from "@/app/actions";
+import {
+  AssetTotalsSummary,
+  type AssetTotal,
+} from "@/components/asset-totals-summary";
 import {
   Accordion,
   AccordionContent,
@@ -55,6 +59,40 @@ function walletTotal(result: PositionsResult): number {
 
 function grandTotal(results: PositionsResult[]): number {
   return results.reduce((sum, result) => sum + walletTotal(result), 0);
+}
+
+function totalAssetSymbol(symbol: string): string {
+  const trimmedSymbol = symbol.trim();
+
+  return trimmedSymbol === "sHYPE" ? "HYPE" : trimmedSymbol;
+}
+
+function aggregateAssetTotals(results: PositionsResult[]): AssetTotal[] {
+  const totals = new Map<string, AssetTotal>();
+
+  for (const result of results) {
+    if (result.status !== "ready") continue;
+
+    for (const position of result.positions) {
+      const symbol = totalAssetSymbol(position.symbol);
+      const total = totals.get(symbol);
+
+      if (total) {
+        total.amount += position.amount;
+        total.valueUsd += position.valueUsd;
+      } else {
+        totals.set(symbol, {
+          symbol,
+          amount: position.amount,
+          valueUsd: position.valueUsd,
+        });
+      }
+    }
+  }
+
+  const assetTotals = Array.from(totals.values());
+
+  return assetTotals.sort((a, b) => b.valueUsd - a.valueUsd);
 }
 
 function positionKey(position: Position, i: number): string {
@@ -177,6 +215,8 @@ export function PositionsDisplay({
 }) {
   const [results, setResults] = useState<PositionsResult[]>(initialResults);
   const [isPending, startTransition] = useTransition();
+  const assetTotals = useMemo(() => aggregateAssetTotals(results), [results]);
+  const totalValue = useMemo(() => grandTotal(results), [results]);
 
   function handleLoad() {
     startTransition(async () => {
@@ -213,10 +253,10 @@ export function PositionsDisplay({
             ))}
           </Accordion>
 
-          <div className="flex items-baseline justify-between gap-4 rounded-lg border bg-muted/50 px-4 py-3 font-medium">
-            <span>Total</span>
-            <span className="tabular-nums">{usd.format(grandTotal(results))}</span>
-          </div>
+          <AssetTotalsSummary
+            grandTotalValue={totalValue}
+            totals={assetTotals}
+          />
         </div>
       )}
     </div>
