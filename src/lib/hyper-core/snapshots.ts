@@ -12,13 +12,13 @@ import {
 import type {
   HyperCorePosition,
   HyperCorePositionsResult,
-} from "@/lib/hyperliquid";
+} from "@/lib/hyper-core/client";
 import {
   getHyperCorePositions,
   getHyperCoreSpotMarketData,
-} from "@/lib/hyperliquid";
-import type { Position } from "@/lib/types";
-import type { SavedHyperCoreAccount } from "@/lib/hyper-core-accounts";
+} from "@/lib/hyper-core/client";
+import type { Position } from "@/lib/portfolio/types";
+import type { SavedHyperCoreAccount } from "@/lib/hyper-core/accounts";
 
 const HYPERLIQUID_PROVIDER = "hyperliquid";
 

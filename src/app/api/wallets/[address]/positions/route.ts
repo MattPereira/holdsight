@@ -1,13 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { getWalletPositions } from "@/lib/positions";
-import { getCurrentUserId } from "@/lib/session";
-import type { PositionsResult } from "@/lib/types";
+import { getWalletPositions } from "@/lib/evm/client";
+import { getCurrentUserId } from "@/lib/auth/session";
+import type { PositionsResult } from "@/lib/portfolio/types";
 import {
   isValidEvmAddress,
   normalizeWalletAddress,
   userHasWalletAddress,
-} from "@/lib/wallets";
+} from "@/lib/evm/wallets";
 
 function statusForResult(result: PositionsResult): number {
   switch (result.status) {

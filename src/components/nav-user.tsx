@@ -11,7 +11,7 @@ import {
   RiSparklingLine,
 } from "@remixicon/react";
 
-import { authClient } from "@/lib/auth-client";
+import { authClient } from "@/lib/auth/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,

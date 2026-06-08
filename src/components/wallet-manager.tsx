@@ -20,7 +20,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import type { SavedWallet } from "@/lib/wallets";
+import type { SavedWallet } from "@/lib/evm/wallets";
 
 function shortenAddress(address: string): string {
   if (address.length <= 13) return address;

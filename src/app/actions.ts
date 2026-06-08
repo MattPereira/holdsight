@@ -2,22 +2,22 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getCurrentUserId } from "@/lib/session";
-import { getWalletPositions } from "@/lib/positions";
+import { getCurrentUserId } from "@/lib/auth/session";
+import { getWalletPositions } from "@/lib/evm/client";
 import {
   getLatestPositionSnapshots,
   savePositionSnapshot,
-} from "@/lib/position-snapshots";
-import { ensureUserHyperCoreAccounts } from "@/lib/hyper-core-accounts";
-import { syncHyperCoreAccounts } from "@/lib/hyper-core-snapshots";
+} from "@/lib/portfolio/snapshots";
+import { ensureUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
+import { syncHyperCoreAccounts } from "@/lib/hyper-core/snapshots";
 import {
   addUserWallets,
   getUserWallets,
   removeUserWallet,
   validateUserWallets,
   type SavedWallet,
-} from "@/lib/wallets";
-import type { PositionsResult } from "@/lib/types";
+} from "@/lib/evm/wallets";
+import type { PositionsResult } from "@/lib/portfolio/types";
 
 export type WalletActionResult = {
   wallets: SavedWallet[];

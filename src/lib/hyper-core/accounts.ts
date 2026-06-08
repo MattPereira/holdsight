@@ -8,7 +8,7 @@ import {
   financialAccounts,
   hyperCoreAccounts,
 } from "@/db/schema/financial-accounts";
-import type { SavedWallet } from "@/lib/wallets";
+import type { SavedWallet } from "@/lib/evm/wallets";
 
 export type SavedHyperCoreAccount = {
   id: string;

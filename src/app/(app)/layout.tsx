@@ -5,7 +5,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { getCurrentSession } from "@/lib/session";
+import { getCurrentSession } from "@/lib/auth/session";
 
 export default async function AppLayout({
   children,

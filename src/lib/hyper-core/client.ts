@@ -1,7 +1,7 @@
 import "server-only";
 
-import type { Position } from "@/lib/types";
-import { isValidEvmAddress } from "@/lib/wallets";
+import type { Position } from "@/lib/portfolio/types";
+import { isValidEvmAddress } from "@/lib/evm/wallets";
 
 const HYPERLIQUID_INFO_URL =
   process.env.HYPERLIQUID_INFO_URL ?? "https://api.hyperliquid.xyz/info";

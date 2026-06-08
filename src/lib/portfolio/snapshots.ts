@@ -8,10 +8,10 @@ import {
   financialAccountPositions,
   financialAccountSyncRuns,
 } from "@/db/schema/financial-accounts";
-import { getUserHyperCoreAccounts } from "@/lib/hyper-core-accounts";
-import { getLatestHyperCoreSpotPositionsByAccountId } from "@/lib/hyper-core-snapshots";
-import type { Position, PositionsResult } from "@/lib/types";
-import { getUserWallets } from "@/lib/wallets";
+import { getUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
+import { getLatestHyperCoreSpotPositionsByAccountId } from "@/lib/hyper-core/snapshots";
+import type { Position, PositionsResult } from "@/lib/portfolio/types";
+import { getUserWallets } from "@/lib/evm/wallets";
 
 const ZERION_PROVIDER = "zerion";
 

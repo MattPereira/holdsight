@@ -1,6 +1,6 @@
 import { PositionsDisplay } from "@/components/positions-display";
-import { getLatestPositionSnapshots } from "@/lib/position-snapshots";
-import { getCurrentUserId } from "@/lib/session";
+import { getLatestPositionSnapshots } from "@/lib/portfolio/snapshots";
+import { getCurrentUserId } from "@/lib/auth/session";
 
 export default async function Home() {
   const userId = await getCurrentUserId();

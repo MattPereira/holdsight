@@ -1,5 +1,5 @@
 import "server-only";
-import type { Position, PositionsResult } from "@/lib/types";
+import type { Position, PositionsResult } from "@/lib/portfolio/types";
 
 const ZERION_BASE = "https://api.zerion.io/v1";
 const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;

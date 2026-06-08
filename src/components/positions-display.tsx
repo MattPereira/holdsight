@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Position, PositionsResult } from "@/lib/types";
+import type { Position, PositionsResult } from "@/lib/portfolio/types";
 
 const usd = new Intl.NumberFormat("en-US", {
   style: "currency",
