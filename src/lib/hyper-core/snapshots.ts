@@ -17,7 +17,7 @@ import {
   getHyperCorePositions,
   getHyperCoreSpotMarketData,
 } from "@/lib/hyper-core/client";
-import type { Position } from "@/lib/portfolio/types";
+import type { Position, PositionsResult } from "@/lib/portfolio/types";
 import type { SavedHyperCoreAccount } from "@/lib/hyper-core/accounts";
 
 const HYPERLIQUID_PROVIDER = "hyperliquid";
@@ -104,7 +104,7 @@ export async function saveHyperCorePositionSnapshot(
   }
 }
 
-function toSpotPosition(row: {
+function toPosition(row: {
   sourcePositionId: string | null;
   symbol: string;
   name: string | null;
@@ -156,7 +156,72 @@ export async function getLatestHyperCoreSpotPositionsByAccountId(
     )
     .orderBy(desc(financialAccountPositions.valueUsd));
 
-  return positions.map(toSpotPosition);
+  return positions.map(toPosition);
+}
+
+export async function getLatestHyperCorePositionSnapshots(
+  accounts: SavedHyperCoreAccount[],
+): Promise<PositionsResult[]> {
+  const results: PositionsResult[] = [];
+
+  for (const account of accounts) {
+    const [syncRun] = await db
+      .select({
+        id: financialAccountSyncRuns.id,
+        status: financialAccountSyncRuns.status,
+        httpStatus: financialAccountSyncRuns.httpStatus,
+        errorMessage: financialAccountSyncRuns.errorMessage,
+      })
+      .from(financialAccountSyncRuns)
+      .where(eq(financialAccountSyncRuns.financialAccountId, account.id))
+      .orderBy(desc(financialAccountSyncRuns.startedAt))
+      .limit(1);
+
+    if (!syncRun) {
+      results.push({
+        status: "ready",
+        address: account.address,
+        positions: [],
+      });
+      continue;
+    }
+
+    if (syncRun.status === "indexing" || syncRun.status === "rate_limited") {
+      results.push({ status: syncRun.status, address: account.address });
+      continue;
+    }
+
+    if (syncRun.status === "error") {
+      results.push({
+        status: "error",
+        address: account.address,
+        message: syncRun.errorMessage ?? "HyperCore position sync failed.",
+        httpStatus: syncRun.httpStatus ?? 502,
+      });
+      continue;
+    }
+
+    const positions = await db
+      .select({
+        sourcePositionId: financialAccountPositions.sourcePositionId,
+        symbol: financialAccountPositions.symbol,
+        name: financialAccountPositions.name,
+        amount: financialAccountPositions.amount,
+        priceUsd: financialAccountPositions.priceUsd,
+        valueUsd: financialAccountPositions.valueUsd,
+      })
+      .from(financialAccountPositions)
+      .where(eq(financialAccountPositions.syncRunId, syncRun.id))
+      .orderBy(desc(financialAccountPositions.valueUsd));
+
+    results.push({
+      status: "ready",
+      address: account.address,
+      positions: positions.map(toPosition),
+    });
+  }
+
+  return results;
 }
 
 export async function syncHyperCoreAccounts(

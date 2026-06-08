@@ -6,6 +6,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { AssetTotal } from "@/lib/portfolio/asset-totals";
 
 const usd = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -16,12 +17,6 @@ const percentFormat = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
   style: "percent",
 });
-
-export type AssetTotal = {
-  symbol: string;
-  amount: number;
-  valueUsd: number;
-};
 
 function PositionCardRow({ label, value }: { label: string; value: string }) {
   return (
@@ -45,7 +40,7 @@ function DesktopAssetTotalsTable({
         <TableHeader>
           <TableRow className="bg-muted/30 hover:bg-muted/30">
             <TableHead>Asset</TableHead>
-            <TableHead className="text-right">Portfolio</TableHead>
+            <TableHead className="text-right">Allocation</TableHead>
             <TableHead className="text-right">Total</TableHead>
           </TableRow>
         </TableHeader>

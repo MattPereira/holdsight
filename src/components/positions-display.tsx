@@ -1,12 +1,8 @@
 "use client";
 
 import { RiRefreshLine } from "@remixicon/react";
-import { useMemo, useState, useTransition } from "react";
-import { loadPositions } from "@/app/actions";
-import {
-  AssetTotalsSummary,
-  type AssetTotal,
-} from "@/components/asset-totals-summary";
+import { useState, useTransition } from "react";
+import { loadEvmPositions, loadHyperCorePositions } from "@/app/actions";
 import {
   Accordion,
   AccordionContent,
@@ -22,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { walletTotal } from "@/lib/portfolio/asset-totals";
 import type { Position, PositionsResult } from "@/lib/portfolio/types";
 
 const usd = new Intl.NumberFormat("en-US", {
@@ -49,50 +46,6 @@ function statusMessage(result: PositionsResult): string {
     case "ready":
       return "No positions.";
   }
-}
-
-function walletTotal(result: PositionsResult): number {
-  return result.status === "ready"
-    ? result.positions.reduce((sum, p) => sum + p.valueUsd, 0)
-    : 0;
-}
-
-function grandTotal(results: PositionsResult[]): number {
-  return results.reduce((sum, result) => sum + walletTotal(result), 0);
-}
-
-function totalAssetSymbol(symbol: string): string {
-  const trimmedSymbol = symbol.trim();
-
-  return trimmedSymbol === "sHYPE" ? "HYPE" : trimmedSymbol;
-}
-
-function aggregateAssetTotals(results: PositionsResult[]): AssetTotal[] {
-  const totals = new Map<string, AssetTotal>();
-
-  for (const result of results) {
-    if (result.status !== "ready") continue;
-
-    for (const position of result.positions) {
-      const symbol = totalAssetSymbol(position.symbol);
-      const total = totals.get(symbol);
-
-      if (total) {
-        total.amount += position.amount;
-        total.valueUsd += position.valueUsd;
-      } else {
-        totals.set(symbol, {
-          symbol,
-          amount: position.amount,
-          valueUsd: position.valueUsd,
-        });
-      }
-    }
-  }
-
-  const assetTotals = Array.from(totals.values());
-
-  return assetTotals.sort((a, b) => b.valueUsd - a.valueUsd);
 }
 
 function positionKey(position: Position, i: number): string {
@@ -210,17 +163,20 @@ function WalletAccordionItem({ result }: { result: PositionsResult }) {
 
 export function PositionsDisplay({
   initialResults,
+  source,
+  title,
 }: {
   initialResults: PositionsResult[];
+  source: "evm" | "hypercore";
+  title: string;
 }) {
   const [results, setResults] = useState<PositionsResult[]>(initialResults);
   const [isPending, startTransition] = useTransition();
-  const assetTotals = useMemo(() => aggregateAssetTotals(results), [results]);
-  const totalValue = useMemo(() => grandTotal(results), [results]);
 
   function handleLoad() {
     startTransition(async () => {
-      const data = await loadPositions();
+      const data =
+        source === "evm" ? await loadEvmPositions() : await loadHyperCorePositions();
       setResults(data);
     });
   }
@@ -228,14 +184,14 @@ export function PositionsDisplay({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
-        <h1 className="text-xl font-semibold">Universal Portfolio</h1>
+        <h1 className="text-xl font-semibold">{title}</h1>
         <Button
           type="button"
           variant="outline"
           size="icon-sm"
           onClick={handleLoad}
           disabled={isPending}
-          aria-label={results.length > 0 ? "Refresh positions" : "Load positions"}
+          aria-label={results.length > 0 ? `Refresh ${title}` : `Load ${title}`}
         >
           <RiRefreshLine />
         </Button>
@@ -252,11 +208,6 @@ export function PositionsDisplay({
               <WalletAccordionItem key={result.address} result={result} />
             ))}
           </Accordion>
-
-          <AssetTotalsSummary
-            grandTotalValue={totalValue}
-            totals={assetTotals}
-          />
         </div>
       )}
     </div>

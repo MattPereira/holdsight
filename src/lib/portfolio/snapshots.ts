@@ -95,19 +95,16 @@ function toPosition(row: {
 export async function getLatestPositionSnapshots(
   userId: string,
 ): Promise<PositionsResult[]> {
+  return getLatestEvmPositionSnapshots(userId);
+}
+
+export async function getLatestEvmPositionSnapshots(
+  userId: string,
+): Promise<PositionsResult[]> {
   const wallets = await getUserWallets(userId);
-  const hyperCoreAccounts = await getUserHyperCoreAccounts(userId);
-  const hyperCoreAccountByAddress = new Map(
-    hyperCoreAccounts.map((account) => [account.address, account]),
-  );
   const results: PositionsResult[] = [];
 
   for (const wallet of wallets) {
-    const hyperCoreAccount = hyperCoreAccountByAddress.get(wallet.address);
-    const hyperCoreSpotPositions = hyperCoreAccount
-      ? await getLatestHyperCoreSpotPositionsByAccountId(hyperCoreAccount.id)
-      : [];
-
     const [syncRun] = await db
       .select({
         id: financialAccountSyncRuns.id,
@@ -124,7 +121,7 @@ export async function getLatestPositionSnapshots(
       results.push({
         status: "ready",
         address: wallet.address,
-        positions: hyperCoreSpotPositions,
+        positions: [],
       });
       continue;
     }
@@ -166,11 +163,37 @@ export async function getLatestPositionSnapshots(
     results.push({
       status: "ready",
       address: wallet.address,
-      positions: [...positions.map(toPosition), ...hyperCoreSpotPositions].sort(
-        (a, b) => b.valueUsd - a.valueUsd,
-      ),
+      positions: positions.map(toPosition),
     });
   }
 
   return results;
+}
+
+export async function getLatestPortfolioPositionSnapshots(
+  userId: string,
+): Promise<PositionsResult[]> {
+  const evmResults = await getLatestEvmPositionSnapshots(userId);
+  const hyperCoreAccounts = await getUserHyperCoreAccounts(userId);
+  const hyperCoreAccountByAddress = new Map(
+    hyperCoreAccounts.map((account) => [account.address, account]),
+  );
+
+  return Promise.all(
+    evmResults.map(async (result) => {
+      const hyperCoreAccount = hyperCoreAccountByAddress.get(result.address);
+      const hyperCoreSpotPositions = hyperCoreAccount
+        ? await getLatestHyperCoreSpotPositionsByAccountId(hyperCoreAccount.id)
+        : [];
+
+      if (result.status !== "ready") return result;
+
+      return {
+        ...result,
+        positions: [...result.positions, ...hyperCoreSpotPositions].sort(
+          (a, b) => b.valueUsd - a.valueUsd,
+        ),
+      };
+    }),
+  );
 }

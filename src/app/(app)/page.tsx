@@ -1,16 +1,17 @@
-import { PositionsDisplay } from "@/components/positions-display";
-import { getLatestPositionSnapshots } from "@/lib/portfolio/snapshots";
+import { PortfolioSummaryDisplay } from "@/components/portfolio-summary-display";
 import { getCurrentUserId } from "@/lib/auth/session";
+import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
+import { getLatestPortfolioPositionSnapshots } from "@/lib/portfolio/snapshots";
 
 export default async function Home() {
   const userId = await getCurrentUserId();
-  const positionSnapshots = userId
-    ? await getLatestPositionSnapshots(userId)
-    : [];
+  const summary = userId
+    ? portfolioAssetSummary(await getLatestPortfolioPositionSnapshots(userId))
+    : portfolioAssetSummary([]);
 
   return (
     <div className="flex flex-col gap-5">
-      <PositionsDisplay initialResults={positionSnapshots} />
+      <PortfolioSummaryDisplay initialSummary={summary} />
     </div>
   );
 }
