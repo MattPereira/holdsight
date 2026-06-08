@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { RiArrowRightSLine, RiWalletLine } from "@remixicon/react";
 
 import { NavUser } from "@/components/nav-user";
@@ -18,11 +19,11 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 
-const accounts = [
-  "Ethereum Virtual Machine",
-  "HyperCore",
-  "Kraken",
-  "Charles Schwab",
+const accounts: { label: string; href?: string }[] = [
+  { label: "EVM Wallets", href: "/evm-wallets" },
+  { label: "HyperCore", href: "/hyper-core" },
+  { label: "Kraken" },
+  { label: "Charles Schwab" },
 ];
 
 export function AppSidebar({
@@ -37,12 +38,12 @@ export function AppSidebar({
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="grid flex-1 px-2 py-1.5 text-left leading-tight">
-          <span className="truncate text-base font-semibold">Holdsight</span>
-          <span className="truncate text-xs text-muted-foreground">
+        <Link href="/" className="grid flex-1 px-2 py-1.5 text-left leading-tight">
+          <span className="truncate text-lg font-semibold">Holdsight</span>
+          <span className="truncate text-sm text-muted-foreground">
             Universal Portfolio
           </span>
-        </div>
+        </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -63,9 +64,13 @@ export function AppSidebar({
               {accountsOpen ? (
                 <SidebarMenuSub>
                   {accounts.map((account) => (
-                    <SidebarMenuSubItem key={account}>
+                    <SidebarMenuSubItem key={account.label}>
                       <SidebarMenuSubButton asChild>
-                        <span>{account}</span>
+                        {account.href ? (
+                          <Link href={account.href}>{account.label}</Link>
+                        ) : (
+                          <span>{account.label}</span>
+                        )}
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
                   ))}

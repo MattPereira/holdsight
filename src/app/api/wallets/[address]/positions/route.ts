@@ -1,7 +1,7 @@
-import { headers } from "next/headers";
 import { type NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+
 import { getWalletPositions } from "@/lib/positions";
+import { getCurrentUserId } from "@/lib/session";
 import type { PositionsResult } from "@/lib/types";
 import {
   isValidEvmAddress,
@@ -27,8 +27,8 @@ export async function GET(
   { params }: { params: Promise<{ address: string }> },
 ) {
   // Privacy-first: no portfolio data leaves the server without a valid session.
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session) {
+  const userId = await getCurrentUserId();
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -38,7 +38,7 @@ export async function GET(
     return NextResponse.json({ error: "Invalid wallet address" }, { status: 400 });
   }
 
-  const isSavedWallet = await userHasWalletAddress(session.user.id, address);
+  const isSavedWallet = await userHasWalletAddress(userId, address);
   if (!isSavedWallet) {
     return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
   }

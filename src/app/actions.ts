@@ -1,9 +1,8 @@
 "use server";
 
-import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
-import { auth } from "@/lib/auth";
+import { getCurrentUserId } from "@/lib/session";
 import { getWalletPositions } from "@/lib/positions";
 import {
   getLatestPositionSnapshots,
@@ -26,11 +25,6 @@ export type WalletActionResult = {
   error: string | null;
 };
 
-async function getSessionUserId(): Promise<string | null> {
-  const session = await auth.api.getSession({ headers: await headers() });
-  return session?.user.id ?? null;
-}
-
 async function unauthorizedWalletResult(): Promise<WalletActionResult> {
   return {
     wallets: [],
@@ -40,7 +34,7 @@ async function unauthorizedWalletResult(): Promise<WalletActionResult> {
 }
 
 export async function addWallets(input: string): Promise<WalletActionResult> {
-  const userId = await getSessionUserId();
+  const userId = await getCurrentUserId();
   if (!userId) return unauthorizedWalletResult();
 
   const result = await addUserWallets(userId, input);
@@ -61,7 +55,7 @@ export async function addWallets(input: string): Promise<WalletActionResult> {
 }
 
 export async function removeWallet(address: string): Promise<WalletActionResult> {
-  const userId = await getSessionUserId();
+  const userId = await getCurrentUserId();
   if (!userId) return unauthorizedWalletResult();
 
   await removeUserWallet(userId, address);
@@ -85,7 +79,7 @@ export async function removeWallet(address: string): Promise<WalletActionResult>
  */
 export async function loadPositions(): Promise<PositionsResult[]> {
   // Privacy-first: no portfolio data leaves the server without a valid session.
-  const userId = await getSessionUserId();
+  const userId = await getCurrentUserId();
   if (!userId) {
     return [
       {
