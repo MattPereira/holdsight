@@ -18,7 +18,7 @@ export default async function WalletsPage() {
       <PositionsDisplay
         initialResults={positionSnapshots}
         source="evm"
-        title="EVM Positions"
+        title="EVM Wallets"
         headerAction={<WalletManager initialWallets={wallets} />}
       />
     </div>

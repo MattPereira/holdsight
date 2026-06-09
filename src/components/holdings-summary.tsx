@@ -65,10 +65,7 @@ function WeightBar({
 }) {
   return (
     <div
-      className={cn(
-        "h-2 overflow-hidden rounded-full bg-muted",
-        className,
-      )}
+      className={cn("h-2.5 overflow-hidden rounded-full bg-muted", className)}
     >
       <div
         className="h-full rounded-full bg-primary/70"
@@ -243,7 +240,7 @@ export function HoldingsRows({
 export function HoldingsSummary({
   grandTotalValue,
   totals,
-  label = "Summary",
+  label = "Total Assets",
 }: {
   grandTotalValue: number;
   totals: AssetTotal[];

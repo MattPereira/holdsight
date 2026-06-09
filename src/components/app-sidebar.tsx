@@ -26,23 +26,17 @@ const accounts: { label: string; href?: string }[] = [
   { label: "Charles Schwab" },
 ];
 
-export function AppSidebar({
-  name,
-  email,
-}: {
-  name: string;
-  email: string;
-}) {
+export function AppSidebar({ name, email }: { name: string; email: string }) {
   const [accountsOpen, setAccountsOpen] = useState(true);
 
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <Link href="/" className="grid flex-1 px-2 py-1.5 text-left leading-tight">
-          <span className="truncate text-lg font-semibold">Holdsight</span>
-          <span className="truncate text-sm text-muted-foreground">
-            Universal Portfolio
-          </span>
+        <Link
+          href="/"
+          className="grid flex-1 px-2 py-1.5 text-left leading-tight"
+        >
+          <span className="truncate text-xl font-medium">Holdsight</span>
         </Link>
       </SidebarHeader>
       <SidebarContent>
@@ -54,6 +48,8 @@ export function AppSidebar({
             >
               <SidebarMenuButton
                 type="button"
+                size="lg"
+                className="text-base [&>svg]:size-5"
                 aria-expanded={accountsOpen}
                 onClick={() => setAccountsOpen((open) => !open)}
               >
@@ -65,7 +61,7 @@ export function AppSidebar({
                 <SidebarMenuSub>
                   {accounts.map((account) => (
                     <SidebarMenuSubItem key={account.label}>
-                      <SidebarMenuSubButton asChild>
+                      <SidebarMenuSubButton asChild className="h-9 text-base">
                         {account.href ? (
                           <Link href={account.href}>{account.label}</Link>
                         ) : (

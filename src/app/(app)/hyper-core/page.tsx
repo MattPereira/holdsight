@@ -8,16 +8,15 @@ export default async function HyperCorePage() {
   const hyperCoreAccounts = userId
     ? await getUserHyperCoreAccounts(userId)
     : [];
-  const positionSnapshots = await getLatestHyperCorePositionSnapshots(
-    hyperCoreAccounts,
-  );
+  const positionSnapshots =
+    await getLatestHyperCorePositionSnapshots(hyperCoreAccounts);
 
   return (
     <div className="flex flex-col gap-6">
       <PositionsDisplay
         initialResults={positionSnapshots}
         source="hypercore"
-        title="HyperCore Positions"
+        title="HyperCore"
       />
     </div>
   );

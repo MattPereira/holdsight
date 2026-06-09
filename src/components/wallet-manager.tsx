@@ -69,10 +69,8 @@ export function WalletManager({
       </SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Wallets</SheetTitle>
-          <SheetDescription>
-            Add EVM wallet addresses to include them in your portfolio.
-          </SheetDescription>
+          <SheetTitle>EVM Wallets</SheetTitle>
+          <SheetDescription>Add your EVM wallet addresses</SheetDescription>
         </SheetHeader>
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4">
           <form onSubmit={handleSubmit}>
@@ -97,8 +95,8 @@ export function WalletManager({
                   </Button>
                 </div>
                 <FieldDescription>
-                  Paste one or more addresses separated by spaces, commas, or new
-                  lines.
+                  Paste one or more addresses separated by spaces, commas, or
+                  new lines.
                 </FieldDescription>
                 <FieldError>{error}</FieldError>
               </Field>
