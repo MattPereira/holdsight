@@ -3,36 +3,18 @@
 import { RiRefreshLine } from "@remixicon/react";
 import { useMemo, useState, useTransition } from "react";
 import { loadEvmPositions, loadHyperCorePositions } from "@/app/actions";
-import { HoldingsSummary } from "@/components/holdings-summary";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+  formatUsd,
+  HoldingsRows,
+  HoldingsSummary,
+  type HoldingsDisplayRow,
+} from "@/components/holdings-summary";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   portfolioAssetSummary,
   walletTotal,
 } from "@/lib/portfolio/asset-totals";
 import type { Position, PositionsResult } from "@/lib/portfolio/types";
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
-const amountFormat = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 6,
-});
 
 function shortenAddress(address: string): string {
   if (address.length <= 13) return address;
@@ -56,110 +38,48 @@ function positionKey(position: Position, i: number): string {
   return position.sourcePositionId ?? `${position.symbol}-${position.chainId}-${i}`;
 }
 
-/* ------------------------------- desktop ------------------------------- */
+/* ------------------------------- wallet -------------------------------- */
 
-function DesktopWalletTable({ positions }: { positions: Position[] }) {
-  return (
-    <div className="hidden overflow-hidden rounded-lg border sm:block">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/30 hover:bg-muted/30">
-            <TableHead>Symbol</TableHead>
-            <TableHead>Chain</TableHead>
-            <TableHead className="text-right">Price</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
-            <TableHead className="text-right">Total</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {positions.map((position, i) => (
-            <TableRow key={positionKey(position, i)}>
-              <TableCell className="font-medium">{position.symbol}</TableCell>
-              <TableCell className="text-muted-foreground">
-                {position.chainId}
-              </TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground">
-                {usd.format(position.priceUsd)}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {amountFormat.format(position.amount)}
-              </TableCell>
-              <TableCell className="text-right tabular-nums font-medium">
-                {usd.format(position.valueUsd)}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
+function positionRows(positions: Position[]): HoldingsDisplayRow[] {
+  return positions.map((position, i) => ({
+    key: positionKey(position, i),
+    symbol: position.symbol,
+    priceUsd: position.priceUsd,
+    amount: position.amount,
+    valueUsd: position.valueUsd,
+    detail: position.chainId,
+  }));
 }
 
-/* -------------------------------- mobile ------------------------------- */
-
-function PositionCardRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-sm tabular-nums">{value}</span>
-    </div>
-  );
-}
-
-function MobileWalletList({ positions }: { positions: Position[] }) {
-  return (
-    <ul className="divide-y rounded-lg border sm:hidden">
-      {positions.map((position, i) => (
-        <li key={positionKey(position, i)} className="flex flex-col gap-2 px-4 py-3">
-          <div className="flex items-baseline justify-between gap-4">
-            <span className="font-medium">{position.symbol}</span>
-            <span className="text-xs text-muted-foreground">
-              {position.chainId}
-            </span>
-          </div>
-          <PositionCardRow label="Price" value={usd.format(position.priceUsd)} />
-          <PositionCardRow
-            label="Amount"
-            value={amountFormat.format(position.amount)}
-          />
-          <PositionCardRow label="Total" value={usd.format(position.valueUsd)} />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/* ------------------------------- accordion ----------------------------- */
-
-function WalletAccordionItem({ result }: { result: PositionsResult }) {
+function WalletSection({ result }: { result: PositionsResult }) {
   const hasPositions =
     result.status === "ready" && result.positions.length > 0;
+  const total = walletTotal(result);
+
+  if (result.status === "ready" && result.positions.length === 0) {
+    return null;
+  }
 
   return (
-    <AccordionItem value={result.address} className="rounded-lg border">
-      <AccordionTrigger className="px-4 hover:no-underline">
-        <div className="flex flex-1 items-center justify-between gap-4 pr-2">
-          <span className="font-mono text-sm text-muted-foreground">
-            {shortenAddress(result.address)}
-          </span>
-          <span className="text-sm font-medium tabular-nums">
-            {usd.format(walletTotal(result))}
-          </span>
-        </div>
-      </AccordionTrigger>
-      <AccordionContent className="px-4 pb-4">
-        {hasPositions ? (
-          <>
-            <DesktopWalletTable positions={result.positions} />
-            <MobileWalletList positions={result.positions} />
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            {statusMessage(result)}
-          </p>
-        )}
-      </AccordionContent>
-    </AccordionItem>
+    <section className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-4 px-2">
+        <span className="font-mono text-sm font-medium">
+          {shortenAddress(result.address)}
+        </span>
+        <span className="text-sm font-medium tabular-nums">
+          {formatUsd(total)}
+        </span>
+      </div>
+      {hasPositions ? (
+        <HoldingsRows
+          rows={positionRows(result.positions)}
+          totalValue={total}
+          mobileVariant="positions"
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">{statusMessage(result)}</p>
+      )}
+    </section>
   );
 }
 
@@ -169,10 +89,12 @@ export function PositionsDisplay({
   initialResults,
   source,
   title,
+  headerAction,
 }: {
   initialResults: PositionsResult[];
   source: "evm" | "hypercore";
   title: string;
+  headerAction?: React.ReactNode;
 }) {
   const [results, setResults] = useState<PositionsResult[]>(initialResults);
   const [isPending, startTransition] = useTransition();
@@ -200,6 +122,7 @@ export function PositionsDisplay({
         >
           <RiRefreshLine />
         </Button>
+        {headerAction}
       </div>
 
       {results.length > 0 && (
@@ -209,15 +132,11 @@ export function PositionsDisplay({
             totals={summary.totals}
           />
 
-          <Accordion
-            type="multiple"
-            defaultValue={results.map((result) => result.address)}
-            className="gap-4"
-          >
+          <div className="flex flex-col gap-6">
             {results.map((result) => (
-              <WalletAccordionItem key={result.address} result={result} />
+              <WalletSection key={result.address} result={result} />
             ))}
-          </Accordion>
+          </div>
         </div>
       )}
     </div>

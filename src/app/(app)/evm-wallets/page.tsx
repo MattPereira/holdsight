@@ -15,11 +15,11 @@ export default async function WalletsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <WalletManager initialWallets={wallets} />
       <PositionsDisplay
         initialResults={positionSnapshots}
         source="evm"
         title="EVM Positions"
+        headerAction={<WalletManager initialWallets={wallets} />}
       />
     </div>
   );

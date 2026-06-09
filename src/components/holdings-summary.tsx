@@ -2,7 +2,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -10,7 +9,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { AssetTotal } from "@/lib/portfolio/asset-totals";
 
-const usd = new Intl.NumberFormat("en-US", {
+const usdFormat = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
 });
@@ -49,6 +48,10 @@ function weightOf(valueUsd: number, grandTotalValue: number) {
   return grandTotalValue === 0 ? 0 : valueUsd / grandTotalValue;
 }
 
+export function formatUsd(value: number) {
+  return usdFormat.format(value);
+}
+
 function priceOf(valueUsd: number, amount: number) {
   return amount === 0 ? 0 : valueUsd / amount;
 }
@@ -75,128 +78,199 @@ function WeightBar({
   );
 }
 
+export type HoldingsDisplayRow = {
+  key: string;
+  symbol: string;
+  priceUsd: number;
+  amount: number;
+  valueUsd: number;
+  detail?: string;
+};
+
 function DesktopHoldingsTable({
-  grandTotalValue,
-  totals,
+  rows,
+  showWeight,
+  totalValue,
 }: {
-  grandTotalValue: number;
-  totals: AssetTotal[];
+  rows: HoldingsDisplayRow[];
+  showWeight: boolean;
+  totalValue: number;
 }) {
   return (
     <div className="hidden overflow-hidden rounded-lg border sm:block">
-      <Table>
+      <Table className="table-fixed">
+        {showWeight ? (
+          <colgroup>
+            <col className="w-[20%]" />
+            <col className="w-[28%]" />
+            <col className="w-[18%]" />
+            <col className="w-[14%]" />
+            <col className="w-[20%]" />
+          </colgroup>
+        ) : (
+          <colgroup>
+            <col className="w-[25%]" />
+            <col className="w-[25%]" />
+            <col className="w-[20%]" />
+            <col className="w-[30%]" />
+          </colgroup>
+        )}
         <TableHeader>
           <TableRow className="bg-muted/30 hover:bg-muted/30">
             <TableHead>Asset</TableHead>
-            <TableHead className="text-right">Price</TableHead>
+            {showWeight ? (
+              <TableHead className="text-right">Weight</TableHead>
+            ) : null}
             <TableHead className="text-right">Amount</TableHead>
+            <TableHead className="text-right">Price</TableHead>
             <TableHead className="text-right">Value</TableHead>
-            <TableHead className="text-right">Weight</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {totals.map((total) => {
-            const weight = weightOf(total.valueUsd, grandTotalValue);
+          {rows.map((row) => {
+            const weight = weightOf(row.valueUsd, totalValue);
             return (
-              <TableRow key={total.symbol}>
-                <TableCell className="font-medium">{total.symbol}</TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatPrice(priceOf(total.valueUsd, total.amount))}
+              <TableRow key={row.key}>
+                <TableCell className="font-medium">{row.symbol}</TableCell>
+                {showWeight ? (
+                  <TableCell>
+                    <div className="grid grid-cols-[minmax(6rem,1fr)_4rem] items-center gap-3">
+                      <WeightBar weight={weight} />
+                      <span className="text-right tabular-nums">
+                        {percentFormat.format(weight)}
+                      </span>
+                    </div>
+                  </TableCell>
+                ) : null}
+                <TableCell className="text-right tabular-nums text-muted-foreground">
+                  {amountFormat.format(row.amount)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums text-muted-foreground">
+                  {formatPrice(row.priceUsd)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {amountFormat.format(total.amount)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {usd.format(total.valueUsd)}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-end gap-3">
-                    <WeightBar weight={weight} className="w-24" />
-                    <span className="w-16 text-right tabular-nums">
-                      {percentFormat.format(weight)}
-                    </span>
-                  </div>
+                  {formatUsd(row.valueUsd)}
                 </TableCell>
               </TableRow>
             );
           })}
         </TableBody>
-        <TableFooter>
-          <TableRow className="hover:bg-transparent">
-            <TableCell></TableCell>
-            <TableCell></TableCell>
-            <TableCell></TableCell>
-            <TableCell className="text-right tabular-nums">
-              {usd.format(grandTotalValue)}
-            </TableCell>
-            <TableCell className="text-right tabular-nums">
-              {percentFormat.format(grandTotalValue === 0 ? 0 : 1)}
-            </TableCell>
-          </TableRow>
-        </TableFooter>
       </Table>
     </div>
   );
 }
 
-function MobileHoldingsList({
-  grandTotalValue,
-  totals,
+function MobileSummaryList({
+  rows,
+  totalValue,
 }: {
-  grandTotalValue: number;
-  totals: AssetTotal[];
+  rows: HoldingsDisplayRow[];
+  totalValue: number;
 }) {
   return (
     <ul className="divide-y rounded-lg border sm:hidden">
-      {totals.map((total) => {
-        const weight = weightOf(total.valueUsd, grandTotalValue);
+      {rows.map((row) => {
+        const weight = weightOf(row.valueUsd, totalValue);
         return (
-          <li key={total.symbol} className="flex flex-col gap-2 px-4 py-3">
+          <li key={row.key} className="flex flex-col gap-2 px-4 py-3">
             <div className="flex items-baseline justify-between gap-4">
-              <span className="text-base font-semibold">{total.symbol}</span>
+              <span className="text-base font-semibold">{row.symbol}</span>
               <span className="text-base font-semibold tabular-nums">
-                {usd.format(total.valueUsd)}
+                {formatUsd(row.valueUsd)}
               </span>
             </div>
             <div className="flex items-center gap-3">
               <WeightBar weight={weight} className="flex-1" />
-              <span className="text-sm tabular-nums text-muted-foreground">
+              <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">
                 {percentFormat.format(weight)}
               </span>
             </div>
           </li>
         );
       })}
-      <li className="flex items-baseline justify-between gap-4 bg-muted/50 px-4 py-3">
-        <span className="text-base font-semibold">Total</span>
-        <span className="text-base font-semibold tabular-nums">
-          {usd.format(grandTotalValue)}
-        </span>
-      </li>
     </ul>
+  );
+}
+
+function MobilePositionList({ rows }: { rows: HoldingsDisplayRow[] }) {
+  return (
+    <ul className="divide-y rounded-lg border sm:hidden">
+      {rows.map((row) => (
+        <li key={row.key} className="flex flex-col gap-2 px-4 py-3">
+          <div className="flex items-baseline justify-between gap-4">
+            <span className="font-medium">{row.symbol}</span>
+            <span className="font-medium tabular-nums">
+              {formatUsd(row.valueUsd)}
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between gap-4 text-xs text-muted-foreground">
+            <span>{row.detail}</span>
+            <span className="tabular-nums">
+              {amountFormat.format(row.amount)} @ {formatPrice(row.priceUsd)}
+            </span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function HoldingsRows({
+  rows,
+  totalValue,
+  mobileVariant,
+}: {
+  rows: HoldingsDisplayRow[];
+  totalValue: number;
+  mobileVariant: "summary" | "positions";
+}) {
+  return (
+    <>
+      <DesktopHoldingsTable
+        rows={rows}
+        showWeight={mobileVariant === "summary"}
+        totalValue={totalValue}
+      />
+      {mobileVariant === "summary" ? (
+        <MobileSummaryList rows={rows} totalValue={totalValue} />
+      ) : (
+        <MobilePositionList rows={rows} />
+      )}
+    </>
   );
 }
 
 export function HoldingsSummary({
   grandTotalValue,
   totals,
+  label = "Summary",
 }: {
   grandTotalValue: number;
   totals: AssetTotal[];
+  label?: string;
 }) {
+  const rows = totals.map((total) => ({
+    key: total.symbol,
+    symbol: total.symbol,
+    priceUsd: priceOf(total.valueUsd, total.amount),
+    amount: total.amount,
+    valueUsd: total.valueUsd,
+  }));
+
   return (
-    <section className="flex flex-col">
+    <section className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-4 px-2">
+        <span className="text-sm font-medium">{label}</span>
+        <span className="text-sm font-medium tabular-nums">
+          {formatUsd(grandTotalValue)}
+        </span>
+      </div>
       {totals.length > 0 ? (
-        <>
-          <DesktopHoldingsTable
-            grandTotalValue={grandTotalValue}
-            totals={totals}
-          />
-          <MobileHoldingsList
-            grandTotalValue={grandTotalValue}
-            totals={totals}
-          />
-        </>
+        <HoldingsRows
+          rows={rows}
+          totalValue={grandTotalValue}
+          mobileVariant="summary"
+        />
       ) : (
         <p className="text-sm text-muted-foreground">No positions.</p>
       )}
