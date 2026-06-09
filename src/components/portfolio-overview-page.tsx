@@ -3,15 +3,15 @@
 import { RiRefreshLine } from "@remixicon/react";
 import { useState, useTransition } from "react";
 import { loadPortfolioSummary } from "@/app/actions";
-import { HoldingsSummary } from "@/components/holdings-summary";
-import { PortfolioOverviewSheet } from "@/components/portfolio-overview-sheet";
+import { PortfolioAllocations } from "@/components/portfolio-allocations";
+import { PortfolioAllocationsSettings } from "@/components/portfolio-allocations-settings";
 import { Button } from "@/components/ui/button";
 import type {
   AssetGroup,
   PortfolioAssetSummary,
 } from "@/lib/portfolio/asset-totals";
 
-export function PortfolioSummaryDisplay({
+export function PortfolioOverviewPage({
   initialSummary,
   initialGroups,
 }: {
@@ -43,14 +43,14 @@ export function PortfolioSummaryDisplay({
         >
           <RiRefreshLine />
         </Button>
-        <PortfolioOverviewSheet
+        <PortfolioAllocationsSettings
           groups={groups}
           availableSymbols={summary.totals.map((total) => total.symbol)}
           onGroupsChange={setGroups}
         />
       </div>
 
-      <HoldingsSummary
+      <PortfolioAllocations
         grandTotalValue={summary.grandTotalValue}
         totals={summary.totals}
         groups={groups}

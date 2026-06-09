@@ -1,4 +1,4 @@
-import { PositionsDisplay } from "@/components/positions-display";
+import { AccountDetailsPage } from "@/components/account-details-page";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
 import { getLatestHyperCorePositionSnapshots } from "@/lib/hyper-core/snapshots";
@@ -13,7 +13,7 @@ export default async function HyperCorePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PositionsDisplay
+      <AccountDetailsPage
         initialResults={positionSnapshots}
         source="hypercore"
         title="HyperCore"

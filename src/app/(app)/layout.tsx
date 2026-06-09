@@ -40,7 +40,7 @@ export default async function AppLayout({
             <ThemeToggle />
           </div>
         </header>
-        <div className="p-6">{children}</div>
+        <div className="p-6 md:p-10">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );

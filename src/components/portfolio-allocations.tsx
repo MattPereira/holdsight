@@ -1,12 +1,19 @@
 "use client";
 
 import { RiArrowRightSLine } from "@remixicon/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Label, Pie, PieChart } from "recharts";
 
-import { PortfolioAllocationChart } from "@/components/portfolio-allocation-chart";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { cn } from "@/lib/utils";
 import {
   applyAssetGroups,
+  ASSET_CHART_COLORS,
   assetColorByKey,
   type AssetGroup,
   type AssetTotal,
@@ -17,56 +24,43 @@ const usdFormat = new Intl.NumberFormat("en-US", {
   currency: "USD",
 });
 
-const priceFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-// Sub-dollar prices keep enough significant digits that cheap tokens
-// don't collapse to $0.00.
-const subDollarPriceFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumSignificantDigits: 4,
-});
-
-function formatPrice(price: number) {
-  return price !== 0 && Math.abs(price) < 1
-    ? subDollarPriceFormat.format(price)
-    : priceFormat.format(price);
-}
-
-const amountFormat = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 4,
-});
-
 const percentFormat = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2,
   style: "percent",
+});
+
+// Compact form for the donut center, where space is tight (e.g. "$182.1K").
+const compactUsdFormat = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  notation: "compact",
+  maximumFractionDigits: 1,
 });
 
 function weightOf(valueUsd: number, grandTotalValue: number) {
   return grandTotalValue === 0 ? 0 : valueUsd / grandTotalValue;
 }
 
-export function formatUsd(value: number) {
+function formatUsd(value: number) {
   return usdFormat.format(value);
 }
 
-function priceOf(valueUsd: number, amount: number) {
-  return amount === 0 ? 0 : valueUsd / amount;
+// Recharts/shadcn keys must be safe CSS-identifier-ish tokens; symbols can
+// contain "+" and spaces (e.g. "HYPE + sHYPE"), so slugify them.
+function slugify(value: string, index: number): string {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return slug || `asset-${index}`;
 }
 
-export type HoldingsDisplayRow = {
+type HoldingsDisplayRow = {
   key: string;
   symbol: string;
   name?: string;
-  priceUsd: number;
   amount: number;
   valueUsd: number;
-  detail?: string;
   isGroup?: boolean;
   members?: HoldingsDisplayRow[];
 };
@@ -87,6 +81,103 @@ function ColorSwatch({
       className={cn("size-2.5 shrink-0 rounded-[3px]", className)}
       style={{ backgroundColor: color }}
     />
+  );
+}
+
+function AllocationDonutChart({
+  grandTotalValue,
+  totals,
+  groups,
+}: {
+  grandTotalValue: number;
+  totals: AssetTotal[];
+  groups: AssetGroup[];
+}) {
+  const { chartData, chartConfig } = useMemo(() => {
+    const rows = applyAssetGroups(totals, groups);
+    const config: ChartConfig = { value: { label: "Value" } };
+    const data = rows.map((row, index) => {
+      const key = slugify(row.label, index);
+      const color = ASSET_CHART_COLORS[index % ASSET_CHART_COLORS.length];
+      config[key] = { label: row.label, color };
+      return {
+        asset: key,
+        label: row.label,
+        value: row.valueUsd,
+        fill: color,
+      };
+    });
+    return { chartData: data, chartConfig: config };
+  }, [totals, groups]);
+
+  return (
+    <ChartContainer
+      config={chartConfig}
+      className="mx-auto aspect-square h-auto w-full max-w-[380px] sm:max-w-[300px] lg:max-w-[440px]"
+    >
+      <PieChart>
+        <ChartTooltip
+          content={
+            <ChartTooltipContent
+              nameKey="asset"
+              formatter={(value, _name, item) => (
+                <div className="flex w-full items-center justify-between gap-3">
+                  <span className="text-muted-foreground">
+                    {item.payload.label}
+                  </span>
+                  <span className="font-medium tabular-nums">
+                    {usdFormat.format(Number(value))}
+                    {grandTotalValue > 0
+                      ? ` (${((Number(value) / grandTotalValue) * 100).toFixed(2)}%)`
+                      : ""}
+                  </span>
+                </div>
+              )}
+            />
+          }
+        />
+        <Pie
+          data={chartData}
+          dataKey="value"
+          nameKey="asset"
+          innerRadius="50%"
+          strokeWidth={2}
+          stroke="var(--background)"
+        >
+          <Label
+            content={({ viewBox }) => {
+              if (!viewBox || !("cx" in viewBox)) {
+                return null;
+              }
+              const { cx, cy } = viewBox;
+              return (
+                <text
+                  x={cx}
+                  y={cy}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                >
+                  <tspan
+                    x={cx}
+                    y={(cy ?? 0) - 8}
+                    className="fill-foreground text-xl font-semibold tabular-nums"
+                  >
+                    {compactUsdFormat.format(grandTotalValue)}
+                  </tspan>
+                  <tspan
+                    x={cx}
+                    y={(cy ?? 0) + 14}
+                    className="fill-muted-foreground text-xs"
+                  >
+                    Total Assets
+                  </tspan>
+                </text>
+              );
+            }}
+          />
+        </Pie>
+      </PieChart>
+    </ChartContainer>
   );
 }
 
@@ -222,38 +313,13 @@ function SummaryList({
   );
 }
 
-function PositionList({ rows }: { rows: HoldingsDisplayRow[] }) {
-  return (
-    <ul className="divide-y rounded-lg border">
-      {rows.map((row) => (
-        <li key={row.key} className="flex flex-col gap-2 px-4 py-3">
-          <div className="flex items-baseline justify-between gap-4">
-            <span className="font-medium">{row.symbol}</span>
-            <span className="font-medium tabular-nums">
-              {formatUsd(row.valueUsd)}
-            </span>
-          </div>
-          <div className="flex items-baseline justify-between gap-4 text-xs text-muted-foreground">
-            <span>{row.detail}</span>
-            <span className="tabular-nums">
-              {amountFormat.format(row.amount)} @ {formatPrice(row.priceUsd)}
-            </span>
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-export function HoldingsRows({
+function HoldingsRows({
   rows,
   totalValue,
-  variant,
   colorByKey,
 }: {
   rows: HoldingsDisplayRow[];
   totalValue: number;
-  variant: "summary" | "positions";
   colorByKey?: Map<string, string>;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -270,7 +336,7 @@ export function HoldingsRows({
     });
   }
 
-  return variant === "summary" ? (
+  return (
     <SummaryList
       rows={rows}
       totalValue={totalValue}
@@ -278,12 +344,10 @@ export function HoldingsRows({
       onToggle={toggle}
       colorByKey={colorByKey}
     />
-  ) : (
-    <PositionList rows={rows} />
   );
 }
 
-export function HoldingsSummary({
+export function PortfolioAllocations({
   grandTotalValue,
   totals,
   groups = [],
@@ -298,7 +362,6 @@ export function HoldingsSummary({
       key: row.key,
       symbol: row.label,
       name: row.name,
-      priceUsd: row.isGroup ? 0 : priceOf(row.valueUsd, row.amount),
       amount: row.amount,
       valueUsd: row.valueUsd,
       isGroup: row.isGroup,
@@ -306,7 +369,6 @@ export function HoldingsSummary({
         key: member.symbol,
         symbol: member.symbol,
         name: member.name,
-        priceUsd: priceOf(member.valueUsd, member.amount),
         amount: member.amount,
         valueUsd: member.valueUsd,
       })),
@@ -319,7 +381,7 @@ export function HoldingsSummary({
 
   return (
     <section className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-center">
-      <PortfolioAllocationChart
+      <AllocationDonutChart
         grandTotalValue={grandTotalValue}
         totals={totals}
         groups={groups}
@@ -328,7 +390,6 @@ export function HoldingsSummary({
         <HoldingsRows
           rows={rows}
           totalValue={grandTotalValue}
-          variant="summary"
           colorByKey={colorByKey}
         />
       </div>

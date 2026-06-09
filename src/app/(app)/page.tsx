@@ -1,4 +1,4 @@
-import { PortfolioSummaryDisplay } from "@/components/portfolio-summary-display";
+import { PortfolioOverviewPage } from "@/components/portfolio-overview-page";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 import { getUserAssetGroups } from "@/lib/portfolio/groups";
@@ -17,7 +17,7 @@ export default async function Home() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PortfolioSummaryDisplay initialSummary={summary} initialGroups={groups} />
+      <PortfolioOverviewPage initialSummary={summary} initialGroups={groups} />
     </div>
   );
 }

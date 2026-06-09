@@ -1,4 +1,4 @@
-import { PositionsDisplay } from "@/components/positions-display";
+import { AccountDetailsPage } from "@/components/account-details-page";
 import { WalletManager } from "@/components/wallet-manager";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getUserWallets } from "@/lib/evm/wallets";
@@ -15,7 +15,7 @@ export default async function WalletsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PositionsDisplay
+      <AccountDetailsPage
         initialResults={positionSnapshots}
         source="evm"
         title="EVM Wallets"

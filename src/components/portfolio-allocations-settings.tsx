@@ -40,7 +40,7 @@ function symbolKey(symbol: string): string {
   return symbol.trim().toUpperCase();
 }
 
-export function PortfolioOverviewSheet({
+export function PortfolioAllocationsSettings({
   groups,
   availableSymbols,
   onGroupsChange,
