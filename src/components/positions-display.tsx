@@ -1,8 +1,9 @@
 "use client";
 
 import { RiRefreshLine } from "@remixicon/react";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { loadEvmPositions, loadHyperCorePositions } from "@/app/actions";
+import { HoldingsSummary } from "@/components/holdings-summary";
 import {
   Accordion,
   AccordionContent,
@@ -18,7 +19,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { walletTotal } from "@/lib/portfolio/asset-totals";
+import {
+  portfolioAssetSummary,
+  walletTotal,
+} from "@/lib/portfolio/asset-totals";
 import type { Position, PositionsResult } from "@/lib/portfolio/types";
 
 const usd = new Intl.NumberFormat("en-US", {
@@ -172,6 +176,7 @@ export function PositionsDisplay({
 }) {
   const [results, setResults] = useState<PositionsResult[]>(initialResults);
   const [isPending, startTransition] = useTransition();
+  const summary = useMemo(() => portfolioAssetSummary(results), [results]);
 
   function handleLoad() {
     startTransition(async () => {
@@ -199,6 +204,11 @@ export function PositionsDisplay({
 
       {results.length > 0 && (
         <div className="flex flex-col gap-4">
+          <HoldingsSummary
+            grandTotalValue={summary.grandTotalValue}
+            totals={summary.totals}
+          />
+
           <Accordion
             type="multiple"
             defaultValue={results.map((result) => result.address)}

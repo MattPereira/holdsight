@@ -3,7 +3,7 @@
 import { RiRefreshLine } from "@remixicon/react";
 import { useState, useTransition } from "react";
 import { loadPortfolioSummary } from "@/app/actions";
-import { AssetTotalsSummary } from "@/components/asset-totals-summary";
+import { HoldingsSummary } from "@/components/holdings-summary";
 import { Button } from "@/components/ui/button";
 import type { PortfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 
@@ -39,7 +39,7 @@ export function PortfolioSummaryDisplay({
         </Button>
       </div>
 
-      <AssetTotalsSummary
+      <HoldingsSummary
         grandTotalValue={summary.grandTotalValue}
         totals={summary.totals}
       />

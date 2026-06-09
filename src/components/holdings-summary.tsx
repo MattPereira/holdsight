@@ -75,7 +75,7 @@ function WeightBar({
   );
 }
 
-function DesktopAssetTotalsTable({
+function DesktopHoldingsTable({
   grandTotalValue,
   totals,
 }: {
@@ -139,7 +139,7 @@ function DesktopAssetTotalsTable({
   );
 }
 
-function MobileAssetTotalsList({
+function MobileHoldingsList({
   grandTotalValue,
   totals,
 }: {
@@ -177,7 +177,7 @@ function MobileAssetTotalsList({
   );
 }
 
-export function AssetTotalsSummary({
+export function HoldingsSummary({
   grandTotalValue,
   totals,
 }: {
@@ -188,11 +188,11 @@ export function AssetTotalsSummary({
     <section className="flex flex-col">
       {totals.length > 0 ? (
         <>
-          <DesktopAssetTotalsTable
+          <DesktopHoldingsTable
             grandTotalValue={grandTotalValue}
             totals={totals}
           />
-          <MobileAssetTotalsList
+          <MobileHoldingsList
             grandTotalValue={grandTotalValue}
             totals={totals}
           />

@@ -12,9 +12,7 @@ export type PortfolioAssetSummary = {
 };
 
 function totalAssetSymbol(symbol: string): string {
-  const trimmedSymbol = symbol.trim();
-
-  return trimmedSymbol === "sHYPE" ? "HYPE" : trimmedSymbol;
+  return symbol.trim();
 }
 
 export function walletTotal(result: PositionsResult): number {
