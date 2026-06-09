@@ -62,6 +62,7 @@ function priceOf(valueUsd: number, amount: number) {
 export type HoldingsDisplayRow = {
   key: string;
   symbol: string;
+  name?: string;
   priceUsd: number;
   amount: number;
   valueUsd: number;
@@ -113,11 +114,21 @@ function SummaryList({
           <>
             <span className="flex min-w-0 items-center gap-3">
               <ColorSwatch color={color} className="size-9 rounded-md" />
-              <span
-                className="min-w-0 truncate text-base font-semibold"
-                title={row.symbol}
-              >
-                {row.symbol}
+              <span className="flex min-w-0 flex-col">
+                <span
+                  className="min-w-0 truncate text-base font-semibold"
+                  title={row.symbol}
+                >
+                  {row.symbol}
+                </span>
+                {row.name ? (
+                  <span
+                    className="min-w-0 truncate text-xs text-muted-foreground"
+                    title={row.name}
+                  >
+                    {row.name}
+                  </span>
+                ) : null}
               </span>
               {row.isGroup ? (
                 <RiArrowRightSLine
@@ -162,7 +173,7 @@ function SummaryList({
                 )}
               >
                 <div className="overflow-hidden">
-                  <ul className="ml-7 flex flex-col gap-2 border-l pb-3 pl-4 pr-4">
+                  <ul className="relative flex flex-col gap-2 pb-3 pl-16 pr-4 before:absolute before:bottom-3 before:left-[34px] before:top-0 before:w-px before:bg-border">
                     {members.map((member) => {
                       const memberWeight = weightOf(
                         member.valueUsd,
@@ -173,11 +184,21 @@ function SummaryList({
                           key={member.key}
                           className="flex items-center justify-between gap-4 text-sm"
                         >
-                          <span
-                            className="min-w-0 truncate text-muted-foreground"
-                            title={member.symbol}
-                          >
-                            {member.symbol}
+                          <span className="flex min-w-0 flex-col">
+                            <span
+                              className="min-w-0 truncate font-medium"
+                              title={member.symbol}
+                            >
+                              {member.symbol}
+                            </span>
+                            {member.name ? (
+                              <span
+                                className="min-w-0 truncate text-xs text-muted-foreground"
+                                title={member.name}
+                              >
+                                {member.name}
+                              </span>
+                            ) : null}
                           </span>
                           <span className="flex shrink-0 flex-col items-end">
                             <span className="font-medium tabular-nums">
@@ -276,6 +297,7 @@ export function HoldingsSummary({
     (row) => ({
       key: row.key,
       symbol: row.label,
+      name: row.name,
       priceUsd: row.isGroup ? 0 : priceOf(row.valueUsd, row.amount),
       amount: row.amount,
       valueUsd: row.valueUsd,
@@ -283,6 +305,7 @@ export function HoldingsSummary({
       members: row.members.map((member) => ({
         key: member.symbol,
         symbol: member.symbol,
+        name: member.name,
         priceUsd: priceOf(member.valueUsd, member.amount),
         amount: member.amount,
         valueUsd: member.valueUsd,

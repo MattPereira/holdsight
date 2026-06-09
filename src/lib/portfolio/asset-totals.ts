@@ -2,6 +2,7 @@ import type { PositionsResult } from "@/lib/portfolio/types";
 
 export type AssetTotal = {
   symbol: string;
+  name?: string;
   amount: number;
   valueUsd: number;
 };
@@ -26,6 +27,7 @@ export type AssetGroup = {
 export type AssetTotalRow = {
   key: string;
   label: string;
+  name?: string;
   amount: number;
   valueUsd: number;
   isGroup: boolean;
@@ -76,6 +78,7 @@ export function applyAssetGroups(
       rows.push({
         key: total.symbol,
         label: total.symbol,
+        name: total.name,
         amount: total.amount,
         valueUsd: total.valueUsd,
         isGroup: false,
@@ -87,12 +90,10 @@ export function applyAssetGroups(
   for (const [groupId, members] of grouped) {
     const group = groupById.get(groupId)!;
     members.sort((a, b) => b.valueUsd - a.valueUsd);
+    const memberSymbols = members.map((member) => member.symbol);
     rows.push({
       key: `group:${groupId}`,
-      label: groupLabel(
-        group.name,
-        members.map((member) => member.symbol),
-      ),
+      label: groupLabel(group.name, memberSymbols),
       amount: 0,
       valueUsd: members.reduce((sum, member) => sum + member.valueUsd, 0),
       isGroup: true,
@@ -159,9 +160,11 @@ export function aggregateAssetTotals(results: PositionsResult[]): AssetTotal[] {
       if (total) {
         total.amount += position.amount;
         total.valueUsd += position.valueUsd;
+        total.name ??= position.name;
       } else {
         totals.set(symbol, {
           symbol,
+          name: position.name,
           amount: position.amount,
           valueUsd: position.valueUsd,
         });
