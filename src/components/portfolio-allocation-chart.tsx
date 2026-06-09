@@ -32,7 +32,10 @@ const compactUsdFormat = new Intl.NumberFormat("en-US", {
 // Recharts/shadcn keys must be safe CSS-identifier-ish tokens; symbols can
 // contain "+" and spaces (e.g. "HYPE + sHYPE"), so slugify them.
 function slugify(value: string, index: number): string {
-  const slug = value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
   return slug || `asset-${index}`;
 }
 
@@ -69,7 +72,7 @@ export function PortfolioAllocationChart({
   return (
     <ChartContainer
       config={chartConfig}
-      className="mx-auto aspect-square h-[300px] w-full max-w-[300px]"
+      className="mx-auto aspect-square h-auto w-full max-w-[380px] sm:max-w-[300px] lg:max-w-[440px]"
     >
       <PieChart>
         <ChartTooltip
@@ -96,7 +99,7 @@ export function PortfolioAllocationChart({
           data={chartData}
           dataKey="value"
           nameKey="asset"
-          innerRadius={70}
+          innerRadius="50%"
           strokeWidth={2}
           stroke="var(--background)"
         >
@@ -107,7 +110,12 @@ export function PortfolioAllocationChart({
               }
               const { cx, cy } = viewBox;
               return (
-                <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+                <text
+                  x={cx}
+                  y={cy}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                >
                   <tspan
                     x={cx}
                     y={(cy ?? 0) - 8}

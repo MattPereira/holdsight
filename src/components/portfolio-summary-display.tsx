@@ -4,7 +4,6 @@ import { RiRefreshLine } from "@remixicon/react";
 import { useState, useTransition } from "react";
 import { loadPortfolioSummary } from "@/app/actions";
 import { HoldingsSummary } from "@/components/holdings-summary";
-import { PortfolioAllocationChart } from "@/components/portfolio-allocation-chart";
 import { PortfolioOverviewSheet } from "@/components/portfolio-overview-sheet";
 import { Button } from "@/components/ui/button";
 import type {
@@ -51,18 +50,10 @@ export function PortfolioSummaryDisplay({
         />
       </div>
 
-      <PortfolioAllocationChart
-        grandTotalValue={summary.grandTotalValue}
-        totals={summary.totals}
-        groups={groups}
-      />
-
       <HoldingsSummary
         grandTotalValue={summary.grandTotalValue}
         totals={summary.totals}
         groups={groups}
-        showColors
-        showHeader={false}
       />
     </div>
   );

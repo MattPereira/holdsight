@@ -74,7 +74,7 @@ function WalletSection({ result }: { result: PositionsResult }) {
         <HoldingsRows
           rows={positionRows(result.positions)}
           totalValue={total}
-          mobileVariant="positions"
+          variant="positions"
         />
       ) : (
         <p className="text-sm text-muted-foreground">{statusMessage(result)}</p>
