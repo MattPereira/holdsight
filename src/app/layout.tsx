@@ -1,10 +1,16 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { Anta, Geist, Geist_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+
+const anta = Anta({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-anta",
+});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,6 +43,7 @@ export default function RootLayout({
         geistMono.variable,
         "font-sans",
         inter.variable,
+        anta.variable,
       )}
     >
       <body className="min-h-full flex flex-col">

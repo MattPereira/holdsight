@@ -31,8 +31,11 @@ export default async function AppLayout({
     <SidebarProvider>
       <AppSidebar name={session.user.name} email={session.user.email} />
       <SidebarInset>
-        <header className="flex h-14 items-center gap-2 border-b px-4">
+        <header className="relative flex h-14 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
+          <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 font-anta text-lg font-medium">
+            Holdsight
+          </span>
           <div className="ml-auto">
             <ThemeToggle />
           </div>

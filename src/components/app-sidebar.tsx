@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { RiArrowRightSLine, RiWalletLine } from "@remixicon/react";
+import {
+  RiArrowRightSLine,
+  RiFocus3Line,
+  RiWalletLine,
+} from "@remixicon/react";
 
 import { NavUser } from "@/components/nav-user";
 import {
@@ -34,9 +38,12 @@ export function AppSidebar({ name, email }: { name: string; email: string }) {
       <SidebarHeader>
         <Link
           href="/"
-          className="grid flex-1 px-2 py-1.5 text-left leading-tight"
+          className="flex flex-1 items-center gap-2 px-2 py-1.5 text-left leading-tight"
         >
-          <span className="truncate text-xl font-medium">Holdsight</span>
+          <RiFocus3Line className="size-5 shrink-0" />
+          <span className="truncate font-anta text-2xl font-medium">
+            Holdsight
+          </span>
         </Link>
       </SidebarHeader>
       <SidebarContent>
