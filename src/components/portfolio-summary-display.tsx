@@ -6,14 +6,20 @@ import { loadPortfolioSummary } from "@/app/actions";
 import { HoldingsSummary } from "@/components/holdings-summary";
 import { PortfolioOverviewSheet } from "@/components/portfolio-overview-sheet";
 import { Button } from "@/components/ui/button";
-import type { PortfolioAssetSummary } from "@/lib/portfolio/asset-totals";
+import type {
+  AssetGroup,
+  PortfolioAssetSummary,
+} from "@/lib/portfolio/asset-totals";
 
 export function PortfolioSummaryDisplay({
   initialSummary,
+  initialGroups,
 }: {
   initialSummary: PortfolioAssetSummary;
+  initialGroups: AssetGroup[];
 }) {
   const [summary, setSummary] = useState<PortfolioAssetSummary>(initialSummary);
+  const [groups, setGroups] = useState<AssetGroup[]>(initialGroups);
   const [isPending, startTransition] = useTransition();
 
   function handleLoad() {
@@ -37,12 +43,17 @@ export function PortfolioSummaryDisplay({
         >
           <RiRefreshLine />
         </Button>
-        <PortfolioOverviewSheet />
+        <PortfolioOverviewSheet
+          groups={groups}
+          availableSymbols={summary.totals.map((total) => total.symbol)}
+          onGroupsChange={setGroups}
+        />
       </div>
 
       <HoldingsSummary
         grandTotalValue={summary.grandTotalValue}
         totals={summary.totals}
+        groups={groups}
       />
     </div>
   );

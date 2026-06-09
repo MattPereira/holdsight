@@ -11,6 +11,98 @@ export type PortfolioAssetSummary = {
   totals: AssetTotal[];
 };
 
+export type AssetGroup = {
+  id: string;
+  name: string | null;
+  symbols: string[];
+};
+
+/**
+ * A row in the holdings summary. Ungrouped assets have an empty `members`
+ * array; grouped assets carry their underlying holdings so the UI can expand
+ * them. A group's `amount` is meaningless (different symbols) so callers should
+ * only render it for single-asset rows.
+ */
+export type AssetTotalRow = {
+  key: string;
+  label: string;
+  amount: number;
+  valueUsd: number;
+  isGroup: boolean;
+  members: AssetTotal[];
+};
+
+function symbolKey(symbol: string): string {
+  return symbol.trim().toUpperCase();
+}
+
+/** Label a group by its name, falling back to its members joined with " + ". */
+export function groupLabel(name: string | null, memberSymbols: string[]): string {
+  const trimmed = name?.trim();
+  return trimmed ? trimmed : memberSymbols.join(" + ");
+}
+
+/**
+ * Fold grouped assets into combined rows. Members are matched to groups
+ * case-insensitively by symbol. A group with no held members is omitted, so
+ * combined totals only ever reflect assets the user actually holds.
+ */
+export function applyAssetGroups(
+  totals: AssetTotal[],
+  groups: AssetGroup[],
+): AssetTotalRow[] {
+  const symbolToGroupId = new Map<string, string>();
+  const groupById = new Map<string, AssetGroup>();
+  for (const group of groups) {
+    groupById.set(group.id, group);
+    for (const symbol of group.symbols) {
+      symbolToGroupId.set(symbolKey(symbol), group.id);
+    }
+  }
+
+  const grouped = new Map<string, AssetTotal[]>();
+  const rows: AssetTotalRow[] = [];
+
+  for (const total of totals) {
+    const groupId = symbolToGroupId.get(symbolKey(total.symbol));
+    if (groupId && groupById.has(groupId)) {
+      const members = grouped.get(groupId);
+      if (members) {
+        members.push(total);
+      } else {
+        grouped.set(groupId, [total]);
+      }
+    } else {
+      rows.push({
+        key: total.symbol,
+        label: total.symbol,
+        amount: total.amount,
+        valueUsd: total.valueUsd,
+        isGroup: false,
+        members: [],
+      });
+    }
+  }
+
+  for (const [groupId, members] of grouped) {
+    const group = groupById.get(groupId)!;
+    members.sort((a, b) => b.valueUsd - a.valueUsd);
+    rows.push({
+      key: `group:${groupId}`,
+      label: groupLabel(
+        group.name,
+        members.map((member) => member.symbol),
+      ),
+      amount: 0,
+      valueUsd: members.reduce((sum, member) => sum + member.valueUsd, 0),
+      isGroup: true,
+      members,
+    });
+  }
+
+  return rows.sort((a, b) => b.valueUsd - a.valueUsd);
+}
+
 function totalAssetSymbol(symbol: string): string {
   return symbol.trim();
 }

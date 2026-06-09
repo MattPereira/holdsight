@@ -23,8 +23,15 @@ import {
 } from "@/lib/evm/wallets";
 import {
   portfolioAssetSummary,
+  type AssetGroup,
   type PortfolioAssetSummary,
 } from "@/lib/portfolio/asset-totals";
+import {
+  createAssetGroup,
+  getUserAssetGroups,
+  removeAssetGroup,
+  updateAssetGroup,
+} from "@/lib/portfolio/groups";
 import type { PositionsResult } from "@/lib/portfolio/types";
 
 export type WalletActionResult = {
@@ -152,6 +159,61 @@ export async function loadHyperCorePositions(): Promise<PositionsResult[]> {
   await syncHyperCoreAccounts(hyperCoreAccounts);
 
   return getLatestHyperCorePositionSnapshots(hyperCoreAccounts);
+}
+
+export type AssetGroupActionResult = {
+  groups: AssetGroup[];
+  error: string | null;
+};
+
+async function unauthorizedGroupResult(): Promise<AssetGroupActionResult> {
+  return {
+    groups: [],
+    error: "You must be signed in to manage groups.",
+  };
+}
+
+export async function createGroup(input: {
+  name?: string | null;
+  symbols: string[];
+}): Promise<AssetGroupActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) return unauthorizedGroupResult();
+
+  const result = await createAssetGroup(userId, input);
+  const groups = await getUserAssetGroups(userId);
+  if (result.error) return { groups, error: result.error };
+
+  revalidatePath("/");
+  return { groups, error: null };
+}
+
+export async function updateGroup(
+  groupId: string,
+  input: { name?: string | null; symbols: string[] },
+): Promise<AssetGroupActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) return unauthorizedGroupResult();
+
+  const result = await updateAssetGroup(userId, groupId, input);
+  const groups = await getUserAssetGroups(userId);
+  if (result.error) return { groups, error: result.error };
+
+  revalidatePath("/");
+  return { groups, error: null };
+}
+
+export async function deleteGroup(
+  groupId: string,
+): Promise<AssetGroupActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) return unauthorizedGroupResult();
+
+  await removeAssetGroup(userId, groupId);
+  const groups = await getUserAssetGroups(userId);
+
+  revalidatePath("/");
+  return { groups, error: null };
 }
 
 export async function loadPortfolioSummary(): Promise<PortfolioAssetSummary> {

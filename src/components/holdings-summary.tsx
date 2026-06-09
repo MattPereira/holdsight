@@ -1,3 +1,8 @@
+"use client";
+
+import { RiArrowDownSLine, RiArrowRightSLine } from "@remixicon/react";
+import { Fragment, useState } from "react";
+
 import {
   Table,
   TableBody,
@@ -7,7 +12,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import type { AssetTotal } from "@/lib/portfolio/asset-totals";
+import {
+  applyAssetGroups,
+  type AssetGroup,
+  type AssetTotal,
+} from "@/lib/portfolio/asset-totals";
 
 const usdFormat = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -82,16 +91,47 @@ export type HoldingsDisplayRow = {
   amount: number;
   valueUsd: number;
   detail?: string;
+  isGroup?: boolean;
+  members?: HoldingsDisplayRow[];
 };
+
+function GroupToggle({
+  label,
+  expanded,
+  onToggle,
+}: {
+  label: string;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const Chevron = expanded ? RiArrowDownSLine : RiArrowRightSLine;
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={expanded}
+      className="flex w-full min-w-0 items-center gap-1.5 text-left"
+    >
+      <Chevron className="size-4 shrink-0 text-muted-foreground" />
+      <span className="truncate" title={label}>
+        {label}
+      </span>
+    </button>
+  );
+}
 
 function DesktopHoldingsTable({
   rows,
   showWeight,
   totalValue,
+  expanded,
+  onToggle,
 }: {
   rows: HoldingsDisplayRow[];
   showWeight: boolean;
   totalValue: number;
+  expanded: Set<string>;
+  onToggle: (key: string) => void;
 }) {
   return (
     <div className="hidden overflow-hidden rounded-lg border sm:block">
@@ -126,29 +166,82 @@ function DesktopHoldingsTable({
         <TableBody>
           {rows.map((row) => {
             const weight = weightOf(row.valueUsd, totalValue);
+            const isExpanded = expanded.has(row.key);
+            const members = isExpanded ? (row.members ?? []) : [];
             return (
-              <TableRow key={row.key}>
-                <TableCell className="font-medium">{row.symbol}</TableCell>
-                {showWeight ? (
-                  <TableCell>
-                    <div className="grid grid-cols-[minmax(6rem,1fr)_4rem] items-center gap-3">
-                      <WeightBar weight={weight} />
-                      <span className="text-right tabular-nums">
-                        {percentFormat.format(weight)}
-                      </span>
-                    </div>
+              <Fragment key={row.key}>
+                <TableRow>
+                  <TableCell className="font-medium">
+                    {row.isGroup ? (
+                      <GroupToggle
+                        label={row.symbol}
+                        expanded={isExpanded}
+                        onToggle={() => onToggle(row.key)}
+                      />
+                    ) : (
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <span className="size-4 shrink-0" aria-hidden="true" />
+                        <span className="block truncate" title={row.symbol}>
+                          {row.symbol}
+                        </span>
+                      </div>
+                    )}
                   </TableCell>
-                ) : null}
-                <TableCell className="text-right tabular-nums text-muted-foreground">
-                  {amountFormat.format(row.amount)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">
-                  {formatPrice(row.priceUsd)}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatUsd(row.valueUsd)}
-                </TableCell>
-              </TableRow>
+                  {showWeight ? (
+                    <TableCell>
+                      <div className="grid grid-cols-[minmax(6rem,1fr)_4rem] items-center gap-3">
+                        <WeightBar weight={weight} />
+                        <span className="text-right tabular-nums">
+                          {percentFormat.format(weight)}
+                        </span>
+                      </div>
+                    </TableCell>
+                  ) : null}
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                    {row.isGroup ? "—" : amountFormat.format(row.amount)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                    {row.isGroup ? "—" : formatPrice(row.priceUsd)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatUsd(row.valueUsd)}
+                  </TableCell>
+                </TableRow>
+                {members.map((member) => {
+                  const memberWeight = weightOf(member.valueUsd, totalValue);
+                  return (
+                    <TableRow
+                      key={`${row.key}:${member.key}`}
+                      className="bg-muted/20 hover:bg-muted/20"
+                    >
+                      <TableCell className="pl-9 font-medium text-muted-foreground">
+                        <span className="block truncate" title={member.symbol}>
+                          {member.symbol}
+                        </span>
+                      </TableCell>
+                      {showWeight ? (
+                        <TableCell>
+                          <div className="grid grid-cols-[minmax(6rem,1fr)_4rem] items-center gap-3">
+                            <WeightBar weight={memberWeight} />
+                            <span className="text-right tabular-nums text-muted-foreground">
+                              {percentFormat.format(memberWeight)}
+                            </span>
+                          </div>
+                        </TableCell>
+                      ) : null}
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {amountFormat.format(member.amount)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {formatPrice(member.priceUsd)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {formatUsd(member.valueUsd)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </Fragment>
             );
           })}
         </TableBody>
@@ -160,19 +253,40 @@ function DesktopHoldingsTable({
 function MobileSummaryList({
   rows,
   totalValue,
+  expanded,
+  onToggle,
 }: {
   rows: HoldingsDisplayRow[];
   totalValue: number;
+  expanded: Set<string>;
+  onToggle: (key: string) => void;
 }) {
   return (
     <ul className="divide-y rounded-lg border sm:hidden">
       {rows.map((row) => {
         const weight = weightOf(row.valueUsd, totalValue);
+        const isExpanded = expanded.has(row.key);
+        const members = isExpanded ? (row.members ?? []) : [];
         return (
           <li key={row.key} className="flex flex-col gap-2 px-4 py-3">
             <div className="flex items-baseline justify-between gap-4">
-              <span className="text-base font-semibold">{row.symbol}</span>
-              <span className="text-base font-semibold tabular-nums">
+              {row.isGroup ? (
+                <span className="min-w-0 text-base font-semibold">
+                  <GroupToggle
+                    label={row.symbol}
+                    expanded={isExpanded}
+                    onToggle={() => onToggle(row.key)}
+                  />
+                </span>
+              ) : (
+                <span className="flex min-w-0 items-center gap-1.5 text-base font-semibold">
+                  <span className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="truncate" title={row.symbol}>
+                    {row.symbol}
+                  </span>
+                </span>
+              )}
+              <span className="shrink-0 text-base font-semibold tabular-nums">
                 {formatUsd(row.valueUsd)}
               </span>
             </div>
@@ -182,6 +296,34 @@ function MobileSummaryList({
                 {percentFormat.format(weight)}
               </span>
             </div>
+            {members.length > 0 ? (
+              <ul className="flex flex-col gap-2 border-l pl-3">
+                {members.map((member) => {
+                  const memberWeight = weightOf(member.valueUsd, totalValue);
+                  return (
+                    <li key={member.key} className="flex flex-col gap-1">
+                      <div className="flex items-baseline justify-between gap-4 text-sm text-muted-foreground">
+                        <span
+                          className="min-w-0 truncate"
+                          title={member.symbol}
+                        >
+                          {member.symbol}
+                        </span>
+                        <span className="shrink-0 tabular-nums">
+                          {formatUsd(member.valueUsd)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <WeightBar weight={memberWeight} className="flex-1" />
+                        <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">
+                          {percentFormat.format(memberWeight)}
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
           </li>
         );
       })}
@@ -221,15 +363,36 @@ export function HoldingsRows({
   totalValue: number;
   mobileVariant: "summary" | "positions";
 }) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  function toggle(key: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }
+
   return (
     <>
       <DesktopHoldingsTable
         rows={rows}
         showWeight={mobileVariant === "summary"}
         totalValue={totalValue}
+        expanded={expanded}
+        onToggle={toggle}
       />
       {mobileVariant === "summary" ? (
-        <MobileSummaryList rows={rows} totalValue={totalValue} />
+        <MobileSummaryList
+          rows={rows}
+          totalValue={totalValue}
+          expanded={expanded}
+          onToggle={toggle}
+        />
       ) : (
         <MobilePositionList rows={rows} />
       )}
@@ -240,19 +403,31 @@ export function HoldingsRows({
 export function HoldingsSummary({
   grandTotalValue,
   totals,
+  groups = [],
   label = "Total Assets",
 }: {
   grandTotalValue: number;
   totals: AssetTotal[];
+  groups?: AssetGroup[];
   label?: string;
 }) {
-  const rows = totals.map((total) => ({
-    key: total.symbol,
-    symbol: total.symbol,
-    priceUsd: priceOf(total.valueUsd, total.amount),
-    amount: total.amount,
-    valueUsd: total.valueUsd,
-  }));
+  const rows: HoldingsDisplayRow[] = applyAssetGroups(totals, groups).map(
+    (row) => ({
+      key: row.key,
+      symbol: row.label,
+      priceUsd: row.isGroup ? 0 : priceOf(row.valueUsd, row.amount),
+      amount: row.amount,
+      valueUsd: row.valueUsd,
+      isGroup: row.isGroup,
+      members: row.members.map((member) => ({
+        key: member.symbol,
+        symbol: member.symbol,
+        priceUsd: priceOf(member.valueUsd, member.amount),
+        amount: member.amount,
+        valueUsd: member.valueUsd,
+      })),
+    }),
+  );
 
   return (
     <section className="flex flex-col gap-2">
