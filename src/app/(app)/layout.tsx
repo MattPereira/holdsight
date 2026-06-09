@@ -33,7 +33,7 @@ export default async function AppLayout({
       <SidebarInset>
         <header className="relative flex h-14 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
-          <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 font-anta text-lg font-medium">
+          <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 font-anta text-xl font-medium">
             Holdsight
           </span>
           <div className="ml-auto">
