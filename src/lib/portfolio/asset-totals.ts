@@ -103,6 +103,35 @@ export function applyAssetGroups(
   return rows.sort((a, b) => b.valueUsd - a.valueUsd);
 }
 
+/**
+ * Themed colors for the allocation pie, cycled across however many top-level
+ * rows there are. Shared with the holdings table so each asset's swatch matches
+ * its pie slice.
+ */
+export const ASSET_CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+];
+
+/**
+ * Map each grouped/ungrouped row key to its allocation color. Rows are ordered
+ * by value (see {@link applyAssetGroups}), so the assignment is stable as long
+ * as both the chart and the table start from the same totals/groups.
+ */
+export function assetColorByKey(
+  totals: AssetTotal[],
+  groups: AssetGroup[],
+): Map<string, string> {
+  const colors = new Map<string, string>();
+  applyAssetGroups(totals, groups).forEach((row, index) => {
+    colors.set(row.key, ASSET_CHART_COLORS[index % ASSET_CHART_COLORS.length]);
+  });
+  return colors;
+}
+
 function totalAssetSymbol(symbol: string): string {
   return symbol.trim();
 }

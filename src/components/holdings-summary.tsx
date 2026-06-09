@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   applyAssetGroups,
+  assetColorByKey,
   type AssetGroup,
   type AssetTotal,
 } from "@/lib/portfolio/asset-totals";
@@ -95,14 +96,29 @@ export type HoldingsDisplayRow = {
   members?: HoldingsDisplayRow[];
 };
 
+function ColorSwatch({ color }: { color?: string }) {
+  if (!color) {
+    return null;
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className="size-2.5 shrink-0 rounded-[3px]"
+      style={{ backgroundColor: color }}
+    />
+  );
+}
+
 function GroupToggle({
   label,
   expanded,
   onToggle,
+  color,
 }: {
   label: string;
   expanded: boolean;
   onToggle: () => void;
+  color?: string;
 }) {
   const Chevron = expanded ? RiArrowDownSLine : RiArrowRightSLine;
   return (
@@ -113,6 +129,7 @@ function GroupToggle({
       className="flex w-full min-w-0 items-center gap-1.5 text-left"
     >
       <Chevron className="size-4 shrink-0 text-muted-foreground" />
+      <ColorSwatch color={color} />
       <span className="truncate" title={label}>
         {label}
       </span>
@@ -126,12 +143,14 @@ function DesktopHoldingsTable({
   totalValue,
   expanded,
   onToggle,
+  colorByKey,
 }: {
   rows: HoldingsDisplayRow[];
   showWeight: boolean;
   totalValue: number;
   expanded: Set<string>;
   onToggle: (key: string) => void;
+  colorByKey?: Map<string, string>;
 }) {
   return (
     <div className="hidden overflow-hidden rounded-lg border sm:block">
@@ -168,19 +187,27 @@ function DesktopHoldingsTable({
             const weight = weightOf(row.valueUsd, totalValue);
             const isExpanded = expanded.has(row.key);
             const members = isExpanded ? (row.members ?? []) : [];
+            const color = colorByKey?.get(row.key);
             return (
               <Fragment key={row.key}>
-                <TableRow>
+                <TableRow
+                  className={cn(
+                    row.isGroup && "bg-muted/50",
+                    row.isGroup && isExpanded && "border-b-0",
+                  )}
+                >
                   <TableCell className="font-medium">
                     {row.isGroup ? (
                       <GroupToggle
                         label={row.symbol}
                         expanded={isExpanded}
                         onToggle={() => onToggle(row.key)}
+                        color={color}
                       />
                     ) : (
                       <div className="flex min-w-0 items-center gap-1.5">
                         <span className="size-4 shrink-0" aria-hidden="true" />
+                        <ColorSwatch color={color} />
                         <span className="block truncate" title={row.symbol}>
                           {row.symbol}
                         </span>
@@ -207,17 +234,26 @@ function DesktopHoldingsTable({
                     {formatUsd(row.valueUsd)}
                   </TableCell>
                 </TableRow>
-                {members.map((member) => {
+                {members.map((member, memberIndex) => {
                   const memberWeight = weightOf(member.valueUsd, totalValue);
                   return (
                     <TableRow
                       key={`${row.key}:${member.key}`}
-                      className="bg-muted/20 hover:bg-muted/20"
+                      className={cn(
+                        "bg-muted/50",
+                        memberIndex < members.length - 1 && "border-b-0",
+                      )}
                     >
-                      <TableCell className="pl-9 font-medium text-muted-foreground">
-                        <span className="block truncate" title={member.symbol}>
-                          {member.symbol}
-                        </span>
+                      <TableCell className="py-0 font-medium text-muted-foreground">
+                        <div className="flex items-stretch">
+                          <span className="ml-2 w-px shrink-0 self-stretch bg-border" />
+                          <span
+                            className="truncate self-center py-2 pl-3"
+                            title={member.symbol}
+                          >
+                            {member.symbol}
+                          </span>
+                        </div>
                       </TableCell>
                       {showWeight ? (
                         <TableCell>
@@ -255,11 +291,13 @@ function MobileSummaryList({
   totalValue,
   expanded,
   onToggle,
+  colorByKey,
 }: {
   rows: HoldingsDisplayRow[];
   totalValue: number;
   expanded: Set<string>;
   onToggle: (key: string) => void;
+  colorByKey?: Map<string, string>;
 }) {
   return (
     <ul className="divide-y rounded-lg border sm:hidden">
@@ -267,6 +305,7 @@ function MobileSummaryList({
         const weight = weightOf(row.valueUsd, totalValue);
         const isExpanded = expanded.has(row.key);
         const members = isExpanded ? (row.members ?? []) : [];
+        const color = colorByKey?.get(row.key);
         return (
           <li key={row.key} className="flex flex-col gap-2 px-4 py-3">
             <div className="flex items-baseline justify-between gap-4">
@@ -276,11 +315,13 @@ function MobileSummaryList({
                     label={row.symbol}
                     expanded={isExpanded}
                     onToggle={() => onToggle(row.key)}
+                    color={color}
                   />
                 </span>
               ) : (
                 <span className="flex min-w-0 items-center gap-1.5 text-base font-semibold">
                   <span className="size-4 shrink-0" aria-hidden="true" />
+                  <ColorSwatch color={color} />
                   <span className="truncate" title={row.symbol}>
                     {row.symbol}
                   </span>
@@ -358,10 +399,12 @@ export function HoldingsRows({
   rows,
   totalValue,
   mobileVariant,
+  colorByKey,
 }: {
   rows: HoldingsDisplayRow[];
   totalValue: number;
   mobileVariant: "summary" | "positions";
+  colorByKey?: Map<string, string>;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -385,6 +428,7 @@ export function HoldingsRows({
         totalValue={totalValue}
         expanded={expanded}
         onToggle={toggle}
+        colorByKey={colorByKey}
       />
       {mobileVariant === "summary" ? (
         <MobileSummaryList
@@ -392,6 +436,7 @@ export function HoldingsRows({
           totalValue={totalValue}
           expanded={expanded}
           onToggle={toggle}
+          colorByKey={colorByKey}
         />
       ) : (
         <MobilePositionList rows={rows} />
@@ -405,12 +450,17 @@ export function HoldingsSummary({
   totals,
   groups = [],
   label = "Total Assets",
+  showColors = false,
+  showHeader = true,
 }: {
   grandTotalValue: number;
   totals: AssetTotal[];
   groups?: AssetGroup[];
   label?: string;
+  showColors?: boolean;
+  showHeader?: boolean;
 }) {
+  const colorByKey = showColors ? assetColorByKey(totals, groups) : undefined;
   const rows: HoldingsDisplayRow[] = applyAssetGroups(totals, groups).map(
     (row) => ({
       key: row.key,
@@ -431,17 +481,20 @@ export function HoldingsSummary({
 
   return (
     <section className="flex flex-col gap-2">
-      <div className="flex items-baseline justify-between gap-4 px-2">
-        <span className="text-sm font-medium">{label}</span>
-        <span className="text-sm font-medium tabular-nums">
-          {formatUsd(grandTotalValue)}
-        </span>
-      </div>
+      {showHeader ? (
+        <div className="flex items-baseline justify-between gap-4 px-2">
+          <span className="text-sm font-medium">{label}</span>
+          <span className="text-sm font-medium tabular-nums">
+            {formatUsd(grandTotalValue)}
+          </span>
+        </div>
+      ) : null}
       {totals.length > 0 ? (
         <HoldingsRows
           rows={rows}
           totalValue={grandTotalValue}
           mobileVariant="summary"
+          colorByKey={colorByKey}
         />
       ) : (
         <p className="text-sm text-muted-foreground">No positions.</p>
