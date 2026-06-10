@@ -174,7 +174,7 @@ export async function validateUserEvmAccounts(
 ): Promise<string | null> {
   const accounts = await getUserEvmAccounts(userId);
   if (accounts.length === 0) {
-    return "Add at least one wallet before loading positions.";
+    return "Add at least one wallet before loading balances.";
   }
 
   const invalidAddress = accounts

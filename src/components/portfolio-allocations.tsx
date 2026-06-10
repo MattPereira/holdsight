@@ -376,7 +376,7 @@ export function PortfolioAllocations({
   );
 
   if (totals.length === 0) {
-    return <p className="text-sm text-muted-foreground">No positions.</p>;
+    return <p className="text-sm text-muted-foreground">No balances.</p>;
   }
 
   return (

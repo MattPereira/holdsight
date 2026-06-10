@@ -4,38 +4,38 @@ import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
-  evmPositionDetails,
+  evmBalanceDetails,
+  investmentBalances,
   investmentAccounts,
-  investmentPositions,
 } from "@/db/schema/investment-accounts";
 import { getUserEvmAccounts, type SavedEvmAccount } from "@/lib/evm/accounts";
-import { getWalletPositions } from "@/lib/evm/client";
-import type { Position, PositionsResult } from "@/lib/portfolio/types";
+import { getWalletBalances } from "@/lib/evm/client";
+import type { InvestmentBalance, BalancesResult } from "@/lib/portfolio/types";
 
 const ZERION_PROVIDER = "zerion";
 
 function resultStatusToSyncStatus(
-  status: PositionsResult["status"],
+  status: BalancesResult["status"],
 ): "success" | "indexing" | "rate_limited" | "error" {
   return status === "ready" ? "success" : status;
 }
 
-function positionToRow(investmentAccountId: string, position: Position) {
+function balanceToRow(investmentAccountId: string, balance: InvestmentBalance) {
   return {
     investmentAccountId,
-    sourcePositionId: position.sourcePositionId,
-    symbol: position.symbol,
-    name: position.name,
+    sourceBalanceId: balance.sourceBalanceId,
+    symbol: balance.symbol,
+    name: balance.name,
     assetClass: "token" as const,
-    amount: String(position.amount),
-    priceUsd: String(position.priceUsd),
-    valueUsd: String(position.valueUsd),
+    amount: String(balance.amount),
+    priceUsd: String(balance.priceUsd),
+    valueUsd: String(balance.valueUsd),
   };
 }
 
-export async function replaceEvmAccountPositions(
+export async function replaceEvmAccountBalances(
   investmentAccountId: string,
-  result: PositionsResult,
+  result: BalancesResult,
 ): Promise<void> {
   await db.transaction(async (tx) => {
     await tx
@@ -52,34 +52,34 @@ export async function replaceEvmAccountPositions(
     if (result.status !== "ready") return;
 
     await tx
-      .delete(investmentPositions)
-      .where(eq(investmentPositions.investmentAccountId, investmentAccountId));
+      .delete(investmentBalances)
+      .where(eq(investmentBalances.investmentAccountId, investmentAccountId));
 
-    if (result.positions.length === 0) return;
+    if (result.balances.length === 0) return;
 
-    const insertedPositions = await tx
-      .insert(investmentPositions)
+    const insertedBalances = await tx
+      .insert(investmentBalances)
       .values(
-        result.positions.map((position) =>
-          positionToRow(investmentAccountId, position),
+        result.balances.map((balance) =>
+          balanceToRow(investmentAccountId, balance),
         ),
       )
-      .returning({ id: investmentPositions.id });
+      .returning({ id: investmentBalances.id });
 
-    const details = insertedPositions.map((position, index) => ({
-      positionId: position.id,
-      chainId: result.positions[index]?.chainId ?? "unknown",
-      contractAddress: result.positions[index]?.contractAddress,
+    const details = insertedBalances.map((balance, index) => ({
+      balanceId: balance.id,
+      chainId: result.balances[index]?.chainId ?? "unknown",
+      contractAddress: result.balances[index]?.contractAddress,
     }));
 
     if (details.length > 0) {
-      await tx.insert(evmPositionDetails).values(details);
+      await tx.insert(evmBalanceDetails).values(details);
     }
   });
 }
 
-function toPosition(row: {
-  sourcePositionId: string | null;
+function toInvestmentBalance(row: {
+  sourceBalanceId: string | null;
   symbol: string;
   name: string | null;
   amount: string;
@@ -87,9 +87,9 @@ function toPosition(row: {
   valueUsd: string;
   chainId: string | null;
   contractAddress: string | null;
-}): Position {
+}): InvestmentBalance {
   return {
-    sourcePositionId: row.sourcePositionId ?? undefined,
+    sourceBalanceId: row.sourceBalanceId ?? undefined,
     symbol: row.symbol,
     name: row.name ?? undefined,
     chainId: row.chainId ?? "unknown",
@@ -100,18 +100,18 @@ function toPosition(row: {
   };
 }
 
-export async function getCurrentEvmPositions(
+export async function getCurrentEvmBalances(
   userId: string,
-): Promise<PositionsResult[]> {
+): Promise<BalancesResult[]> {
   const wallets = await getUserEvmAccounts(userId);
-  const results: PositionsResult[] = [];
+  const results: BalancesResult[] = [];
 
   for (const wallet of wallets) {
     if (wallet.syncStatus === "idle") {
       results.push({
         status: "ready",
         address: wallet.address,
-        positions: [],
+        balances: [],
       });
       continue;
     }
@@ -125,35 +125,35 @@ export async function getCurrentEvmPositions(
       results.push({
         status: "error",
         address: wallet.address,
-        message: wallet.syncErrorMessage ?? "Position sync failed.",
+        message: wallet.syncErrorMessage ?? "Balance sync failed.",
         httpStatus: wallet.syncHttpStatus ?? 502,
       });
       continue;
     }
 
-    const positions = await db
+    const balances = await db
       .select({
-        sourcePositionId: investmentPositions.sourcePositionId,
-        symbol: investmentPositions.symbol,
-        name: investmentPositions.name,
-        amount: investmentPositions.amount,
-        priceUsd: investmentPositions.priceUsd,
-        valueUsd: investmentPositions.valueUsd,
-        chainId: evmPositionDetails.chainId,
-        contractAddress: evmPositionDetails.contractAddress,
+        sourceBalanceId: investmentBalances.sourceBalanceId,
+        symbol: investmentBalances.symbol,
+        name: investmentBalances.name,
+        amount: investmentBalances.amount,
+        priceUsd: investmentBalances.priceUsd,
+        valueUsd: investmentBalances.valueUsd,
+        chainId: evmBalanceDetails.chainId,
+        contractAddress: evmBalanceDetails.contractAddress,
       })
-      .from(investmentPositions)
+      .from(investmentBalances)
       .leftJoin(
-        evmPositionDetails,
-        eq(evmPositionDetails.positionId, investmentPositions.id),
+        evmBalanceDetails,
+        eq(evmBalanceDetails.balanceId, investmentBalances.id),
       )
-      .where(eq(investmentPositions.investmentAccountId, wallet.id))
-      .orderBy(desc(investmentPositions.valueUsd));
+      .where(eq(investmentBalances.investmentAccountId, wallet.id))
+      .orderBy(desc(investmentBalances.valueUsd));
 
     results.push({
       status: "ready",
       address: wallet.address,
-      positions: positions.map(toPosition),
+      balances: balances.map(toInvestmentBalance),
     });
   }
 
@@ -161,19 +161,19 @@ export async function getCurrentEvmPositions(
 }
 
 /**
- * Fetch EVM positions for every tracked wallet. Called from the client only on
+ * Fetch EVM balances for every tracked wallet. Called from the client only on
  * a button click, so this is the single place a Zerion request is triggered.
  *
  * Wallets are fetched sequentially so we never burst past the per-second rate
  * limit. If we get rate limited, we stop immediately rather than spending more
  * of the limited daily quota on calls that would also fail.
  */
-export async function syncEvmWalletPositions(
+export async function syncEvmWalletBalances(
   wallets: SavedEvmAccount[],
 ): Promise<void> {
   for (const wallet of wallets) {
-    const result = await getWalletPositions(wallet.address);
-    await replaceEvmAccountPositions(wallet.id, result);
+    const result = await getWalletBalances(wallet.address);
+    await replaceEvmAccountBalances(wallet.id, result);
     if (result.status === "rate_limited") break;
   }
 }

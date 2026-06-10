@@ -1,4 +1,4 @@
-import type { PositionsResult } from "@/lib/portfolio/types";
+import type { BalancesResult } from "@/lib/portfolio/types";
 
 export type AssetTotal = {
   symbol: string;
@@ -137,36 +137,36 @@ function totalAssetSymbol(symbol: string): string {
   return symbol.trim();
 }
 
-export function walletTotal(result: PositionsResult): number {
+export function walletTotal(result: BalancesResult): number {
   return result.status === "ready"
-    ? result.positions.reduce((sum, p) => sum + p.valueUsd, 0)
+    ? result.balances.reduce((sum, balance) => sum + balance.valueUsd, 0)
     : 0;
 }
 
-export function grandTotal(results: PositionsResult[]): number {
+export function grandTotal(results: BalancesResult[]): number {
   return results.reduce((sum, result) => sum + walletTotal(result), 0);
 }
 
-export function aggregateAssetTotals(results: PositionsResult[]): AssetTotal[] {
+export function aggregateAssetTotals(results: BalancesResult[]): AssetTotal[] {
   const totals = new Map<string, AssetTotal>();
 
   for (const result of results) {
     if (result.status !== "ready") continue;
 
-    for (const position of result.positions) {
-      const symbol = totalAssetSymbol(position.symbol);
+    for (const balance of result.balances) {
+      const symbol = totalAssetSymbol(balance.symbol);
       const total = totals.get(symbol);
 
       if (total) {
-        total.amount += position.amount;
-        total.valueUsd += position.valueUsd;
-        total.name ??= position.name;
+        total.amount += balance.amount;
+        total.valueUsd += balance.valueUsd;
+        total.name ??= balance.name;
       } else {
         totals.set(symbol, {
           symbol,
-          name: position.name,
-          amount: position.amount,
-          valueUsd: position.valueUsd,
+          name: balance.name,
+          amount: balance.amount,
+          valueUsd: balance.valueUsd,
         });
       }
     }
@@ -178,7 +178,7 @@ export function aggregateAssetTotals(results: PositionsResult[]): AssetTotal[] {
 }
 
 export function portfolioAssetSummary(
-  results: PositionsResult[],
+  results: BalancesResult[],
 ): PortfolioAssetSummary {
   return {
     grandTotalValue: grandTotal(results),

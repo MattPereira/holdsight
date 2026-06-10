@@ -43,6 +43,13 @@
       "when": 1781125366440,
       "tag": "0005_sparkling_smasher",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1781127976035,
+      "tag": "0006_cloudy_marvel_boy",
+      "breakpoints": true
     }
   ]
 }

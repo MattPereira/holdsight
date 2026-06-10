@@ -4,15 +4,15 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
-  getCurrentEvmPositions,
-  syncEvmWalletPositions,
-} from "@/lib/evm/positions";
-import { getCurrentPortfolioPositions } from "@/lib/portfolio/positions";
+  getCurrentEvmBalances,
+  syncEvmWalletBalances,
+} from "@/lib/evm/balances";
+import { getCurrentPortfolioBalances } from "@/lib/portfolio/balances";
 import { ensureUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
 import {
-  getCurrentHyperCorePositions,
+  getCurrentHyperCoreBalances,
   syncHyperCoreAccounts,
-} from "@/lib/hyper-core/positions";
+} from "@/lib/hyper-core/balances";
 import {
   addUserEvmAccounts,
   getUserEvmAccounts,
@@ -31,7 +31,7 @@ import {
   removeAssetGroup,
   updateAssetGroup,
 } from "@/lib/portfolio/groups";
-import type { PositionsResult } from "@/lib/portfolio/types";
+import type { BalancesResult } from "@/lib/portfolio/types";
 
 export type WalletActionResult = {
   wallets: SavedEvmAccount[];
@@ -47,12 +47,12 @@ async function unauthorizedWalletResult(): Promise<WalletActionResult> {
   };
 }
 
-function unauthorizedPositionsResult(): PositionsResult[] {
+function unauthorizedBalancesResult(): BalancesResult[] {
   return [
     {
       status: "error",
       address: "AUTH",
-      message: "You must be signed in to view positions.",
+      message: "You must be signed in to view balances.",
       httpStatus: 401,
     },
   ];
@@ -99,17 +99,17 @@ export async function removeWallet(address: string): Promise<WalletActionResult>
 }
 
 /**
- * Fetch EVM positions for every tracked wallet. Called from the client only on
+ * Fetch EVM balances for every tracked wallet. Called from the client only on
  * a button click, so this is the single place a Zerion request is triggered.
  *
  * Wallets are fetched sequentially (not in parallel) so we never burst past the
  * per-second rate limit. If we get rate limited, we stop immediately rather than
  * spending more of the limited daily quota on calls that would also fail.
  */
-export async function loadEvmPositions(): Promise<PositionsResult[]> {
+export async function loadEvmBalances(): Promise<BalancesResult[]> {
   // Privacy-first: no portfolio data leaves the server without a valid session.
   const userId = await getCurrentUserId();
-  if (!userId) return unauthorizedPositionsResult();
+  if (!userId) return unauthorizedBalancesResult();
 
   const walletConfigError = await validateUserEvmAccounts(userId);
   if (walletConfigError) {
@@ -124,14 +124,14 @@ export async function loadEvmPositions(): Promise<PositionsResult[]> {
   }
 
   const wallets = await getUserEvmAccounts(userId);
-  await syncEvmWalletPositions(wallets);
+  await syncEvmWalletBalances(wallets);
 
-  return getCurrentEvmPositions(userId);
+  return getCurrentEvmBalances(userId);
 }
 
-export async function loadHyperCorePositions(): Promise<PositionsResult[]> {
+export async function loadHyperCoreBalances(): Promise<BalancesResult[]> {
   const userId = await getCurrentUserId();
-  if (!userId) return unauthorizedPositionsResult();
+  if (!userId) return unauthorizedBalancesResult();
 
   const walletConfigError = await validateUserEvmAccounts(userId);
   if (walletConfigError) {
@@ -149,7 +149,7 @@ export async function loadHyperCorePositions(): Promise<PositionsResult[]> {
   const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
   await syncHyperCoreAccounts(hyperCoreAccounts);
 
-  return getCurrentHyperCorePositions(hyperCoreAccounts);
+  return getCurrentHyperCoreBalances(hyperCoreAccounts);
 }
 
 export type AssetGroupActionResult = {
@@ -215,10 +215,10 @@ export async function loadPortfolioSummary(): Promise<PortfolioAssetSummary> {
   if (walletConfigError) return emptyPortfolioSummary();
 
   const wallets = await getUserEvmAccounts(userId);
-  await syncEvmWalletPositions(wallets);
+  await syncEvmWalletBalances(wallets);
 
   const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
   await syncHyperCoreAccounts(hyperCoreAccounts);
 
-  return portfolioAssetSummary(await getCurrentPortfolioPositions(userId));
+  return portfolioAssetSummary(await getCurrentPortfolioBalances(userId));
 }

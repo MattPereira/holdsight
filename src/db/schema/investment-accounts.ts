@@ -157,6 +157,46 @@ export const brokerageAccounts = pgTable(
   (table) => [index("brokerage_accounts_brokerage_idx").on(table.brokerage)],
 );
 
+export const investmentBalances = pgTable(
+  "investment_balances",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    investmentAccountId: uuid("investment_account_id")
+      .notNull()
+      .references(() => investmentAccounts.id, { onDelete: "cascade" }),
+    sourceBalanceId: text("source_balance_id"),
+    symbol: text("symbol").notNull(),
+    name: text("name"),
+    assetClass: assetClass("asset_class").notNull(),
+    amount: numeric("amount", { precision: 36, scale: 18 }).notNull(),
+    priceUsd: numeric("price_usd", { precision: 36, scale: 18 }).notNull(),
+    valueUsd: numeric("value_usd", { precision: 36, scale: 18 }).notNull(),
+    asOf: timestamp("as_of").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("investment_balances_investment_account_id_idx").on(
+      table.investmentAccountId,
+    ),
+    index("investment_balances_symbol_idx").on(table.symbol),
+  ],
+);
+
+export const evmBalanceDetails = pgTable("evm_balance_details", {
+  balanceId: uuid("balance_id")
+    .primaryKey()
+    .references(() => investmentBalances.id, { onDelete: "cascade" }),
+  chainId: text("chain_id").notNull(),
+  contractAddress: text("contract_address"),
+});
+
+export const hyperCoreBalanceDetails = pgTable("hyper_core_balance_details", {
+  balanceId: uuid("balance_id")
+    .primaryKey()
+    .references(() => investmentBalances.id, { onDelete: "cascade" }),
+  balanceType: text("balance_type").notNull(),
+});
+
 export const investmentPositions = pgTable(
   "investment_positions",
   {
@@ -167,7 +207,7 @@ export const investmentPositions = pgTable(
     sourcePositionId: text("source_position_id"),
     symbol: text("symbol").notNull(),
     name: text("name"),
-    assetClass: assetClass("asset_class").notNull(),
+    assetClass: assetClass("asset_class").default("derivative").notNull(),
     amount: numeric("amount", { precision: 36, scale: 18 }).notNull(),
     priceUsd: numeric("price_usd", { precision: 36, scale: 18 }).notNull(),
     valueUsd: numeric("value_usd", { precision: 36, scale: 18 }).notNull(),
@@ -181,14 +221,6 @@ export const investmentPositions = pgTable(
     index("investment_positions_symbol_idx").on(table.symbol),
   ],
 );
-
-export const evmPositionDetails = pgTable("evm_position_details", {
-  positionId: uuid("position_id")
-    .primaryKey()
-    .references(() => investmentPositions.id, { onDelete: "cascade" }),
-  chainId: text("chain_id").notNull(),
-  contractAddress: text("contract_address"),
-});
 
 export const hyperCorePositionDetails = pgTable("hyper_core_position_details", {
   positionId: uuid("position_id")
@@ -230,6 +262,7 @@ export const investmentAccountsRelations = relations(
     hyperCoreAccount: one(hyperCoreAccounts),
     centralizedExchangeAccount: one(centralizedExchangeAccounts),
     brokerageAccount: one(brokerageAccounts),
+    balances: many(investmentBalances),
     positions: many(investmentPositions),
   }),
 );
@@ -282,6 +315,38 @@ export const brokerageAccountsRelations = relations(
   }),
 );
 
+export const investmentBalancesRelations = relations(
+  investmentBalances,
+  ({ one }) => ({
+    investmentAccount: one(investmentAccounts, {
+      fields: [investmentBalances.investmentAccountId],
+      references: [investmentAccounts.id],
+    }),
+    evmDetails: one(evmBalanceDetails),
+    hyperCoreDetails: one(hyperCoreBalanceDetails),
+  }),
+);
+
+export const evmBalanceDetailsRelations = relations(
+  evmBalanceDetails,
+  ({ one }) => ({
+    balance: one(investmentBalances, {
+      fields: [evmBalanceDetails.balanceId],
+      references: [investmentBalances.id],
+    }),
+  }),
+);
+
+export const hyperCoreBalanceDetailsRelations = relations(
+  hyperCoreBalanceDetails,
+  ({ one }) => ({
+    balance: one(investmentBalances, {
+      fields: [hyperCoreBalanceDetails.balanceId],
+      references: [investmentBalances.id],
+    }),
+  }),
+);
+
 export const investmentPositionsRelations = relations(
   investmentPositions,
   ({ one }) => ({
@@ -289,18 +354,7 @@ export const investmentPositionsRelations = relations(
       fields: [investmentPositions.investmentAccountId],
       references: [investmentAccounts.id],
     }),
-    evmDetails: one(evmPositionDetails),
     hyperCoreDetails: one(hyperCorePositionDetails),
-  }),
-);
-
-export const evmPositionDetailsRelations = relations(
-  evmPositionDetails,
-  ({ one }) => ({
-    position: one(investmentPositions, {
-      fields: [evmPositionDetails.positionId],
-      references: [investmentPositions.id],
-    }),
   }),
 );
 

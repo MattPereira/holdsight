@@ -1,38 +1,10 @@
 import "server-only";
 
 import { isValidEvmAddress } from "@/lib/evm/accounts";
-import type { Position } from "@/lib/portfolio/types";
+import type { InvestmentBalance } from "@/lib/portfolio/types";
 
 const HYPERLIQUID_INFO_URL =
   process.env.HYPERLIQUID_INFO_URL ?? "https://api.hyperliquid.xyz/info";
-
-type HyperliquidPerpState = {
-  assetPositions?: Array<{
-    position: {
-      coin: string;
-      szi: string;
-      entryPx: string;
-      positionValue: string;
-      unrealizedPnl: string;
-      liquidationPx?: string | null;
-      marginUsed: string;
-      returnOnEquity?: string;
-      leverage?: {
-        type?: string;
-        value?: number;
-        rawUsd?: string;
-      };
-    };
-  }>;
-  marginSummary?: {
-    accountValue?: string;
-    totalMarginUsed?: string;
-    totalNtlPos?: string;
-    totalRawUsd?: string;
-  };
-  withdrawable?: string;
-  time?: number;
-};
 
 type HyperliquidSpotState = {
   balances?: Array<{
@@ -78,41 +50,16 @@ type HyperliquidSpotMarketData = {
   assetCtxs: HyperliquidSpotAssetCtx[];
 };
 
-export type HyperCorePerpDetails = {
-  market: string;
-  side: "long" | "short";
-  signedSize: string;
-  entryPx: string;
-  liquidationPx: string | null;
-  marginUsed: string;
-  unrealizedPnl: string;
-  returnOnEquity: string | null;
-  leverageType: string | null;
-  leverageValue: string | null;
-  rawLeverage: unknown;
+export type HyperCoreBalance = InvestmentBalance & {
+  assetClass: "token" | "cash";
+  balanceType: "spot" | "staking";
 };
 
-export type HyperCorePosition = Position & {
-  assetClass: "token" | "cash" | "derivative";
-  hyperCorePerpDetails?: HyperCorePerpDetails;
-};
-
-export type HyperCoreAccountSummary = {
-  accountValue: string;
-  totalMarginUsed: string;
-  totalNtlPos: string;
-  totalRawUsd: string;
-  withdrawable: string;
-  sourceTime: Date | null;
-  raw: HyperliquidPerpState;
-};
-
-export type HyperCorePositionsResult =
+export type HyperCoreBalancesResult =
   | {
       status: "ready";
       address: string;
-      positions: HyperCorePosition[];
-      accountSummary: HyperCoreAccountSummary | null;
+      balances: HyperCoreBalance[];
     }
   | { status: "rate_limited"; address: string }
   | { status: "error"; address: string; message: string; httpStatus: number };
@@ -121,10 +68,6 @@ function toNumber(value: string | number | null | undefined): number {
   if (value === null || value === undefined || value === "") return 0;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function toNumericString(value: string | number | null | undefined): string {
-  return String(toNumber(value));
 }
 
 async function postInfo(body: Record<string, unknown>): Promise<Response> {
@@ -155,13 +98,6 @@ async function readInfo<T>(body: Record<string, unknown>): Promise<T> {
   }
 
   return (await res.json()) as T;
-}
-
-async function fetchPerpState(address: string): Promise<HyperliquidPerpState> {
-  return readInfo<HyperliquidPerpState>({
-    type: "clearinghouseState",
-    user: address,
-  });
 }
 
 async function fetchSpotState(address: string): Promise<HyperliquidSpotState> {
@@ -240,11 +176,11 @@ function tokenUsdPrice(
   return spotUsdPrice(token?.index ?? tokenIndex, meta, assetCtxs);
 }
 
-function normalizeSpotPositions(
+function normalizeSpotBalances(
   spotState: HyperliquidSpotState,
   marketData: HyperliquidSpotMarketData,
-): HyperCorePosition[] {
-  const positions: HyperCorePosition[] = [];
+): HyperCoreBalance[] {
+  const balances: HyperCoreBalance[] = [];
 
   for (const balance of spotState.balances ?? []) {
     const amount = toNumber(balance.total);
@@ -259,8 +195,8 @@ function normalizeSpotPositions(
     if (priceUsd === null) continue;
 
     const symbol = balance.coin || tokenName(marketData.meta, balance.token) || "?";
-    positions.push({
-      sourcePositionId: `hypercore:spot:${balance.token}`,
+    balances.push({
+      sourceBalanceId: `hypercore:spot:${balance.token}`,
       symbol,
       name: tokenName(marketData.meta, balance.token) ?? symbol,
       chainId: "hypercore",
@@ -268,16 +204,17 @@ function normalizeSpotPositions(
       priceUsd,
       valueUsd: amount * priceUsd,
       assetClass: symbol === "USDC" ? "cash" : "token",
+      balanceType: "spot",
     });
   }
 
-  return positions;
+  return balances;
 }
 
-function normalizeStakingPositions(
+function normalizeStakingBalances(
   stakingSummary: HyperliquidDelegatorSummary,
   marketData: HyperliquidSpotMarketData,
-): HyperCorePosition[] {
+): HyperCoreBalance[] {
   const priceUsd = tokenUsdPrice(
     "HYPE",
     marketData.meta,
@@ -287,19 +224,19 @@ function normalizeStakingPositions(
 
   const buckets = [
     {
-      sourcePositionId: "hypercore:staking:hype:delegated",
+      sourceBalanceId: "hypercore:staking:hype:delegated",
       symbol: "sHYPE",
       name: "HYPE Staked",
       amount: toNumber(stakingSummary.delegated),
     },
     {
-      sourcePositionId: "hypercore:staking:hype:undelegated",
+      sourceBalanceId: "hypercore:staking:hype:undelegated",
       symbol: "HYPE",
       name: "HYPE",
       amount: toNumber(stakingSummary.undelegated),
     },
     {
-      sourcePositionId: "hypercore:staking:hype:pending-withdrawal",
+      sourceBalanceId: "hypercore:staking:hype:pending-withdrawal",
       symbol: "pHYPE",
       name: "HYPE Pending Unstake",
       amount: toNumber(stakingSummary.totalPendingWithdrawal),
@@ -310,7 +247,7 @@ function normalizeStakingPositions(
     if (bucket.amount === 0) return [];
 
     return [{
-      sourcePositionId: bucket.sourcePositionId,
+      sourceBalanceId: bucket.sourceBalanceId,
       symbol: bucket.symbol,
       name: bucket.name,
       chainId: "hypercore",
@@ -318,72 +255,15 @@ function normalizeStakingPositions(
       priceUsd,
       valueUsd: bucket.amount * priceUsd,
       assetClass: "token" as const,
+      balanceType: "staking" as const,
     }];
   });
 }
 
-function normalizePerpPositions(
-  perpState: HyperliquidPerpState,
-): HyperCorePosition[] {
-  return (perpState.assetPositions ?? [])
-    .map(({ position }) => {
-      const signedSize = toNumber(position.szi);
-      const valueUsd = toNumber(position.positionValue);
-      const priceUsd = signedSize === 0 ? 0 : Math.abs(valueUsd / signedSize);
-      const side: HyperCorePerpDetails["side"] =
-        signedSize >= 0 ? "long" : "short";
-      const leverageValue = position.leverage?.value;
-
-      return {
-        sourcePositionId: `hypercore:perp:${position.coin}`,
-        symbol: `${position.coin}-PERP`,
-        name: `${position.coin} Perpetual`,
-        chainId: "hypercore",
-        amount: signedSize,
-        priceUsd,
-        valueUsd,
-        assetClass: "derivative" as const,
-        hyperCorePerpDetails: {
-          market: position.coin,
-          side,
-          signedSize: toNumericString(position.szi),
-          entryPx: toNumericString(position.entryPx),
-          liquidationPx: position.liquidationPx
-            ? toNumericString(position.liquidationPx)
-            : null,
-          marginUsed: toNumericString(position.marginUsed),
-          unrealizedPnl: toNumericString(position.unrealizedPnl),
-          returnOnEquity: position.returnOnEquity
-            ? toNumericString(position.returnOnEquity)
-            : null,
-          leverageType: position.leverage?.type ?? null,
-          leverageValue:
-            leverageValue === undefined ? null : toNumericString(leverageValue),
-          rawLeverage: position.leverage ?? null,
-        },
-      };
-    })
-    .filter((position) => position.amount !== 0);
-}
-
-function normalizeAccountSummary(
-  perpState: HyperliquidPerpState,
-): HyperCoreAccountSummary {
-  return {
-    accountValue: toNumericString(perpState.marginSummary?.accountValue),
-    totalMarginUsed: toNumericString(perpState.marginSummary?.totalMarginUsed),
-    totalNtlPos: toNumericString(perpState.marginSummary?.totalNtlPos),
-    totalRawUsd: toNumericString(perpState.marginSummary?.totalRawUsd),
-    withdrawable: toNumericString(perpState.withdrawable),
-    sourceTime: perpState.time ? new Date(perpState.time) : null,
-    raw: perpState,
-  };
-}
-
-export async function getHyperCorePositions(
+export async function fetchHyperCoreBalances(
   address: string,
   spotMarketData?: HyperliquidSpotMarketData,
-): Promise<HyperCorePositionsResult> {
+): Promise<HyperCoreBalancesResult> {
   if (!isValidEvmAddress(address)) {
     return {
       status: "error",
@@ -394,27 +274,22 @@ export async function getHyperCorePositions(
   }
 
   try {
-    const [
-      perpState,
-      spotState,
-      stakingSummary,
-      resolvedSpotMarketData,
-    ] = await Promise.all([
-      fetchPerpState(address),
-      fetchSpotState(address),
-      fetchDelegatorSummary(address),
-      spotMarketData ? Promise.resolve(spotMarketData) : fetchSpotMarketData(),
-    ]);
+    const [spotState, stakingSummary, resolvedSpotMarketData] =
+      await Promise.all([
+        fetchSpotState(address),
+        fetchDelegatorSummary(address),
+        spotMarketData
+          ? Promise.resolve(spotMarketData)
+          : fetchSpotMarketData(),
+      ]);
 
     return {
       status: "ready",
       address,
-      positions: [
-        ...normalizeSpotPositions(spotState, resolvedSpotMarketData),
-        ...normalizeStakingPositions(stakingSummary, resolvedSpotMarketData),
-        ...normalizePerpPositions(perpState),
+      balances: [
+        ...normalizeSpotBalances(spotState, resolvedSpotMarketData),
+        ...normalizeStakingBalances(stakingSummary, resolvedSpotMarketData),
       ],
-      accountSummary: normalizeAccountSummary(perpState),
     };
   } catch (err) {
     const httpStatus =

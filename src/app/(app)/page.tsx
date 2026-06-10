@@ -2,13 +2,13 @@ import { PortfolioOverviewPage } from "@/components/portfolio-overview-page";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 import { getUserAssetGroups } from "@/lib/portfolio/groups";
-import { getCurrentPortfolioPositions } from "@/lib/portfolio/positions";
+import { getCurrentPortfolioBalances } from "@/lib/portfolio/balances";
 
 export default async function Home() {
   const userId = await getCurrentUserId();
   const [summary, groups] = userId
     ? await Promise.all([
-        getCurrentPortfolioPositions(userId).then(
+        getCurrentPortfolioBalances(userId).then(
           portfolioAssetSummary,
         ),
         getUserAssetGroups(userId),

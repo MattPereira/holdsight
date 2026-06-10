@@ -1,5 +1,5 @@
 import "server-only";
-import type { Position, PositionsResult } from "@/lib/portfolio/types";
+import type { InvestmentBalance, BalancesResult } from "@/lib/portfolio/types";
 
 const ZERION_BASE = "https://api.zerion.io/v1";
 const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
@@ -55,7 +55,7 @@ function queuedPacedFetch(
   return request;
 }
 
-type RawPosition = {
+type RawInvestmentBalance = {
   id?: string;
   attributes: {
     quantity?: { float?: number };
@@ -79,14 +79,14 @@ type RawPosition = {
   };
 };
 
-function toPosition(raw: RawPosition): Position {
+function toInvestmentBalance(raw: RawInvestmentBalance): InvestmentBalance {
   const chainId = raw.relationships?.chain?.data?.id ?? "unknown";
   const implementation = raw.attributes.fungible_info?.implementations?.find(
     (item) => item.chain_id === chainId,
   );
 
   return {
-    sourcePositionId: raw.id,
+    sourceBalanceId: raw.id,
     symbol: raw.attributes.fungible_info?.symbol ?? "?",
     name: raw.attributes.fungible_info?.name,
     chainId,
@@ -100,7 +100,7 @@ function toPosition(raw: RawPosition): Position {
 function validateOptions(
   address: string,
   opts: { chains?: string; currency?: string; minValue?: number },
-): PositionsResult | null {
+): BalancesResult | null {
   if (!EVM_ADDRESS_RE.test(address)) {
     return {
       status: "error",
@@ -141,15 +141,15 @@ function validateOptions(
 }
 
 /**
- * Fetch every multi-chain token position for a wallet, following pagination.
+ * Fetch every multi-chain token balance for a wallet, following pagination.
  * Never cached (`no-store`): a Zerion call happens only when this is invoked,
  * and always returns fresh data. Trigger it from a user action (button), not
  * during page render, so page loads cost zero Zerion calls.
  */
-export async function getWalletPositions(
+export async function getWalletBalances(
   address: string,
   opts: { chains?: string; currency?: string; minValue?: number } = {},
-): Promise<PositionsResult> {
+): Promise<BalancesResult> {
   const validationError = validateOptions(address, opts);
   if (validationError) return validationError;
 
@@ -166,7 +166,7 @@ export async function getWalletPositions(
   if (opts.chains) url.searchParams.set("filter[chain_ids]", opts.chains);
 
   const headers = { accept: "application/json", authorization: authHeader() };
-  const raw: RawPosition[] = [];
+  const raw: RawInvestmentBalance[] = [];
   let next: string | null = url.toString();
 
   while (next) {
@@ -185,16 +185,16 @@ export async function getWalletPositions(
       };
     }
 
-    const body = (await res.json()) as { data: RawPosition[]; links?: { next?: string } };
+    const body = (await res.json()) as { data: RawInvestmentBalance[]; links?: { next?: string } };
     raw.push(...body.data);
     next = body.links?.next ?? null;
   }
 
-  // Drop dust: keep only positions worth at least `minValue` USD. This also
+  // Drop dust: keep only balances worth at least `minValue` USD. This also
   // removes unpriced spam, which Zerion reports with a value of 0.
-  const positions = raw
-    .map(toPosition)
+  const balances = raw
+    .map(toInvestmentBalance)
     .filter((p) => p.valueUsd >= minValue);
 
-  return { status: "ready", address, positions };
+  return { status: "ready", address, balances };
 }

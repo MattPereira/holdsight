@@ -1,15 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { getWalletPositions } from "@/lib/evm/client";
+import { getWalletBalances } from "@/lib/evm/client";
 import { getCurrentUserId } from "@/lib/auth/session";
-import type { PositionsResult } from "@/lib/portfolio/types";
+import type { BalancesResult } from "@/lib/portfolio/types";
 import {
   isValidEvmAddress,
   normalizeEvmAddress,
   userHasEvmAccountAddress,
 } from "@/lib/evm/accounts";
 
-function statusForResult(result: PositionsResult): number {
+function statusForResult(result: BalancesResult): number {
   switch (result.status) {
     case "ready":
       return 200;
@@ -46,7 +46,7 @@ export async function GET(
   const { searchParams } = request.nextUrl;
 
   try {
-    const result = await getWalletPositions(address, {
+    const result = await getWalletBalances(address, {
       currency: searchParams.get("currency") ?? undefined,
       // Pass ?chains=ethereum,base to narrow; omit for all chains.
       chains: searchParams.get("chains") ?? undefined,

@@ -7,7 +7,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { walletTotal } from "@/lib/portfolio/asset-totals";
-import type { Position, PositionsResult } from "@/lib/portfolio/types";
+import type { InvestmentBalance, BalancesResult } from "@/lib/portfolio/types";
 
 const usdFormat = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -48,7 +48,7 @@ function shortenAddress(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
-function statusMessage(result: PositionsResult): string {
+function statusMessage(result: BalancesResult): string {
   switch (result.status) {
     case "indexing":
       return "Indexing...";
@@ -57,17 +57,17 @@ function statusMessage(result: PositionsResult): string {
     case "error":
       return result.message;
     case "ready":
-      return "No positions.";
+      return "No balances.";
   }
 }
 
-function positionKey(position: Position, i: number): string {
+function balanceKey(balance: InvestmentBalance, i: number): string {
   return (
-    position.sourcePositionId ?? `${position.symbol}-${position.chainId}-${i}`
+    balance.sourceBalanceId ?? `${balance.symbol}-${balance.chainId}-${i}`
   );
 }
 
-function DesktopTable({ positions }: { positions: Position[] }) {
+function DesktopTable({ balances }: { balances: InvestmentBalance[] }) {
   return (
     <div className="hidden overflow-hidden rounded-lg border sm:block">
       <Table className="table-fixed">
@@ -88,20 +88,20 @@ function DesktopTable({ positions }: { positions: Position[] }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {positions.map((position, i) => (
-            <TableRow key={positionKey(position, i)}>
-              <TableCell className="font-medium">{position.symbol}</TableCell>
+          {balances.map((balance, i) => (
+            <TableRow key={balanceKey(balance, i)}>
+              <TableCell className="font-medium">{balance.symbol}</TableCell>
               <TableCell className="text-muted-foreground">
-                {position.chainId}
+                {balance.chainId}
               </TableCell>
               <TableCell className="text-right tabular-nums text-muted-foreground">
-                {amountFormat.format(position.amount)}
+                {amountFormat.format(balance.amount)}
               </TableCell>
               <TableCell className="text-right tabular-nums text-muted-foreground">
-                {formatPrice(position.priceUsd)}
+                {formatPrice(balance.priceUsd)}
               </TableCell>
               <TableCell className="text-right font-medium tabular-nums">
-                {formatUsd(position.valueUsd)}
+                {formatUsd(balance.valueUsd)}
               </TableCell>
             </TableRow>
           ))}
@@ -111,25 +111,25 @@ function DesktopTable({ positions }: { positions: Position[] }) {
   );
 }
 
-function MobileList({ positions }: { positions: Position[] }) {
+function MobileList({ balances }: { balances: InvestmentBalance[] }) {
   return (
     <ul className="divide-y rounded-lg border sm:hidden">
-      {positions.map((position, i) => (
+      {balances.map((balance, i) => (
         <li
-          key={positionKey(position, i)}
+          key={balanceKey(balance, i)}
           className="flex flex-col gap-2 px-4 py-3"
         >
           <div className="flex items-baseline justify-between gap-4">
-            <span className="font-medium">{position.symbol}</span>
+            <span className="font-medium">{balance.symbol}</span>
             <span className="font-medium tabular-nums">
-              {formatUsd(position.valueUsd)}
+              {formatUsd(balance.valueUsd)}
             </span>
           </div>
           <div className="flex items-baseline justify-between gap-4 text-xs text-muted-foreground">
-            <span>{position.chainId}</span>
+            <span>{balance.chainId}</span>
             <span className="tabular-nums">
-              {amountFormat.format(position.amount)} @{" "}
-              {formatPrice(position.priceUsd)}
+              {amountFormat.format(balance.amount)} @{" "}
+              {formatPrice(balance.priceUsd)}
             </span>
           </div>
         </li>
@@ -146,13 +146,13 @@ function MobileList({ positions }: { positions: Position[] }) {
  * Intentionally self-contained — it owns its own formatters and markup so a
  * rewrite of the aggregate summary display can never take it down with it.
  */
-export function AccountDetailsTable({ result }: { result: PositionsResult }) {
-  const hasPositions =
-    result.status === "ready" && result.positions.length > 0;
+export function AccountDetailsTable({ result }: { result: BalancesResult }) {
+  const hasBalances =
+    result.status === "ready" && result.balances.length > 0;
   const total = walletTotal(result);
 
   // A ready-but-empty address has nothing worth showing.
-  if (result.status === "ready" && result.positions.length === 0) {
+  if (result.status === "ready" && result.balances.length === 0) {
     return null;
   }
 
@@ -166,10 +166,10 @@ export function AccountDetailsTable({ result }: { result: PositionsResult }) {
           {formatUsd(total)}
         </span>
       </div>
-      {hasPositions ? (
+      {hasBalances ? (
         <>
-          <DesktopTable positions={result.positions} />
-          <MobileList positions={result.positions} />
+          <DesktopTable balances={result.balances} />
+          <MobileList balances={result.balances} />
         </>
       ) : (
         <p className="text-sm text-muted-foreground">{statusMessage(result)}</p>

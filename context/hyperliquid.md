@@ -2,42 +2,41 @@
 
 ## Current State
 
-The refresh button on the home page calls `loadPositions()` in `src/app/actions.ts`.
+The refresh button on the home page calls balance loading actions in
+`src/app/actions.ts`.
 That action now syncs two data sources for each saved EVM wallet:
 
-- Zerion EVM wallet positions.
-- Hyperliquid HyperCore account state for the same wallet address, including
-  spot balances, staking buckets, and perp positions.
+- Zerion EVM wallet balances.
+- Hyperliquid HyperCore balances for the same wallet address, including spot
+  balances and staking buckets.
 
-HyperCore uses its own `financial_accounts.kind = "hyper_core"` records so provider
+HyperCore uses its own `investment_accounts.kind = "hyper_core"` records so provider
 sync history stays separate from `evm_wallet` / Zerion data. The display layer merges
 only HyperCore spot and staking holdings into the existing wallet holdings table.
 
+Perp fetching is intentionally deferred. When it is added, it should live in a
+dedicated positions path, not in the HyperCore balances sync.
+
 ## HyperCore Files
 
-- `src/lib/hyperliquid.ts`
+- `src/lib/hyper-core/client.ts`
   - Server-only Hyperliquid API adapter.
   - Fetches:
-    - `clearinghouseState` for perp account state and positions.
     - `spotClearinghouseState` for spot balances.
     - `spotMetaAndAssetCtxs` for spot prices.
     - `delegatorSummary` for staking holding buckets.
-  - Normalizes spot, staking, and perp records into `HyperCorePosition`.
+  - Normalizes spot and staking records into `HyperCoreBalance`.
 
-- `src/lib/hyper-core-accounts.ts`
+- `src/lib/hyper-core/accounts.ts`
   - Ensures each saved EVM wallet has a matching active HyperCore financial account.
   - Returns only HyperCore accounts that correspond to the current saved wallet set.
 
-- `src/lib/hyper-core-snapshots.ts`
-  - Saves HyperCore sync runs.
-  - Saves normalized HyperCore spot, staking, and perp rows into
-    `financial_account_positions`.
-  - Saves perp-specific fields into `hyper_core_position_details`.
-  - Saves account-level perp summary into `hyper_core_account_snapshots`.
-  - Reads latest HyperCore spot/staking rows for merging into the existing holdings
-    display.
+- `src/lib/hyper-core/balances.ts`
+  - Saves normalized HyperCore spot and staking rows into `investment_balances`.
+  - Saves provider-specific balance metadata into `hyper_core_balance_details`.
+  - Reads HyperCore balances for display and for merging into portfolio totals.
 
-## Database Work Already Done For Perps
+## Database Shape For Future Perps
 
 The schema now has:
 
@@ -55,17 +54,8 @@ The schema now has:
   - `leverage_value`
   - `raw_leverage`
 
-- `hyper_core_account_snapshots`
-  - `sync_run_id`
-  - `account_value`
-  - `total_margin_used`
-  - `total_ntl_pos`
-  - `total_raw_usd`
-  - `withdrawable`
-  - `source_time`
-  - `raw`
-
-Perp rows are already inserted into `financial_account_positions` with:
+Current balance sync does not fetch or insert perps. When perp fetching is added,
+the dedicated positions sync should insert rows into `investment_positions` with:
 
 - `asset_class = "derivative"`
 - `source_position_id = "hypercore:perp:{coin}"`
@@ -75,29 +65,27 @@ Perp rows are already inserted into `financial_account_positions` with:
 - derived `price_usd = abs(positionValue / szi)`
 - `value_usd = positionValue`
 
-Then the matching details row is inserted into `hyper_core_position_details`.
+Then the matching details row should be inserted into
+`hyper_core_position_details`.
 
 ## Display Status
 
-Perps are intentionally not displayed yet.
+Perps are intentionally not fetched or displayed yet.
 
 Current display behavior:
 
-- Existing EVM positions still render normally.
-- HyperCore spot and staking positions are merged into each wallet's existing
+- Existing EVM balances render normally.
+- HyperCore spot and staking balances are merged into each wallet's existing
   holdings table with `chainId = "hypercore"`.
-- HyperCore perps are saved in the DB but filtered out by the current read path because
-  `getLatestHyperCoreSpotPositionsByAccountId()` only returns `assetClass` values
-  `"token"` and `"cash"`.
+- HyperCore perps are deferred.
 
 ## How To Pick Up Perp Display Later
 
 Recommended next steps:
 
-1. Add a perp-specific read function in `src/lib/hyper-core-snapshots.ts`.
-   It should query the latest successful HyperCore sync run for a HyperCore account,
-   select `financial_account_positions` where `asset_class = "derivative"`, and join
-   `hyper_core_position_details`.
+1. Add a dedicated `src/lib/hyper-core/positions.ts`.
+   It should fetch `clearinghouseState`, normalize derivative positions, insert
+   `investment_positions` rows, and join/read `hyper_core_position_details`.
 
 2. Add a type in `src/lib/types.ts`, for example:
 
@@ -131,16 +119,14 @@ Recommended next steps:
    - Suggested columns: Market, Side, Size, Entry, Mark, Value, Margin, PnL,
      Liquidation, Leverage.
 
-5. Consider showing `hyper_core_account_snapshots` above the perps table.
-   Useful summary fields:
+5. Consider adding a HyperCore account snapshot table and showing it above the
+   perps table. Useful summary fields:
    - account value
    - withdrawable
    - total margin used
    - total notional position
 
 ## Migration
-
-The generated migration is `drizzle/0002_clumsy_lorna_dane.sql`.
 
 Before testing HyperCore sync against a database, run:
 
@@ -235,9 +221,9 @@ Keep the display buckets separate even if a summary total combines them.
 
 ### Validator Details
 
-The validator-level `delegations` response should not be squeezed into the generic
-`financial_account_positions` table. Add a provider-specific detail table later,
-similar to `hyper_core_position_details`, if we want validator breakdowns:
+The validator-level `delegations` response should not be squeezed into
+`investment_balances`. Add a provider-specific detail table later if we want
+validator breakdowns:
 
 ```txt
 hyper_core_staking_delegations

@@ -2,12 +2,12 @@
 
 import { RiRefreshLine } from "@remixicon/react";
 import { useMemo, useState, useTransition } from "react";
-import { loadEvmPositions, loadHyperCorePositions } from "@/app/actions";
+import { loadEvmBalances, loadHyperCoreBalances } from "@/app/actions";
 import { AccountDetailsTable } from "@/components/account-details-table";
 import { PortfolioAllocations } from "@/components/portfolio-allocations";
 import { Button } from "@/components/ui/button";
 import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
-import type { PositionsResult } from "@/lib/portfolio/types";
+import type { BalancesResult } from "@/lib/portfolio/types";
 
 /* ------------------------------ container ------------------------------ */
 
@@ -17,12 +17,12 @@ export function AccountDetailsPage({
   title,
   headerAction,
 }: {
-  initialResults: PositionsResult[];
+  initialResults: BalancesResult[];
   source: "evm" | "hypercore";
   title: string;
   headerAction?: React.ReactNode;
 }) {
-  const [results, setResults] = useState<PositionsResult[]>(initialResults);
+  const [results, setResults] = useState<BalancesResult[]>(initialResults);
   const [isPending, startTransition] = useTransition();
   const summary = useMemo(() => portfolioAssetSummary(results), [results]);
 
@@ -30,8 +30,8 @@ export function AccountDetailsPage({
     startTransition(async () => {
       const data =
         source === "evm"
-          ? await loadEvmPositions()
-          : await loadHyperCorePositions();
+          ? await loadEvmBalances()
+          : await loadHyperCoreBalances();
       setResults(data);
     });
   }
