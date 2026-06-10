@@ -1,0 +1,2 @@
+CREATE TYPE "public"."brokerage_account_type" AS ENUM('taxable', 'traditional_ira', 'roth_ira', 'sep_ira', 'simple_ira', '401k', 'other_retirement');--> statement-breakpoint
+ALTER TABLE "brokerage_accounts" ADD COLUMN "account_type" "brokerage_account_type" DEFAULT 'taxable' NOT NULL;

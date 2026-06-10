@@ -34,6 +34,16 @@ export const investmentAccountSyncStatus = pgEnum(
   ["idle", "success", "indexing", "rate_limited", "error"],
 );
 
+export const brokerageAccountType = pgEnum("brokerage_account_type", [
+  "taxable",
+  "traditional_ira",
+  "roth_ira",
+  "sep_ira",
+  "simple_ira",
+  "401k",
+  "other_retirement",
+]);
+
 export const assetClass = pgEnum("asset_class", [
   "crypto",
   "token",
@@ -139,6 +149,9 @@ export const brokerageAccounts = pgTable(
       .primaryKey()
       .references(() => investmentAccounts.id, { onDelete: "cascade" }),
     brokerage: text("brokerage").notNull(),
+    accountType: brokerageAccountType("account_type")
+      .default("taxable")
+      .notNull(),
     externalAccountId: text("external_account_id"),
   },
   (table) => [index("brokerage_accounts_brokerage_idx").on(table.brokerage)],

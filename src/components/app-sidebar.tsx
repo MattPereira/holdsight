@@ -4,8 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   RiArrowRightSLine,
+  RiBankCardLine,
+  RiCashLine,
   RiFocus3Line,
   RiFundsBoxLine,
+  RiHome4Line,
 } from "@remixicon/react";
 
 import { NavUser } from "@/components/nav-user";
@@ -28,7 +31,6 @@ const accounts: { label: string; href?: string }[] = [
   { label: "HyperCore", href: "/hyper-core" },
   { label: "Exchange" },
   { label: "Brokerage" },
-  { label: "Retirement" },
 ];
 
 export function AppSidebar({ name, email }: { name: string; email: string }) {
@@ -80,6 +82,33 @@ export function AppSidebar({ name, email }: { name: string; email: string }) {
                   ))}
                 </SidebarMenuSub>
               ) : null}
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                size="lg"
+                className="text-base [&>svg]:size-5"
+              >
+                <RiCashLine />
+                <span>Checking</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                size="lg"
+                className="text-base [&>svg]:size-5"
+              >
+                <RiBankCardLine />
+                <span>Credit Card</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                size="lg"
+                className="text-base [&>svg]:size-5"
+              >
+                <RiHome4Line />
+                <span>Property</span>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
