@@ -4,15 +4,15 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
-  getLatestEvmPositionSnapshots,
+  getCurrentEvmPositions,
   syncEvmWalletPositions,
-} from "@/lib/evm/snapshots";
-import { getLatestPortfolioPositionSnapshots } from "@/lib/portfolio/snapshots";
+} from "@/lib/evm/positions";
+import { getCurrentPortfolioPositions } from "@/lib/portfolio/positions";
 import { ensureUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
 import {
-  getLatestHyperCorePositionSnapshots,
+  getCurrentHyperCorePositions,
   syncHyperCoreAccounts,
-} from "@/lib/hyper-core/snapshots";
+} from "@/lib/hyper-core/positions";
 import {
   addUserEvmAccounts,
   getUserEvmAccounts,
@@ -126,7 +126,7 @@ export async function loadEvmPositions(): Promise<PositionsResult[]> {
   const wallets = await getUserEvmAccounts(userId);
   await syncEvmWalletPositions(wallets);
 
-  return getLatestEvmPositionSnapshots(userId);
+  return getCurrentEvmPositions(userId);
 }
 
 export async function loadHyperCorePositions(): Promise<PositionsResult[]> {
@@ -149,7 +149,7 @@ export async function loadHyperCorePositions(): Promise<PositionsResult[]> {
   const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
   await syncHyperCoreAccounts(hyperCoreAccounts);
 
-  return getLatestHyperCorePositionSnapshots(hyperCoreAccounts);
+  return getCurrentHyperCorePositions(hyperCoreAccounts);
 }
 
 export type AssetGroupActionResult = {
@@ -220,5 +220,5 @@ export async function loadPortfolioSummary(): Promise<PortfolioAssetSummary> {
   const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
   await syncHyperCoreAccounts(hyperCoreAccounts);
 
-  return portfolioAssetSummary(await getLatestPortfolioPositionSnapshots(userId));
+  return portfolioAssetSummary(await getCurrentPortfolioPositions(userId));
 }

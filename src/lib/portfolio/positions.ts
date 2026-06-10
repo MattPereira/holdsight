@@ -1,14 +1,14 @@
 import "server-only";
 
-import { getLatestEvmPositionSnapshots } from "@/lib/evm/snapshots";
+import { getCurrentEvmPositions } from "@/lib/evm/positions";
 import { getUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
-import { getLatestHyperCoreSpotPositionsByAccountId } from "@/lib/hyper-core/snapshots";
+import { getCurrentHyperCoreSpotPositionsByAccountId } from "@/lib/hyper-core/positions";
 import type { PositionsResult } from "@/lib/portfolio/types";
 
-export async function getLatestPortfolioPositionSnapshots(
+export async function getCurrentPortfolioPositions(
   userId: string,
 ): Promise<PositionsResult[]> {
-  const evmResults = await getLatestEvmPositionSnapshots(userId);
+  const evmResults = await getCurrentEvmPositions(userId);
   const hyperCoreAccounts = await getUserHyperCoreAccounts(userId);
   const hyperCoreAccountByAddress = new Map(
     hyperCoreAccounts.map((account) => [account.address, account]),
@@ -18,7 +18,7 @@ export async function getLatestPortfolioPositionSnapshots(
     evmResults.map(async (result) => {
       const hyperCoreAccount = hyperCoreAccountByAddress.get(result.address);
       const hyperCoreSpotPositions = hyperCoreAccount
-        ? await getLatestHyperCoreSpotPositionsByAccountId(hyperCoreAccount.id)
+        ? await getCurrentHyperCoreSpotPositionsByAccountId(hyperCoreAccount.id)
         : [];
 
       if (result.status !== "ready") return result;

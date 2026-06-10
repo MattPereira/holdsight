@@ -5,15 +5,18 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
-  financialAccounts,
+  investmentAccounts,
   hyperCoreAccounts,
-} from "@/db/schema/financial-accounts";
+} from "@/db/schema/investment-accounts";
 import type { SavedEvmAccount } from "@/lib/evm/accounts";
 
 export type SavedHyperCoreAccount = {
   id: string;
   address: string;
   label: string | null;
+  syncStatus: "idle" | "success" | "indexing" | "rate_limited" | "error";
+  syncHttpStatus: number | null;
+  syncErrorMessage: string | null;
 };
 
 export async function getUserHyperCoreAccounts(
@@ -21,24 +24,27 @@ export async function getUserHyperCoreAccounts(
 ): Promise<SavedHyperCoreAccount[]> {
   return db
     .select({
-      id: financialAccounts.id,
+      id: investmentAccounts.id,
       address: hyperCoreAccounts.address,
-      label: financialAccounts.label,
+      label: investmentAccounts.label,
+      syncStatus: investmentAccounts.syncStatus,
+      syncHttpStatus: investmentAccounts.syncHttpStatus,
+      syncErrorMessage: investmentAccounts.syncErrorMessage,
     })
     .from(hyperCoreAccounts)
     .innerJoin(
-      financialAccounts,
-      eq(hyperCoreAccounts.financialAccountId, financialAccounts.id),
+      investmentAccounts,
+      eq(hyperCoreAccounts.investmentAccountId, investmentAccounts.id),
     )
     .where(
       and(
         eq(hyperCoreAccounts.userId, userId),
-        eq(financialAccounts.userId, userId),
-        eq(financialAccounts.kind, "hyper_core"),
-        eq(financialAccounts.status, "active"),
+        eq(investmentAccounts.userId, userId),
+        eq(investmentAccounts.kind, "hyper_core"),
+        eq(investmentAccounts.status, "active"),
       ),
     )
-    .orderBy(desc(financialAccounts.createdAt));
+    .orderBy(desc(investmentAccounts.createdAt));
 }
 
 export async function ensureUserHyperCoreAccounts(
@@ -49,39 +55,40 @@ export async function ensureUserHyperCoreAccounts(
 
   for (const wallet of wallets) {
     const [existing] = await db
-      .select({ id: hyperCoreAccounts.financialAccountId })
+      .select({ id: hyperCoreAccounts.investmentAccountId })
       .from(hyperCoreAccounts)
       .innerJoin(
-        financialAccounts,
-        eq(hyperCoreAccounts.financialAccountId, financialAccounts.id),
+        investmentAccounts,
+        eq(hyperCoreAccounts.investmentAccountId, investmentAccounts.id),
       )
       .where(
         and(
           eq(hyperCoreAccounts.userId, userId),
           eq(hyperCoreAccounts.address, wallet.address),
-          eq(financialAccounts.userId, userId),
-          eq(financialAccounts.kind, "hyper_core"),
+          eq(investmentAccounts.userId, userId),
+          eq(investmentAccounts.kind, "hyper_core"),
         ),
       )
       .limit(1);
 
     if (existing) continue;
 
-    const financialAccountId = randomUUID();
-    await db.batch([
-      db.insert(financialAccounts).values({
-        id: financialAccountId,
+    const investmentAccountId = randomUUID();
+    await db.transaction(async (tx) => {
+      await tx.insert(investmentAccounts).values({
+        id: investmentAccountId,
         userId,
         kind: "hyper_core",
         provider: "hyperliquid",
         label: wallet.label,
-      }),
-      db.insert(hyperCoreAccounts).values({
-        financialAccountId,
+      });
+
+      await tx.insert(hyperCoreAccounts).values({
+        investmentAccountId,
         userId,
         address: wallet.address,
-      }),
-    ]);
+      });
+    });
   }
 
   const accounts = await getUserHyperCoreAccounts(userId);

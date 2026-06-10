@@ -6,8 +6,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   evmWalletAccounts,
-  financialAccounts,
-} from "@/db/schema/financial-accounts";
+  investmentAccounts,
+} from "@/db/schema/investment-accounts";
 
 const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 
@@ -15,6 +15,9 @@ export type SavedEvmAccount = {
   id: string;
   address: string;
   label: string | null;
+  syncStatus: "idle" | "success" | "indexing" | "rate_limited" | "error";
+  syncHttpStatus: number | null;
+  syncErrorMessage: string | null;
 };
 
 export function isValidEvmAddress(address: string): boolean {
@@ -43,24 +46,27 @@ export async function getUserEvmAccounts(
 ): Promise<SavedEvmAccount[]> {
   return db
     .select({
-      id: financialAccounts.id,
+      id: investmentAccounts.id,
       address: evmWalletAccounts.address,
-      label: financialAccounts.label,
+      label: investmentAccounts.label,
+      syncStatus: investmentAccounts.syncStatus,
+      syncHttpStatus: investmentAccounts.syncHttpStatus,
+      syncErrorMessage: investmentAccounts.syncErrorMessage,
     })
     .from(evmWalletAccounts)
     .innerJoin(
-      financialAccounts,
-      eq(evmWalletAccounts.financialAccountId, financialAccounts.id),
+      investmentAccounts,
+      eq(evmWalletAccounts.investmentAccountId, investmentAccounts.id),
     )
     .where(
       and(
         eq(evmWalletAccounts.userId, userId),
-        eq(financialAccounts.userId, userId),
-        eq(financialAccounts.kind, "evm_wallet"),
-        eq(financialAccounts.status, "active"),
+        eq(investmentAccounts.userId, userId),
+        eq(investmentAccounts.kind, "evm_wallet"),
+        eq(investmentAccounts.status, "active"),
       ),
     )
-    .orderBy(desc(financialAccounts.createdAt));
+    .orderBy(desc(investmentAccounts.createdAt));
 }
 
 export async function userHasEvmAccountAddress(
@@ -69,19 +75,19 @@ export async function userHasEvmAccountAddress(
 ): Promise<boolean> {
   const normalized = normalizeEvmAddress(address);
   const [account] = await db
-    .select({ id: evmWalletAccounts.financialAccountId })
+    .select({ id: evmWalletAccounts.investmentAccountId })
     .from(evmWalletAccounts)
     .innerJoin(
-      financialAccounts,
-      eq(evmWalletAccounts.financialAccountId, financialAccounts.id),
+      investmentAccounts,
+      eq(evmWalletAccounts.investmentAccountId, investmentAccounts.id),
     )
     .where(
       and(
         eq(evmWalletAccounts.userId, userId),
         eq(evmWalletAccounts.address, normalized),
-        eq(financialAccounts.userId, userId),
-        eq(financialAccounts.kind, "evm_wallet"),
-        eq(financialAccounts.status, "active"),
+        eq(investmentAccounts.userId, userId),
+        eq(investmentAccounts.kind, "evm_wallet"),
+        eq(investmentAccounts.status, "active"),
       ),
     )
     .limit(1);
@@ -108,20 +114,21 @@ export async function addUserEvmAccounts(
     const exists = await userHasEvmAccountAddress(userId, address);
     if (exists) continue;
 
-    const financialAccountId = randomUUID();
-    await db.batch([
-      db.insert(financialAccounts).values({
-        id: financialAccountId,
+    const investmentAccountId = randomUUID();
+    await db.transaction(async (tx) => {
+      await tx.insert(investmentAccounts).values({
+        id: investmentAccountId,
         userId,
         kind: "evm_wallet",
         provider: "manual",
-      }),
-      db.insert(evmWalletAccounts).values({
-        financialAccountId,
+      });
+
+      await tx.insert(evmWalletAccounts).values({
+        investmentAccountId,
         userId,
         address,
-      }),
-    ]);
+      });
+    });
 
     added += 1;
   }
@@ -135,17 +142,17 @@ export async function removeUserEvmAccount(
 ): Promise<void> {
   const normalized = normalizeEvmAddress(address);
   const [account] = await db
-    .select({ id: evmWalletAccounts.financialAccountId })
+    .select({ id: evmWalletAccounts.investmentAccountId })
     .from(evmWalletAccounts)
     .innerJoin(
-      financialAccounts,
-      eq(evmWalletAccounts.financialAccountId, financialAccounts.id),
+      investmentAccounts,
+      eq(evmWalletAccounts.investmentAccountId, investmentAccounts.id),
     )
     .where(
       and(
         eq(evmWalletAccounts.userId, userId),
         eq(evmWalletAccounts.address, normalized),
-        eq(financialAccounts.userId, userId),
+        eq(investmentAccounts.userId, userId),
       ),
     )
     .limit(1);
@@ -153,11 +160,11 @@ export async function removeUserEvmAccount(
   if (!account) return;
 
   await db
-    .delete(financialAccounts)
+    .delete(investmentAccounts)
     .where(
       and(
-        eq(financialAccounts.id, account.id),
-        eq(financialAccounts.userId, userId),
+        eq(investmentAccounts.id, account.id),
+        eq(investmentAccounts.userId, userId),
       ),
     );
 }

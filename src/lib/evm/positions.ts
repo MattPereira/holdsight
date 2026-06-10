@@ -5,9 +5,9 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   evmPositionDetails,
-  financialAccountPositions,
-  financialAccountSyncRuns,
-} from "@/db/schema/financial-accounts";
+  investmentAccounts,
+  investmentPositions,
+} from "@/db/schema/investment-accounts";
 import { getUserEvmAccounts, type SavedEvmAccount } from "@/lib/evm/accounts";
 import { getWalletPositions } from "@/lib/evm/client";
 import type { Position, PositionsResult } from "@/lib/portfolio/types";
@@ -20,9 +20,9 @@ function resultStatusToSyncStatus(
   return status === "ready" ? "success" : status;
 }
 
-function positionToRow(syncRunId: string, position: Position) {
+function positionToRow(investmentAccountId: string, position: Position) {
   return {
-    syncRunId,
+    investmentAccountId,
     sourcePositionId: position.sourcePositionId,
     symbol: position.symbol,
     name: position.name,
@@ -33,40 +33,49 @@ function positionToRow(syncRunId: string, position: Position) {
   };
 }
 
-export async function saveEvmPositionSnapshot(
-  financialAccountId: string,
+export async function replaceEvmAccountPositions(
+  investmentAccountId: string,
   result: PositionsResult,
 ): Promise<void> {
-  const [syncRun] = await db
-    .insert(financialAccountSyncRuns)
-    .values({
-      financialAccountId,
-      provider: ZERION_PROVIDER,
-      status: resultStatusToSyncStatus(result.status),
-      finishedAt: new Date(),
-      httpStatus: result.status === "error" ? result.httpStatus : undefined,
-      errorMessage: result.status === "error" ? result.message : undefined,
-    })
-    .returning({ id: financialAccountSyncRuns.id });
+  await db.transaction(async (tx) => {
+    await tx
+      .update(investmentAccounts)
+      .set({
+        syncProvider: ZERION_PROVIDER,
+        syncStatus: resultStatusToSyncStatus(result.status),
+        syncHttpStatus: result.status === "error" ? result.httpStatus : null,
+        syncErrorMessage: result.status === "error" ? result.message : null,
+        lastSyncedAt: new Date(),
+      })
+      .where(eq(investmentAccounts.id, investmentAccountId));
 
-  if (!syncRun || result.status !== "ready" || result.positions.length === 0) {
-    return;
-  }
+    if (result.status !== "ready") return;
 
-  const insertedPositions = await db
-    .insert(financialAccountPositions)
-    .values(result.positions.map((position) => positionToRow(syncRun.id, position)))
-    .returning({ id: financialAccountPositions.id });
+    await tx
+      .delete(investmentPositions)
+      .where(eq(investmentPositions.investmentAccountId, investmentAccountId));
 
-  const details = insertedPositions.map((position, index) => ({
-    positionId: position.id,
-    chainId: result.positions[index]?.chainId ?? "unknown",
-    contractAddress: result.positions[index]?.contractAddress,
-  }));
+    if (result.positions.length === 0) return;
 
-  if (details.length > 0) {
-    await db.insert(evmPositionDetails).values(details);
-  }
+    const insertedPositions = await tx
+      .insert(investmentPositions)
+      .values(
+        result.positions.map((position) =>
+          positionToRow(investmentAccountId, position),
+        ),
+      )
+      .returning({ id: investmentPositions.id });
+
+    const details = insertedPositions.map((position, index) => ({
+      positionId: position.id,
+      chainId: result.positions[index]?.chainId ?? "unknown",
+      contractAddress: result.positions[index]?.contractAddress,
+    }));
+
+    if (details.length > 0) {
+      await tx.insert(evmPositionDetails).values(details);
+    }
+  });
 }
 
 function toPosition(row: {
@@ -91,26 +100,14 @@ function toPosition(row: {
   };
 }
 
-export async function getLatestEvmPositionSnapshots(
+export async function getCurrentEvmPositions(
   userId: string,
 ): Promise<PositionsResult[]> {
   const wallets = await getUserEvmAccounts(userId);
   const results: PositionsResult[] = [];
 
   for (const wallet of wallets) {
-    const [syncRun] = await db
-      .select({
-        id: financialAccountSyncRuns.id,
-        status: financialAccountSyncRuns.status,
-        httpStatus: financialAccountSyncRuns.httpStatus,
-        errorMessage: financialAccountSyncRuns.errorMessage,
-      })
-      .from(financialAccountSyncRuns)
-      .where(eq(financialAccountSyncRuns.financialAccountId, wallet.id))
-      .orderBy(desc(financialAccountSyncRuns.startedAt))
-      .limit(1);
-
-    if (!syncRun) {
+    if (wallet.syncStatus === "idle") {
       results.push({
         status: "ready",
         address: wallet.address,
@@ -119,39 +116,39 @@ export async function getLatestEvmPositionSnapshots(
       continue;
     }
 
-    if (syncRun.status === "indexing" || syncRun.status === "rate_limited") {
-      results.push({ status: syncRun.status, address: wallet.address });
+    if (wallet.syncStatus === "indexing" || wallet.syncStatus === "rate_limited") {
+      results.push({ status: wallet.syncStatus, address: wallet.address });
       continue;
     }
 
-    if (syncRun.status === "error") {
+    if (wallet.syncStatus === "error") {
       results.push({
         status: "error",
         address: wallet.address,
-        message: syncRun.errorMessage ?? "Position sync failed.",
-        httpStatus: syncRun.httpStatus ?? 502,
+        message: wallet.syncErrorMessage ?? "Position sync failed.",
+        httpStatus: wallet.syncHttpStatus ?? 502,
       });
       continue;
     }
 
     const positions = await db
       .select({
-        sourcePositionId: financialAccountPositions.sourcePositionId,
-        symbol: financialAccountPositions.symbol,
-        name: financialAccountPositions.name,
-        amount: financialAccountPositions.amount,
-        priceUsd: financialAccountPositions.priceUsd,
-        valueUsd: financialAccountPositions.valueUsd,
+        sourcePositionId: investmentPositions.sourcePositionId,
+        symbol: investmentPositions.symbol,
+        name: investmentPositions.name,
+        amount: investmentPositions.amount,
+        priceUsd: investmentPositions.priceUsd,
+        valueUsd: investmentPositions.valueUsd,
         chainId: evmPositionDetails.chainId,
         contractAddress: evmPositionDetails.contractAddress,
       })
-      .from(financialAccountPositions)
+      .from(investmentPositions)
       .leftJoin(
         evmPositionDetails,
-        eq(evmPositionDetails.positionId, financialAccountPositions.id),
+        eq(evmPositionDetails.positionId, investmentPositions.id),
       )
-      .where(eq(financialAccountPositions.syncRunId, syncRun.id))
-      .orderBy(desc(financialAccountPositions.valueUsd));
+      .where(eq(investmentPositions.investmentAccountId, wallet.id))
+      .orderBy(desc(investmentPositions.valueUsd));
 
     results.push({
       status: "ready",
@@ -176,7 +173,7 @@ export async function syncEvmWalletPositions(
 ): Promise<void> {
   for (const wallet of wallets) {
     const result = await getWalletPositions(wallet.address);
-    await saveEvmPositionSnapshot(wallet.id, result);
+    await replaceEvmAccountPositions(wallet.id, result);
     if (result.status === "rate_limited") break;
   }
 }

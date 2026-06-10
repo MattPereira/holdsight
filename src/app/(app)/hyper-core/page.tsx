@@ -1,20 +1,20 @@
 import { AccountDetailsPage } from "@/components/account-details-page";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
-import { getLatestHyperCorePositionSnapshots } from "@/lib/hyper-core/snapshots";
+import { getCurrentHyperCorePositions } from "@/lib/hyper-core/positions";
 
 export default async function HyperCorePage() {
   const userId = await getCurrentUserId();
   const hyperCoreAccounts = userId
     ? await getUserHyperCoreAccounts(userId)
     : [];
-  const positionSnapshots =
-    await getLatestHyperCorePositionSnapshots(hyperCoreAccounts);
+  const positionResults =
+    await getCurrentHyperCorePositions(hyperCoreAccounts);
 
   return (
     <div className="flex flex-col gap-6">
       <AccountDetailsPage
-        initialResults={positionSnapshots}
+        initialResults={positionResults}
         source="hypercore"
         title="HyperCore"
       />
