@@ -21,7 +21,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import type { SavedWallet } from "@/lib/evm/wallets";
+import type { SavedEvmAccount } from "@/lib/evm/accounts";
 
 function shortenAddress(address: string): string {
   if (address.length <= 13) return address;
@@ -31,7 +31,7 @@ function shortenAddress(address: string): string {
 export function WalletManager({
   initialWallets,
 }: {
-  initialWallets: SavedWallet[];
+  initialWallets: SavedEvmAccount[];
 }) {
   const [wallets, setWallets] = useState(initialWallets);
   const [input, setInput] = useState("");

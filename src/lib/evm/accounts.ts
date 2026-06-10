@@ -11,7 +11,7 @@ import {
 
 const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 
-export type SavedWallet = {
+export type SavedEvmAccount = {
   id: string;
   address: string;
   label: string | null;
@@ -21,24 +21,26 @@ export function isValidEvmAddress(address: string): boolean {
   return EVM_ADDRESS_RE.test(address);
 }
 
-export function normalizeWalletAddress(address: string): string {
+export function normalizeEvmAddress(address: string): string {
   return address.trim().toLowerCase();
 }
 
-export function parseWallets(value: string | undefined): string[] {
+export function parseEvmAddresses(value: string | undefined): string[] {
   if (!value) return [];
 
   return Array.from(
     new Set(
       value
         .split(/[\s,;]+/)
-        .map(normalizeWalletAddress)
+        .map(normalizeEvmAddress)
         .filter(Boolean),
     ),
   );
 }
 
-export async function getUserWallets(userId: string): Promise<SavedWallet[]> {
+export async function getUserEvmAccounts(
+  userId: string,
+): Promise<SavedEvmAccount[]> {
   return db
     .select({
       id: financialAccounts.id,
@@ -61,12 +63,12 @@ export async function getUserWallets(userId: string): Promise<SavedWallet[]> {
     .orderBy(desc(financialAccounts.createdAt));
 }
 
-export async function userHasWalletAddress(
+export async function userHasEvmAccountAddress(
   userId: string,
   address: string,
 ): Promise<boolean> {
-  const normalized = normalizeWalletAddress(address);
-  const [wallet] = await db
+  const normalized = normalizeEvmAddress(address);
+  const [account] = await db
     .select({ id: evmWalletAccounts.financialAccountId })
     .from(evmWalletAccounts)
     .innerJoin(
@@ -84,14 +86,14 @@ export async function userHasWalletAddress(
     )
     .limit(1);
 
-  return Boolean(wallet);
+  return Boolean(account);
 }
 
-export async function addUserWallets(
+export async function addUserEvmAccounts(
   userId: string,
   input: string,
 ): Promise<{ added: number; error: string | null }> {
-  const addresses = parseWallets(input);
+  const addresses = parseEvmAddresses(input);
   if (addresses.length === 0) {
     return { added: 0, error: "Enter at least one wallet address." };
   }
@@ -103,7 +105,7 @@ export async function addUserWallets(
 
   let added = 0;
   for (const address of addresses) {
-    const exists = await userHasWalletAddress(userId, address);
+    const exists = await userHasEvmAccountAddress(userId, address);
     if (exists) continue;
 
     const financialAccountId = randomUUID();
@@ -127,12 +129,12 @@ export async function addUserWallets(
   return { added, error: null };
 }
 
-export async function removeUserWallet(
+export async function removeUserEvmAccount(
   userId: string,
   address: string,
 ): Promise<void> {
-  const normalized = normalizeWalletAddress(address);
-  const [wallet] = await db
+  const normalized = normalizeEvmAddress(address);
+  const [account] = await db
     .select({ id: evmWalletAccounts.financialAccountId })
     .from(evmWalletAccounts)
     .innerJoin(
@@ -148,23 +150,28 @@ export async function removeUserWallet(
     )
     .limit(1);
 
-  if (!wallet) return;
+  if (!account) return;
 
   await db
     .delete(financialAccounts)
     .where(
-      and(eq(financialAccounts.id, wallet.id), eq(financialAccounts.userId, userId)),
+      and(
+        eq(financialAccounts.id, account.id),
+        eq(financialAccounts.userId, userId),
+      ),
     );
 }
 
-export async function validateUserWallets(userId: string): Promise<string | null> {
-  const wallets = await getUserWallets(userId);
-  if (wallets.length === 0) {
+export async function validateUserEvmAccounts(
+  userId: string,
+): Promise<string | null> {
+  const accounts = await getUserEvmAccounts(userId);
+  if (accounts.length === 0) {
     return "Add at least one wallet before loading positions.";
   }
 
-  const invalidAddress = wallets
-    .map((wallet) => wallet.address)
+  const invalidAddress = accounts
+    .map((account) => account.address)
     .find((address) => !EVM_ADDRESS_RE.test(address));
 
   if (invalidAddress) {
@@ -174,9 +181,9 @@ export async function validateUserWallets(userId: string): Promise<string | null
   return null;
 }
 
-export async function getUserWalletAddresses(userId: string): Promise<string[]> {
-  const wallets = await getUserWallets(userId);
-  return wallets
-    .map((wallet) => wallet.address)
-    .filter(Boolean);
+export async function getUserEvmAccountAddresses(
+  userId: string,
+): Promise<string[]> {
+  const accounts = await getUserEvmAccounts(userId);
+  return accounts.map((account) => account.address).filter(Boolean);
 }

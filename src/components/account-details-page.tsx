@@ -54,7 +54,7 @@ export function AccountDetailsPage({
       </div>
 
       {results.length > 0 && (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col">
           <PortfolioAllocations
             grandTotalValue={summary.grandTotalValue}
             totals={summary.totals}

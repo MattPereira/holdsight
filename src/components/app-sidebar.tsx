@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   RiArrowRightSLine,
   RiFocus3Line,
-  RiWalletLine,
+  RiFundsBoxLine,
 } from "@remixicon/react";
 
 import { NavUser } from "@/components/nav-user";
@@ -24,10 +24,11 @@ import {
 } from "@/components/ui/sidebar";
 
 const accounts: { label: string; href?: string }[] = [
-  { label: "EVM Wallets", href: "/evm-wallets" },
+  { label: "Ethereum Virtual Machine", href: "/evm-wallets" },
   { label: "HyperCore", href: "/hyper-core" },
-  { label: "Kraken" },
-  { label: "Charles Schwab" },
+  { label: "Exchange" },
+  { label: "Brokerage" },
+  { label: "Retirement" },
 ];
 
 export function AppSidebar({ name, email }: { name: string; email: string }) {
@@ -60,8 +61,8 @@ export function AppSidebar({ name, email }: { name: string; email: string }) {
                 aria-expanded={accountsOpen}
                 onClick={() => setAccountsOpen((open) => !open)}
               >
-                <RiWalletLine />
-                <span>Accounts</span>
+                <RiFundsBoxLine />
+                <span>Investments</span>
                 <RiArrowRightSLine className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
               </SidebarMenuButton>
               {accountsOpen ? (

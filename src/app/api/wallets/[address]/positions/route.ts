@@ -5,9 +5,9 @@ import { getCurrentUserId } from "@/lib/auth/session";
 import type { PositionsResult } from "@/lib/portfolio/types";
 import {
   isValidEvmAddress,
-  normalizeWalletAddress,
-  userHasWalletAddress,
-} from "@/lib/evm/wallets";
+  normalizeEvmAddress,
+  userHasEvmAccountAddress,
+} from "@/lib/evm/accounts";
 
 function statusForResult(result: PositionsResult): number {
   switch (result.status) {
@@ -33,12 +33,12 @@ export async function GET(
   }
 
   const { address: rawAddress } = await params;
-  const address = normalizeWalletAddress(rawAddress);
+  const address = normalizeEvmAddress(rawAddress);
   if (!isValidEvmAddress(address)) {
     return NextResponse.json({ error: "Invalid wallet address" }, { status: 400 });
   }
 
-  const isSavedWallet = await userHasWalletAddress(userId, address);
+  const isSavedWallet = await userHasEvmAccountAddress(userId, address);
   if (!isSavedWallet) {
     return NextResponse.json({ error: "Wallet not found" }, { status: 404 });
   }

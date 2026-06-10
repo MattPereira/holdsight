@@ -8,7 +8,7 @@ import {
   financialAccounts,
   hyperCoreAccounts,
 } from "@/db/schema/financial-accounts";
-import type { SavedWallet } from "@/lib/evm/wallets";
+import type { SavedEvmAccount } from "@/lib/evm/accounts";
 
 export type SavedHyperCoreAccount = {
   id: string;
@@ -43,7 +43,7 @@ export async function getUserHyperCoreAccounts(
 
 export async function ensureUserHyperCoreAccounts(
   userId: string,
-  wallets: SavedWallet[],
+  wallets: SavedEvmAccount[],
 ): Promise<SavedHyperCoreAccount[]> {
   const walletAddresses = new Set(wallets.map((wallet) => wallet.address));
 

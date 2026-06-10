@@ -3,24 +3,23 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentUserId } from "@/lib/auth/session";
-import { getWalletPositions } from "@/lib/evm/client";
 import {
   getLatestEvmPositionSnapshots,
-  getLatestPortfolioPositionSnapshots,
-  savePositionSnapshot,
-} from "@/lib/portfolio/snapshots";
+  syncEvmWalletPositions,
+} from "@/lib/evm/snapshots";
+import { getLatestPortfolioPositionSnapshots } from "@/lib/portfolio/snapshots";
 import { ensureUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
 import {
   getLatestHyperCorePositionSnapshots,
   syncHyperCoreAccounts,
 } from "@/lib/hyper-core/snapshots";
 import {
-  addUserWallets,
-  getUserWallets,
-  removeUserWallet,
-  validateUserWallets,
-  type SavedWallet,
-} from "@/lib/evm/wallets";
+  addUserEvmAccounts,
+  getUserEvmAccounts,
+  removeUserEvmAccount,
+  validateUserEvmAccounts,
+  type SavedEvmAccount,
+} from "@/lib/evm/accounts";
 import {
   portfolioAssetSummary,
   type AssetGroup,
@@ -35,7 +34,7 @@ import {
 import type { PositionsResult } from "@/lib/portfolio/types";
 
 export type WalletActionResult = {
-  wallets: SavedWallet[];
+  wallets: SavedEvmAccount[];
   message: string;
   error: string | null;
 };
@@ -67,8 +66,8 @@ export async function addWallets(input: string): Promise<WalletActionResult> {
   const userId = await getCurrentUserId();
   if (!userId) return unauthorizedWalletResult();
 
-  const result = await addUserWallets(userId, input);
-  const wallets = await getUserWallets(userId);
+  const result = await addUserEvmAccounts(userId, input);
+  const wallets = await getUserEvmAccounts(userId);
   if (result.error) {
     return { wallets, message: "", error: result.error };
   }
@@ -88,8 +87,8 @@ export async function removeWallet(address: string): Promise<WalletActionResult>
   const userId = await getCurrentUserId();
   if (!userId) return unauthorizedWalletResult();
 
-  await removeUserWallet(userId, address);
-  const wallets = await getUserWallets(userId);
+  await removeUserEvmAccount(userId, address);
+  const wallets = await getUserEvmAccounts(userId);
 
   revalidatePath("/");
   return {
@@ -97,14 +96,6 @@ export async function removeWallet(address: string): Promise<WalletActionResult>
     message: "Wallet removed.",
     error: null,
   };
-}
-
-async function syncEvmWalletPositions(wallets: SavedWallet[]): Promise<void> {
-  for (const wallet of wallets) {
-    const result = await getWalletPositions(wallet.address);
-    await savePositionSnapshot(wallet.id, result);
-    if (result.status === "rate_limited") break;
-  }
 }
 
 /**
@@ -120,7 +111,7 @@ export async function loadEvmPositions(): Promise<PositionsResult[]> {
   const userId = await getCurrentUserId();
   if (!userId) return unauthorizedPositionsResult();
 
-  const walletConfigError = await validateUserWallets(userId);
+  const walletConfigError = await validateUserEvmAccounts(userId);
   if (walletConfigError) {
     return [
       {
@@ -132,7 +123,7 @@ export async function loadEvmPositions(): Promise<PositionsResult[]> {
     ];
   }
 
-  const wallets = await getUserWallets(userId);
+  const wallets = await getUserEvmAccounts(userId);
   await syncEvmWalletPositions(wallets);
 
   return getLatestEvmPositionSnapshots(userId);
@@ -142,7 +133,7 @@ export async function loadHyperCorePositions(): Promise<PositionsResult[]> {
   const userId = await getCurrentUserId();
   if (!userId) return unauthorizedPositionsResult();
 
-  const walletConfigError = await validateUserWallets(userId);
+  const walletConfigError = await validateUserEvmAccounts(userId);
   if (walletConfigError) {
     return [
       {
@@ -154,7 +145,7 @@ export async function loadHyperCorePositions(): Promise<PositionsResult[]> {
     ];
   }
 
-  const wallets = await getUserWallets(userId);
+  const wallets = await getUserEvmAccounts(userId);
   const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
   await syncHyperCoreAccounts(hyperCoreAccounts);
 
@@ -220,10 +211,10 @@ export async function loadPortfolioSummary(): Promise<PortfolioAssetSummary> {
   const userId = await getCurrentUserId();
   if (!userId) return emptyPortfolioSummary();
 
-  const walletConfigError = await validateUserWallets(userId);
+  const walletConfigError = await validateUserEvmAccounts(userId);
   if (walletConfigError) return emptyPortfolioSummary();
 
-  const wallets = await getUserWallets(userId);
+  const wallets = await getUserEvmAccounts(userId);
   await syncEvmWalletPositions(wallets);
 
   const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
