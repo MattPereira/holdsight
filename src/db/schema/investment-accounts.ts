@@ -149,11 +149,43 @@ export const centralizedExchangeAccounts = pgTable(
   ],
 );
 
+// Encrypted API credentials for centralized exchanges. The credentials payload
+// is encrypted before storage; plaintext only exists in memory during sync.
+// SECURITY: see src/lib/exchange/credentials-crypto.ts and
+// src/lib/security/encryption.ts.
+export const exchangeApiCredentials = pgTable(
+  "exchange_api_credentials",
+  {
+    investmentAccountId: uuid("investment_account_id").primaryKey(),
+    userId: uuid("user_id").notNull(),
+    exchange: text("exchange").notNull(),
+    credentialsEncrypted: text("credentials_encrypted").notNull(),
+    lastUsedAt: timestamp("last_used_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "exchange_api_credentials_investment_account_user_fk",
+      columns: [table.investmentAccountId, table.userId],
+      foreignColumns: [investmentAccounts.id, investmentAccounts.userId],
+    }).onDelete("cascade"),
+    index("exchange_api_credentials_user_exchange_idx").on(
+      table.userId,
+      table.exchange,
+    ),
+  ],
+);
+
 // A Plaid Item is one institution login (e.g. a single Charles Schwab login).
 // One Item can expose multiple brokerage accounts. The access token is the
 // long-lived secret used for every subsequent Plaid API call for this Item.
 // SECURITY: this column holds the AES-256-GCM ciphertext of the access token
-// (see src/lib/plaid/crypto.ts), never the plaintext token.
+// (see src/lib/plaid/crypto.ts and src/lib/security/encryption.ts), never the
+// plaintext token.
 export const plaidItems = pgTable(
   "plaid_items",
   {
@@ -307,6 +339,7 @@ export const investmentAccountsRelations = relations(
     evmWalletAccount: one(evmWalletAccounts),
     hyperCoreAccount: one(hyperCoreAccounts),
     centralizedExchangeAccount: one(centralizedExchangeAccounts),
+    exchangeApiCredentials: one(exchangeApiCredentials),
     brokerageAccount: one(brokerageAccounts),
     balances: many(investmentBalances),
     positions: many(investmentPositions),
@@ -347,6 +380,28 @@ export const centralizedExchangeAccountsRelations = relations(
     investmentAccount: one(investmentAccounts, {
       fields: [centralizedExchangeAccounts.investmentAccountId],
       references: [investmentAccounts.id],
+    }),
+    apiCredentials: one(exchangeApiCredentials, {
+      fields: [centralizedExchangeAccounts.investmentAccountId],
+      references: [exchangeApiCredentials.investmentAccountId],
+    }),
+  }),
+);
+
+export const exchangeApiCredentialsRelations = relations(
+  exchangeApiCredentials,
+  ({ one }) => ({
+    investmentAccount: one(investmentAccounts, {
+      fields: [exchangeApiCredentials.investmentAccountId],
+      references: [investmentAccounts.id],
+    }),
+    user: one(user, {
+      fields: [exchangeApiCredentials.userId],
+      references: [user.id],
+    }),
+    centralizedExchangeAccount: one(centralizedExchangeAccounts, {
+      fields: [exchangeApiCredentials.investmentAccountId],
+      references: [centralizedExchangeAccounts.investmentAccountId],
     }),
   }),
 );

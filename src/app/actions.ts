@@ -14,6 +14,15 @@ import {
   syncHyperCoreAccounts,
 } from "@/lib/hyper-core/balances";
 import {
+  ensureUserKrakenAccount,
+  saveUserKrakenCredentials,
+} from "@/lib/exchange/kraken/accounts";
+import {
+  getCurrentUserKrakenBalances,
+  syncKrakenAccounts,
+  syncUserKrakenAccounts,
+} from "@/lib/exchange/kraken/balances";
+import {
   addUserEvmAccounts,
   getUserEvmAccounts,
   removeUserEvmAccount,
@@ -175,6 +184,56 @@ export async function loadHyperCoreBalances(): Promise<BalancesResult[]> {
   await syncHyperCoreAccounts(hyperCoreAccounts);
 
   return getCurrentHyperCoreBalances(hyperCoreAccounts);
+}
+
+export async function loadKrakenBalances(): Promise<BalancesResult[]> {
+  const userId = await getCurrentUserId();
+  if (!userId) return unauthorizedBalancesResult();
+
+  const krakenAccounts = await ensureUserKrakenAccount(userId);
+  await syncKrakenAccounts(userId, krakenAccounts);
+
+  return getCurrentUserKrakenBalances(userId);
+}
+
+export type KrakenCredentialsActionResult = {
+  message: string;
+  error: string | null;
+};
+
+export async function saveKrakenCredentials(input: {
+  apiKey: string;
+  apiSecret: string;
+}): Promise<KrakenCredentialsActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return { message: "", error: "You must be signed in to add credentials." };
+  }
+
+  const apiKey = input.apiKey.trim();
+  const apiSecret = input.apiSecret.trim();
+  if (!apiKey || !apiSecret) {
+    return { message: "", error: "Enter both Kraken API key and secret." };
+  }
+
+  try {
+    const account = await saveUserKrakenCredentials(userId, {
+      apiKey,
+      apiSecret,
+    });
+    await syncKrakenAccounts(userId, [account]);
+    revalidatePath("/");
+    revalidatePath("/exchange");
+    return { message: "Kraken credentials saved.", error: null };
+  } catch (error) {
+    return {
+      message: "",
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to save Kraken credentials.",
+    };
+  }
 }
 
 /* -------------------------------- plaid -------------------------------- */
@@ -478,14 +537,15 @@ export async function loadPortfolioSummary(): Promise<PortfolioAssetSummary> {
   const userId = await getCurrentUserId();
   if (!userId) return emptyPortfolioSummary();
 
-  const walletConfigError = await validateUserEvmAccounts(userId);
-  if (walletConfigError) return emptyPortfolioSummary();
-
   const wallets = await getUserEvmAccounts(userId);
-  await syncEvmWalletBalances(wallets);
+  if (wallets.length > 0) {
+    await syncEvmWalletBalances(wallets);
 
-  const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
-  await syncHyperCoreAccounts(hyperCoreAccounts);
+    const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
+    await syncHyperCoreAccounts(hyperCoreAccounts);
+  }
+
+  await syncUserKrakenAccounts(userId);
 
   return portfolioAssetSummary(await getCurrentPortfolioBalances(userId));
 }

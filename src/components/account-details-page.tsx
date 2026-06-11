@@ -2,7 +2,11 @@
 
 import { RiRefreshLine } from "@remixicon/react";
 import { useMemo, useState, useTransition } from "react";
-import { loadEvmBalances, loadHyperCoreBalances } from "@/app/actions";
+import {
+  loadEvmBalances,
+  loadHyperCoreBalances,
+  loadKrakenBalances,
+} from "@/app/actions";
 import { AccountDetailsTable } from "@/components/account-details-table";
 import { PortfolioAllocations } from "@/components/portfolio-allocations";
 import { Button } from "@/components/ui/button";
@@ -18,7 +22,7 @@ export function AccountDetailsPage({
   headerAction,
 }: {
   initialResults: BalancesResult[];
-  source: "evm" | "hypercore";
+  source: "evm" | "hypercore" | "kraken";
   title: string;
   headerAction?: React.ReactNode;
 }) {
@@ -28,10 +32,11 @@ export function AccountDetailsPage({
 
   function handleLoad() {
     startTransition(async () => {
-      const data =
-        source === "evm"
-          ? await loadEvmBalances()
-          : await loadHyperCoreBalances();
+      const data = await (source === "evm"
+        ? loadEvmBalances()
+        : source === "hypercore"
+          ? loadHyperCoreBalances()
+          : loadKrakenBalances());
       setResults(data);
     });
   }
