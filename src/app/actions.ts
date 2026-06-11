@@ -427,6 +427,7 @@ export async function loadBrokerageBalances(): Promise<BrokerageActionResult> {
 
   await syncUserBrokerageBalances(userId);
   revalidatePath("/");
+  revalidatePath("/brokerage");
   return { accounts: await getCurrentBrokerageBalances(userId), error: null };
 }
 
@@ -546,6 +547,7 @@ export async function loadPortfolioSummary(): Promise<PortfolioAssetSummary> {
   }
 
   await syncUserKrakenAccounts(userId);
+  await syncUserBrokerageBalances(userId);
 
   return portfolioAssetSummary(await getCurrentPortfolioBalances(userId));
 }

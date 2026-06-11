@@ -37,6 +37,8 @@ const compactUsdFormat = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 
+const MIN_VISIBLE_ASSET_VALUE_USD = 1;
+
 function weightOf(valueUsd: number, grandTotalValue: number) {
   return grandTotalValue === 0 ? 0 : valueUsd / grandTotalValue;
 }
@@ -356,26 +358,36 @@ export function PortfolioAllocations({
   totals: AssetTotal[];
   groups?: AssetGroup[];
 }) {
-  const colorByKey = assetColorByKey(totals, groups);
-  const rows: HoldingsDisplayRow[] = applyAssetGroups(totals, groups).map(
-    (row) => ({
-      key: row.key,
-      symbol: row.label,
-      name: row.name,
-      amount: row.amount,
-      valueUsd: row.valueUsd,
-      isGroup: row.isGroup,
-      members: row.members.map((member) => ({
-        key: member.symbol,
-        symbol: member.symbol,
-        name: member.name,
-        amount: member.amount,
-        valueUsd: member.valueUsd,
+  const visibleTotals = useMemo(
+    () =>
+      totals.filter((total) => total.valueUsd >= MIN_VISIBLE_ASSET_VALUE_USD),
+    [totals],
+  );
+  const colorByKey = useMemo(
+    () => assetColorByKey(visibleTotals, groups),
+    [visibleTotals, groups],
+  );
+  const rows: HoldingsDisplayRow[] = useMemo(
+    () =>
+      applyAssetGroups(visibleTotals, groups).map((row) => ({
+        key: row.key,
+        symbol: row.label,
+        name: row.name,
+        amount: row.amount,
+        valueUsd: row.valueUsd,
+        isGroup: row.isGroup,
+        members: row.members.map((member) => ({
+          key: member.symbol,
+          symbol: member.symbol,
+          name: member.name,
+          amount: member.amount,
+          valueUsd: member.valueUsd,
+        })),
       })),
-    }),
+    [visibleTotals, groups],
   );
 
-  if (totals.length === 0) {
+  if (visibleTotals.length === 0) {
     return <p className="text-sm text-muted-foreground">No balances.</p>;
   }
 
@@ -383,7 +395,7 @@ export function PortfolioAllocations({
     <section className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-center">
       <AllocationDonutChart
         grandTotalValue={grandTotalValue}
-        totals={totals}
+        totals={visibleTotals}
         groups={groups}
       />
       <div className="min-w-0">

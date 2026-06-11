@@ -49,6 +49,29 @@ function toAccountType(
   return SUBTYPE_TO_ACCOUNT_TYPE[subtype] ?? "taxable";
 }
 
+function isPlaidCashSecurity(security: Security | undefined): boolean {
+  return (
+    security?.type === "cash" ||
+    security?.ticker_symbol?.toUpperCase().startsWith("CUR:") === true
+  );
+}
+
+function cashCurrencySymbol(
+  holding: Holding,
+  security: Security | undefined,
+): string {
+  const ticker = security?.ticker_symbol?.toUpperCase();
+  if (ticker?.startsWith("CUR:")) return ticker.slice("CUR:".length);
+
+  return (
+    holding.iso_currency_code ??
+    holding.unofficial_currency_code ??
+    security?.iso_currency_code ??
+    security?.unofficial_currency_code ??
+    "USD"
+  );
+}
+
 function buildBalances(
   account: InvestmentAccount,
   holdings: Holding[],
@@ -56,11 +79,15 @@ function buildBalances(
 ): BrokerageBalance[] {
   const balances: BrokerageBalance[] = holdings.map((holding) => {
     const security = securitiesById.get(holding.security_id);
+    const isCash = isPlaidCashSecurity(security);
+
     return {
       sourceBalanceId: holding.security_id,
-      symbol: security?.ticker_symbol ?? security?.name ?? "?",
-      name: security?.name ?? undefined,
-      assetClass: toAssetClass(security?.type),
+      symbol: isCash
+        ? cashCurrencySymbol(holding, security)
+        : (security?.ticker_symbol ?? security?.name ?? "?"),
+      name: isCash ? "Cash" : (security?.name ?? undefined),
+      assetClass: isCash ? "cash" : toAssetClass(security?.type),
       amount: holding.quantity,
       priceUsd: holding.institution_price,
       valueUsd: holding.institution_value,
@@ -68,10 +95,13 @@ function buildBalances(
     };
   });
 
-  // Uninvested cash isn't a holding — it lives on the account balance. Add it
-  // as a synthetic cash row so the account's total reflects buying power.
+  // Some institutions (including Schwab via Plaid) report cash as a real
+  // holding like CUR:USD. Only synthesize cash when Plaid omitted that holding.
   const cash = account.balances.available ?? 0;
-  if (cash > 0) {
+  const hasCashHolding = holdings.some((holding) =>
+    isPlaidCashSecurity(securitiesById.get(holding.security_id)),
+  );
+  if (cash > 0 && !hasCashHolding) {
     balances.push({
       sourceBalanceId: account.account_id,
       symbol: account.balances.iso_currency_code ?? "USD",

@@ -21,12 +21,12 @@ export default async function ExchangePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <KrakenCredentialsForm />
       <AccountDetailsPage
         key={balanceResultsKey}
         initialResults={balanceResults}
         source="kraken"
         title="Exchange"
+        headerAction={<KrakenCredentialsForm />}
       />
     </div>
   );

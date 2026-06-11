@@ -206,6 +206,64 @@ function toBrokerageBalance(row: {
   };
 }
 
+function normalizeBrokerageBalance(
+  balance: BrokerageBalance,
+): BrokerageBalance {
+  const symbol = balance.symbol.trim();
+  if (
+    balance.assetClass === "cash" &&
+    symbol.toUpperCase().startsWith("CUR:")
+  ) {
+    return {
+      ...balance,
+      symbol: symbol.slice("CUR:".length).toUpperCase(),
+      name: "Cash",
+    };
+  }
+
+  return balance;
+}
+
+function dedupeCashBalances(
+  balances: BrokerageBalance[],
+  externalAccountId: string | null,
+): BrokerageBalance[] {
+  const deduped: BrokerageBalance[] = [];
+  const seenCash = new Map<string, number>();
+
+  for (const balance of balances.map(normalizeBrokerageBalance)) {
+    if (balance.assetClass !== "cash") {
+      deduped.push(balance);
+      continue;
+    }
+
+    const key = [
+      balance.symbol.toUpperCase(),
+      balance.amount,
+      balance.priceUsd,
+      balance.valueUsd,
+    ].join(":");
+    const existingIndex = seenCash.get(key);
+
+    if (existingIndex === undefined) {
+      seenCash.set(key, deduped.length);
+      deduped.push(balance);
+      continue;
+    }
+
+    const existing = deduped[existingIndex];
+    if (
+      externalAccountId &&
+      existing.sourceBalanceId === externalAccountId &&
+      balance.sourceBalanceId !== externalAccountId
+    ) {
+      deduped[existingIndex] = balance;
+    }
+  }
+
+  return deduped;
+}
+
 export async function getCurrentBrokerageBalances(
   userId: string,
 ): Promise<CurrentBrokerageAccount[]> {
@@ -230,7 +288,10 @@ export async function getCurrentBrokerageBalances(
 
     results.push({
       ...account,
-      balances: rows.map(toBrokerageBalance),
+      balances: dedupeCashBalances(
+        rows.map(toBrokerageBalance),
+        account.externalAccountId,
+      ),
     });
   }
 

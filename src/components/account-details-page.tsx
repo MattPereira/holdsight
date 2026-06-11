@@ -66,8 +66,8 @@ export function AccountDetailsPage({
           />
 
           <div className="flex flex-col gap-6">
-            {results.map((result) => (
-              <AccountDetailsTable key={result.address} result={result} />
+            {results.map((result, idx) => (
+              <AccountDetailsTable key={idx} result={result} />
             ))}
           </div>
         </div>
