@@ -13,6 +13,7 @@ import {
   getCurrentHyperCoreBalances,
   syncHyperCoreAccounts,
 } from "@/lib/hyper-core/balances";
+import { mergeOnChainBalanceResults } from "@/lib/on-chain/balances";
 import {
   ensureUserKrakenAccount,
   removeUserKrakenAccount,
@@ -185,6 +186,35 @@ export async function loadHyperCoreBalances(): Promise<BalancesResult[]> {
   await syncHyperCoreAccounts(hyperCoreAccounts);
 
   return getCurrentHyperCoreBalances(hyperCoreAccounts);
+}
+
+export async function loadOnChainBalances(): Promise<BalancesResult[]> {
+  const userId = await getCurrentUserId();
+  if (!userId) return unauthorizedBalancesResult();
+
+  const walletConfigError = await validateUserEvmAccounts(userId);
+  if (walletConfigError) {
+    return [
+      {
+        status: "error",
+        address: "WALLETS",
+        message: walletConfigError,
+        httpStatus: 400,
+      },
+    ];
+  }
+
+  const wallets = await getUserEvmAccounts(userId);
+  const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
+  await syncEvmWalletBalances(wallets);
+  await syncHyperCoreAccounts(hyperCoreAccounts);
+
+  const [evmResults, hyperCoreResults] = await Promise.all([
+    getCurrentEvmBalances(userId),
+    getCurrentHyperCoreBalances(hyperCoreAccounts),
+  ]);
+
+  return mergeOnChainBalanceResults(evmResults, hyperCoreResults);
 }
 
 export async function loadKrakenBalances(): Promise<BalancesResult[]> {
@@ -508,6 +538,7 @@ async function unauthorizedGroupResult(): Promise<AssetGroupActionResult> {
 
 export async function createGroup(input: {
   name?: string | null;
+  color?: string | null;
   symbols: string[];
 }): Promise<AssetGroupActionResult> {
   const userId = await getCurrentUserId();
@@ -518,12 +549,15 @@ export async function createGroup(input: {
   if (result.error) return { groups, error: result.error };
 
   revalidatePath("/");
+  revalidatePath("/on-chain");
+  revalidatePath("/exchange");
+  revalidatePath("/brokerage");
   return { groups, error: null };
 }
 
 export async function updateGroup(
   groupId: string,
-  input: { name?: string | null; symbols: string[] },
+  input: { name?: string | null; color?: string | null; symbols: string[] },
 ): Promise<AssetGroupActionResult> {
   const userId = await getCurrentUserId();
   if (!userId) return unauthorizedGroupResult();
@@ -533,6 +567,9 @@ export async function updateGroup(
   if (result.error) return { groups, error: result.error };
 
   revalidatePath("/");
+  revalidatePath("/on-chain");
+  revalidatePath("/exchange");
+  revalidatePath("/brokerage");
   return { groups, error: null };
 }
 
@@ -546,6 +583,9 @@ export async function deleteGroup(
   const groups = await getUserAssetGroups(userId);
 
   revalidatePath("/");
+  revalidatePath("/on-chain");
+  revalidatePath("/exchange");
+  revalidatePath("/brokerage");
   return { groups, error: null };
 }
 

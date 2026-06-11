@@ -1,0 +1,1 @@
+ALTER TABLE "asset_groups" ADD COLUMN "color" text;

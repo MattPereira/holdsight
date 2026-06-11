@@ -5,12 +5,17 @@ import { useMemo, useState, useTransition } from "react";
 import {
   loadEvmBalances,
   loadHyperCoreBalances,
+  loadOnChainBalances,
   loadKrakenBalances,
 } from "@/app/actions";
 import { AccountDetailsTable } from "@/components/account-details-table";
 import { PortfolioAllocations } from "@/components/portfolio-allocations";
+import { PortfolioAllocationsSettings } from "@/components/portfolio-allocations-settings";
 import { Button } from "@/components/ui/button";
-import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
+import {
+  portfolioAssetSummary,
+  type AssetGroup,
+} from "@/lib/portfolio/asset-totals";
 import type { BalancesResult } from "@/lib/portfolio/types";
 
 /* ------------------------------ container ------------------------------ */
@@ -20,13 +25,16 @@ export function AccountDetailsPage({
   source,
   title,
   headerAction,
+  initialGroups = [],
 }: {
   initialResults: BalancesResult[];
-  source: "evm" | "hypercore" | "kraken";
+  source: "evm" | "hypercore" | "kraken" | "onchain";
   title: string;
   headerAction?: React.ReactNode;
+  initialGroups?: AssetGroup[];
 }) {
   const [results, setResults] = useState<BalancesResult[]>(initialResults);
+  const [groups, setGroups] = useState<AssetGroup[]>(initialGroups);
   const [isPending, startTransition] = useTransition();
   const summary = useMemo(() => portfolioAssetSummary(results), [results]);
 
@@ -36,7 +44,9 @@ export function AccountDetailsPage({
         ? loadEvmBalances()
         : source === "hypercore"
           ? loadHyperCoreBalances()
-          : loadKrakenBalances());
+          : source === "onchain"
+            ? loadOnChainBalances()
+            : loadKrakenBalances());
       setResults(data);
     });
   }
@@ -56,6 +66,11 @@ export function AccountDetailsPage({
           <RiRefreshLine />
         </Button>
         {headerAction}
+        <PortfolioAllocationsSettings
+          groups={groups}
+          availableSymbols={summary.totals.map((total) => total.symbol)}
+          onGroupsChange={setGroups}
+        />
       </div>
 
       {results.length > 0 && (
@@ -63,6 +78,7 @@ export function AccountDetailsPage({
           <PortfolioAllocations
             grandTotalValue={summary.grandTotalValue}
             totals={summary.totals}
+            groups={groups}
           />
 
           <div className="flex flex-col gap-6">

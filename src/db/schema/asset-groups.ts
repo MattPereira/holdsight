@@ -20,6 +20,7 @@ export const assetGroups = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     name: text("name"),
+    color: text("color"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

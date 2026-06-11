@@ -7,9 +7,13 @@ import { loadBrokerageBalances } from "@/app/actions";
 import { BrokerageDetailsTable } from "@/components/brokerage-details-table";
 import { BrokerageManager } from "@/components/brokerage-manager";
 import { PortfolioAllocations } from "@/components/portfolio-allocations";
+import { PortfolioAllocationsSettings } from "@/components/portfolio-allocations-settings";
 import { Button } from "@/components/ui/button";
 import type { CurrentBrokerageAccount } from "@/lib/brokerage/balances";
-import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
+import {
+  portfolioAssetSummary,
+  type AssetGroup,
+} from "@/lib/portfolio/asset-totals";
 import type { BalancesResult } from "@/lib/portfolio/types";
 
 // Reuse the portfolio summary/allocations machinery, which speaks in
@@ -34,11 +38,14 @@ function toBalancesResults(
 
 export function BrokerageDetailsPage({
   initialAccounts,
+  initialGroups,
 }: {
   initialAccounts: CurrentBrokerageAccount[];
+  initialGroups: AssetGroup[];
 }) {
   const [accounts, setAccounts] =
     useState<CurrentBrokerageAccount[]>(initialAccounts);
+  const [groups, setGroups] = useState<AssetGroup[]>(initialGroups);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -84,6 +91,11 @@ export function BrokerageDetailsPage({
           onAccountsChange={setAccounts}
           onError={setError}
         />
+        <PortfolioAllocationsSettings
+          groups={groups}
+          availableSymbols={summary.totals.map((total) => total.symbol)}
+          onGroupsChange={setGroups}
+        />
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -98,6 +110,7 @@ export function BrokerageDetailsPage({
             <PortfolioAllocations
               grandTotalValue={summary.grandTotalValue}
               totals={summary.totals}
+              groups={groups}
             />
           )}
 

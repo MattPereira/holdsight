@@ -15,6 +15,7 @@ export type PortfolioAssetSummary = {
 export type AssetGroup = {
   id: string;
   name: string | null;
+  color: string | null;
   symbols: string[];
 };
 
@@ -31,6 +32,7 @@ export type AssetTotalRow = {
   amount: number;
   valueUsd: number;
   isGroup: boolean;
+  color?: string | null;
   members: AssetTotal[];
 };
 
@@ -88,6 +90,21 @@ export function applyAssetGroups(
   }
 
   for (const [groupId, members] of grouped) {
+    if (members.length < 2) {
+      rows.push(
+        ...members.map((member) => ({
+          key: member.symbol,
+          label: member.symbol,
+          name: member.name,
+          amount: member.amount,
+          valueUsd: member.valueUsd,
+          isGroup: false,
+          members: [],
+        })),
+      );
+      continue;
+    }
+
     const group = groupById.get(groupId)!;
     members.sort((a, b) => b.valueUsd - a.valueUsd);
     const memberSymbols = members.map((member) => member.symbol);
@@ -97,6 +114,7 @@ export function applyAssetGroups(
       amount: 0,
       valueUsd: members.reduce((sum, member) => sum + member.valueUsd, 0),
       isGroup: true,
+      color: group.color,
       members,
     });
   }
@@ -128,7 +146,10 @@ export function assetColorByKey(
 ): Map<string, string> {
   const colors = new Map<string, string>();
   applyAssetGroups(totals, groups).forEach((row, index) => {
-    colors.set(row.key, ASSET_CHART_COLORS[index % ASSET_CHART_COLORS.length]);
+    colors.set(
+      row.key,
+      row.color ?? ASSET_CHART_COLORS[index % ASSET_CHART_COLORS.length],
+    );
   });
   return colors;
 }

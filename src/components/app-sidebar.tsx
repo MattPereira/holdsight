@@ -27,8 +27,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const accounts: { label: string; href?: string }[] = [
-  { label: "Ethereum Virtual Machine", href: "/evm-wallets" },
-  { label: "HyperCore", href: "/hyper-core" },
+  { label: "On Chain", href: "/on-chain" },
   { label: "Exchange", href: "/exchange" },
   { label: "Brokerage", href: "/brokerage" },
 ];

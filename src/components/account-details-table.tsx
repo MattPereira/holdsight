@@ -62,9 +62,9 @@ function statusMessage(result: BalancesResult): string {
 }
 
 function balanceKey(balance: InvestmentBalance, i: number): string {
-  return (
-    balance.sourceBalanceId ?? `${balance.symbol}-${balance.chainId}-${i}`
-  );
+  return balance.sourceBalanceId
+    ? `${balance.chainId}:${balance.sourceBalanceId}`
+    : `${balance.symbol}-${balance.chainId}-${i}`;
 }
 
 function DesktopTable({ balances }: { balances: InvestmentBalance[] }) {

@@ -29,12 +29,23 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { groupLabel, type AssetGroup } from "@/lib/portfolio/asset-totals";
+import {
+  ASSET_CHART_COLORS,
+  groupLabel,
+  type AssetGroup,
+} from "@/lib/portfolio/asset-totals";
+import { cn } from "@/lib/utils";
 
 type EditorState =
   | { mode: "idle" }
   | { mode: "create" }
   | { mode: "edit"; groupId: string };
+
+type GroupFormValues = {
+  name: string | null;
+  color: string | null;
+  symbols: string[];
+};
 
 function symbolKey(symbol: string): string {
   return symbol.trim().toUpperCase();
@@ -155,8 +166,17 @@ function AssetGroupManager({
                 className="flex items-start justify-between gap-3 rounded-lg border px-3 py-2"
               >
                 <div className="flex min-w-0 flex-col gap-1.5">
-                  <span className="truncate text-sm font-medium">
-                    {groupLabel(group.name, group.symbols)}
+                  <span className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                    {group.color ? (
+                      <span
+                        aria-hidden="true"
+                        className="size-2.5 shrink-0 rounded-[3px]"
+                        style={{ backgroundColor: group.color }}
+                      />
+                    ) : null}
+                    <span className="truncate">
+                      {groupLabel(group.name, group.symbols)}
+                    </span>
                   </span>
                   <div className="flex flex-wrap gap-1">
                     {group.symbols.map((symbol) => (
@@ -245,11 +265,14 @@ function GroupEditor({
   availableSymbols: string[];
   editingGroup: AssetGroup | undefined;
   onCancel: () => void;
-  onSubmit: (values: { name: string | null; symbols: string[] }) => void;
+  onSubmit: (values: GroupFormValues) => void;
   isPending: boolean;
   error: string | null;
 }) {
   const [name, setName] = useState(editingGroup?.name ?? "");
+  const [color, setColor] = useState<string | null>(
+    editingGroup?.color ?? null,
+  );
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set((editingGroup?.symbols ?? []).map(symbolKey)),
   );
@@ -280,7 +303,7 @@ function GroupEditor({
     const symbols = selectableSymbols.filter((symbol) =>
       selected.has(symbolKey(symbol)),
     );
-    onSubmit({ name: name.trim() || null, symbols });
+    onSubmit({ name: name.trim() || null, color, symbols });
   }
 
   const selectedCount = selectableSymbols.filter((symbol) =>
@@ -307,6 +330,38 @@ function GroupEditor({
           <FieldDescription>
             Leave blank to label the group by its assets (e.g. “HYPE + sHYPE”).
           </FieldDescription>
+        </Field>
+
+        <Field>
+          <FieldLabel>Color (optional)</FieldLabel>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={cn(
+                "flex h-9 items-center rounded-md border px-3 text-sm",
+                color === null && "border-foreground",
+              )}
+              onClick={() => setColor(null)}
+              disabled={isPending}
+            >
+              Auto
+            </button>
+            {ASSET_CHART_COLORS.map((option, index) => (
+              <button
+                key={option}
+                type="button"
+                className={cn(
+                  "size-9 rounded-md border",
+                  color === option && "border-foreground ring-2 ring-ring",
+                )}
+                style={{ backgroundColor: option }}
+                aria-label={`Use color ${index + 1}`}
+                aria-pressed={color === option}
+                onClick={() => setColor(option)}
+                disabled={isPending}
+              />
+            ))}
+          </div>
         </Field>
 
         <Field data-invalid={Boolean(error)}>

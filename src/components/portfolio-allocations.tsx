@@ -100,7 +100,8 @@ function AllocationDonutChart({
     const config: ChartConfig = { value: { label: "Value" } };
     const data = rows.map((row, index) => {
       const key = slugify(row.label, index);
-      const color = ASSET_CHART_COLORS[index % ASSET_CHART_COLORS.length];
+      const color =
+        row.color ?? ASSET_CHART_COLORS[index % ASSET_CHART_COLORS.length];
       config[key] = { label: row.label, color };
       return {
         asset: key,
@@ -376,6 +377,7 @@ export function PortfolioAllocations({
         amount: row.amount,
         valueUsd: row.valueUsd,
         isGroup: row.isGroup,
+        color: row.color,
         members: row.members.map((member) => ({
           key: member.symbol,
           symbol: member.symbol,

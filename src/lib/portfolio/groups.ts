@@ -9,6 +9,13 @@ import type { AssetGroup } from "@/lib/portfolio/asset-totals";
 
 const MIN_GROUP_SYMBOLS = 2;
 const MAX_GROUP_NAME_LENGTH = 40;
+const GROUP_COLORS = new Set([
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+]);
 
 function normalizeSymbols(symbols: string[]): string[] {
   const seen = new Set<string>();
@@ -30,11 +37,18 @@ function normalizeName(name: string | null | undefined): string | null {
   return trimmed.slice(0, MAX_GROUP_NAME_LENGTH);
 }
 
+function normalizeColor(color: string | null | undefined): string | null {
+  const trimmed = color?.trim();
+  if (!trimmed) return null;
+  return GROUP_COLORS.has(trimmed) ? trimmed : null;
+}
+
 export async function getUserAssetGroups(userId: string): Promise<AssetGroup[]> {
   const rows = await db
     .select({
       id: assetGroups.id,
       name: assetGroups.name,
+      color: assetGroups.color,
       createdAt: assetGroups.createdAt,
       symbol: assetGroupMembers.symbol,
     })
@@ -50,7 +64,7 @@ export async function getUserAssetGroups(userId: string): Promise<AssetGroup[]> 
   for (const row of rows) {
     let group = byId.get(row.id);
     if (!group) {
-      group = { id: row.id, name: row.name, symbols: [] };
+      group = { id: row.id, name: row.name, color: row.color, symbols: [] };
       byId.set(row.id, group);
     }
     if (row.symbol) group.symbols.push(row.symbol);
@@ -80,7 +94,7 @@ async function detachSymbols(
 
 export async function createAssetGroup(
   userId: string,
-  input: { name?: string | null; symbols: string[] },
+  input: { name?: string | null; color?: string | null; symbols: string[] },
 ): Promise<{ error: string | null }> {
   const symbols = normalizeSymbols(input.symbols);
   if (symbols.length < MIN_GROUP_SYMBOLS) {
@@ -94,6 +108,7 @@ export async function createAssetGroup(
     id: groupId,
     userId,
     name: normalizeName(input.name),
+    color: normalizeColor(input.color),
   });
   await db.insert(assetGroupMembers).values(
     symbols.map((symbol) => ({ groupId, userId, symbol })),
@@ -105,7 +120,7 @@ export async function createAssetGroup(
 export async function updateAssetGroup(
   userId: string,
   groupId: string,
-  input: { name?: string | null; symbols: string[] },
+  input: { name?: string | null; color?: string | null; symbols: string[] },
 ): Promise<{ error: string | null }> {
   const [group] = await db
     .select({ id: assetGroups.id })
@@ -130,7 +145,10 @@ export async function updateAssetGroup(
     );
   await db
     .update(assetGroups)
-    .set({ name: normalizeName(input.name) })
+    .set({
+      name: normalizeName(input.name),
+      color: normalizeColor(input.color),
+    })
     .where(and(eq(assetGroups.id, groupId), eq(assetGroups.userId, userId)));
   await db.insert(assetGroupMembers).values(
     symbols.map((symbol) => ({ groupId, userId, symbol })),
