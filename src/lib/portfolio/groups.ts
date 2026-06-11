@@ -5,17 +5,11 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { assetGroupMembers, assetGroups } from "@/db/schema/asset-groups";
-import type { AssetGroup } from "@/lib/portfolio/asset-totals";
+import { ASSET_CHART_COLORS, type AssetGroup } from "@/lib/portfolio/asset-totals";
 
-const MIN_GROUP_SYMBOLS = 2;
+const MIN_GROUP_SYMBOLS = 1;
 const MAX_GROUP_NAME_LENGTH = 40;
-const GROUP_COLORS = new Set([
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-]);
+const GROUP_COLORS = new Set(ASSET_CHART_COLORS);
 
 function normalizeSymbols(symbols: string[]): string[] {
   const seen = new Set<string>();
@@ -98,7 +92,7 @@ export async function createAssetGroup(
 ): Promise<{ error: string | null }> {
   const symbols = normalizeSymbols(input.symbols);
   if (symbols.length < MIN_GROUP_SYMBOLS) {
-    return { error: `Select at least ${MIN_GROUP_SYMBOLS} assets to group.` };
+    return { error: "Select at least one asset to group." };
   }
 
   await detachSymbols(userId, symbols);
@@ -131,7 +125,7 @@ export async function updateAssetGroup(
 
   const symbols = normalizeSymbols(input.symbols);
   if (symbols.length < MIN_GROUP_SYMBOLS) {
-    return { error: `Select at least ${MIN_GROUP_SYMBOLS} assets to group.` };
+    return { error: "Select at least one asset to group." };
   }
 
   await detachSymbols(userId, symbols);

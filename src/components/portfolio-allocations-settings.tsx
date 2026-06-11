@@ -284,9 +284,15 @@ function GroupEditor({
       .filter((group) => group.id !== editingGroup?.id)
       .flatMap((group) => group.symbols.map(symbolKey)),
   );
-  const selectableSymbols = availableSymbols.filter(
-    (symbol) => !claimedByOthers.has(symbolKey(symbol)),
-  );
+  // Several holdings can share a symbol (e.g. USD from multiple cash sources),
+  // so dedupe by key — one checkbox represents every holding of that symbol.
+  const seenSymbols = new Set<string>();
+  const selectableSymbols = availableSymbols.filter((symbol) => {
+    const key = symbolKey(symbol);
+    if (claimedByOthers.has(key) || seenSymbols.has(key)) return false;
+    seenSymbols.add(key);
+    return true;
+  });
 
   function toggleSymbol(symbol: string) {
     const key = symbolKey(symbol);
@@ -401,7 +407,7 @@ function GroupEditor({
         >
           Cancel
         </Button>
-        <Button type="submit" disabled={isPending || selectedCount < 2}>
+        <Button type="submit" disabled={isPending || selectedCount < 1}>
           {editingGroup ? "Save group" : "Create group"}
         </Button>
       </div>

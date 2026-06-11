@@ -91,22 +91,25 @@ export function applyAssetGroups(
   }
 
   for (const [groupId, members] of grouped) {
+    const group = groupById.get(groupId)!;
+    // A single-member group still renders as a group so its name/color stick.
+    // Without a custom label, fall back to the lone symbol rather than the
+    // bare "X" joined string so it reads like a normal holding.
     if (members.length < 2) {
-      rows.push(
-        ...members.map((member) => ({
-          key: member.key,
-          label: member.symbol,
-          name: member.name,
-          amount: member.amount,
-          valueUsd: member.valueUsd,
-          isGroup: false,
-          members: [],
-        })),
-      );
+      const [member] = members;
+      rows.push({
+        key: `group:${groupId}`,
+        label: groupLabel(group.name, [member.symbol]),
+        name: member.name,
+        amount: member.amount,
+        valueUsd: member.valueUsd,
+        isGroup: true,
+        color: group.color,
+        members,
+      });
       continue;
     }
 
-    const group = groupById.get(groupId)!;
     members.sort((a, b) => b.valueUsd - a.valueUsd);
     const memberSymbols = members.map((member) => member.symbol);
     rows.push({
@@ -134,24 +137,48 @@ export const ASSET_CHART_COLORS = [
   "var(--chart-3)",
   "var(--chart-4)",
   "var(--chart-5)",
+  "var(--chart-6)",
+  "var(--chart-7)",
+  "var(--chart-8)",
 ];
 
 /**
  * Map each grouped/ungrouped row key to its allocation color. Rows are ordered
  * by value (see {@link applyAssetGroups}), so the assignment is stable as long
  * as both the chart and the table start from the same totals/groups.
+ *
+ * Auto-assigned rows claim the first palette color not already taken — by a
+ * manual pick or an earlier auto row — so no two slices share a hue until all
+ * {@link ASSET_CHART_COLORS} are exhausted, at which point we cycle. Manual
+ * picks always win, even if that means a later auto row has to reuse the hue.
  */
 export function assetColorByKey(
   totals: AssetTotal[],
   groups: AssetGroup[],
 ): Map<string, string> {
+  const rows = applyAssetGroups(totals, groups);
+  const used = new Set(
+    rows.map((row) => row.color).filter((color): color is string => !!color),
+  );
+
+  let cursor = 0;
+  const nextAutoColor = (): string => {
+    for (let i = 0; i < ASSET_CHART_COLORS.length; i++) {
+      const color = ASSET_CHART_COLORS[cursor % ASSET_CHART_COLORS.length];
+      cursor++;
+      if (!used.has(color)) {
+        used.add(color);
+        return color;
+      }
+    }
+    // Every color is spoken for: fall back to cycling by position.
+    return ASSET_CHART_COLORS[cursor++ % ASSET_CHART_COLORS.length];
+  };
+
   const colors = new Map<string, string>();
-  applyAssetGroups(totals, groups).forEach((row, index) => {
-    colors.set(
-      row.key,
-      row.color ?? ASSET_CHART_COLORS[index % ASSET_CHART_COLORS.length],
-    );
-  });
+  for (const row of rows) {
+    colors.set(row.key, row.color ?? nextAutoColor());
+  }
   return colors;
 }
 

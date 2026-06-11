@@ -97,11 +97,11 @@ function AllocationDonutChart({
 }) {
   const { chartData, chartConfig } = useMemo(() => {
     const rows = applyAssetGroups(totals, groups);
+    const colorByKey = assetColorByKey(totals, groups);
     const config: ChartConfig = { value: { label: "Value" } };
     const data = rows.map((row, index) => {
       const key = slugify(row.label, index);
-      const color =
-        row.color ?? ASSET_CHART_COLORS[index % ASSET_CHART_COLORS.length];
+      const color = colorByKey.get(row.key) ?? ASSET_CHART_COLORS[0];
       config[key] = { label: row.label, color };
       return {
         asset: key,
