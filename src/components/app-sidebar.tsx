@@ -30,7 +30,7 @@ const accounts: { label: string; href?: string }[] = [
   { label: "Ethereum Virtual Machine", href: "/evm-wallets" },
   { label: "HyperCore", href: "/hyper-core" },
   { label: "Exchange" },
-  { label: "Brokerage" },
+  { label: "Brokerage", href: "/brokerage" },
 ];
 
 export function AppSidebar({ name, email }: { name: string; email: string }) {
@@ -85,11 +85,14 @@ export function AppSidebar({ name, email }: { name: string; email: string }) {
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton
+                asChild
                 size="lg"
                 className="text-base [&>svg]:size-5"
               >
-                <RiCashLine />
-                <span>Checking</span>
+                <Link href="/checking">
+                  <RiCashLine />
+                  <span>Checking</span>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>

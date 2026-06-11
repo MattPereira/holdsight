@@ -34,6 +34,13 @@ export const investmentAccountSyncStatus = pgEnum(
   ["idle", "success", "indexing", "rate_limited", "error"],
 );
 
+export const plaidItemStatus = pgEnum("plaid_item_status", [
+  "active",
+  "login_required",
+  "error",
+  "disabled",
+]);
+
 export const brokerageAccountType = pgEnum("brokerage_account_type", [
   "taxable",
   "traditional_ira",
@@ -142,19 +149,55 @@ export const centralizedExchangeAccounts = pgTable(
   ],
 );
 
+// A Plaid Item is one institution login (e.g. a single Charles Schwab login).
+// One Item can expose multiple brokerage accounts. The access token is the
+// long-lived secret used for every subsequent Plaid API call for this Item.
+// SECURITY: this column holds the AES-256-GCM ciphertext of the access token
+// (see src/lib/plaid/crypto.ts), never the plaintext token.
+export const plaidItems = pgTable(
+  "plaid_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    itemId: text("item_id").notNull(),
+    accessTokenEncrypted: text("access_token_encrypted").notNull(),
+    institutionId: text("institution_id"),
+    institutionName: text("institution_name"),
+    status: plaidItemStatus("status").default("active").notNull(),
+    lastSyncedAt: timestamp("last_synced_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("plaid_items_item_id_idx").on(table.itemId),
+    index("plaid_items_user_id_idx").on(table.userId),
+  ],
+);
+
 export const brokerageAccounts = pgTable(
   "brokerage_accounts",
   {
     investmentAccountId: uuid("investment_account_id")
       .primaryKey()
       .references(() => investmentAccounts.id, { onDelete: "cascade" }),
+    plaidItemId: uuid("plaid_item_id").references(() => plaidItems.id, {
+      onDelete: "cascade",
+    }),
     brokerage: text("brokerage").notNull(),
     accountType: brokerageAccountType("account_type")
       .default("taxable")
       .notNull(),
     externalAccountId: text("external_account_id"),
   },
-  (table) => [index("brokerage_accounts_brokerage_idx").on(table.brokerage)],
+  (table) => [
+    index("brokerage_accounts_brokerage_idx").on(table.brokerage),
+    index("brokerage_accounts_plaid_item_id_idx").on(table.plaidItemId),
+  ],
 );
 
 export const investmentBalances = pgTable(
@@ -171,6 +214,9 @@ export const investmentBalances = pgTable(
     amount: numeric("amount", { precision: 36, scale: 18 }).notNull(),
     priceUsd: numeric("price_usd", { precision: 36, scale: 18 }).notNull(),
     valueUsd: numeric("value_usd", { precision: 36, scale: 18 }).notNull(),
+    // Total cost basis of the holding, when the source provides it (Plaid
+    // brokerage). Null for sources that don't report it (EVM, HyperCore).
+    costBasisUsd: numeric("cost_basis_usd", { precision: 36, scale: 18 }),
     asOf: timestamp("as_of").defaultNow().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -305,12 +351,24 @@ export const centralizedExchangeAccountsRelations = relations(
   }),
 );
 
+export const plaidItemsRelations = relations(plaidItems, ({ one, many }) => ({
+  user: one(user, {
+    fields: [plaidItems.userId],
+    references: [user.id],
+  }),
+  brokerageAccounts: many(brokerageAccounts),
+}));
+
 export const brokerageAccountsRelations = relations(
   brokerageAccounts,
   ({ one }) => ({
     investmentAccount: one(investmentAccounts, {
       fields: [brokerageAccounts.investmentAccountId],
       references: [investmentAccounts.id],
+    }),
+    plaidItem: one(plaidItems, {
+      fields: [brokerageAccounts.plaidItemId],
+      references: [plaidItems.id],
     }),
   }),
 );

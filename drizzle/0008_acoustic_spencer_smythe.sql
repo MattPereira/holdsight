@@ -1,0 +1,1 @@
+ALTER TABLE "investment_balances" ADD COLUMN "cost_basis_usd" numeric(36, 18);
