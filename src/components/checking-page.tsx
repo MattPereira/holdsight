@@ -1,16 +1,13 @@
 "use client";
 
-import { RiAddLine, RiDeleteBinLine, RiRefreshLine } from "@remixicon/react";
+import { RiDeleteBinLine, RiRefreshLine } from "@remixicon/react";
 import { useState, useTransition } from "react";
 
 import {
-  createDepositoryLinkToken,
-  linkDepositoryAccount,
   loadDepositoryBalances,
   removeDepository,
 } from "@/app/actions";
 import { Button } from "@/components/ui/button";
-import { usePlaidConnect } from "@/components/use-plaid-connect";
 import type { DepositoryAccountRow } from "@/lib/depository/accounts";
 
 const usdFormat = new Intl.NumberFormat("en-US", {
@@ -32,15 +29,7 @@ export function CheckingPage({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const { connect, isConnecting } = usePlaidConnect({
-    purpose: "depository",
-    createLinkToken: createDepositoryLinkToken,
-    linkAccount: linkDepositoryAccount,
-    onLinked: (result) => setAccounts(result.accounts),
-    onError: setError,
-  });
-
-  const busy = isPending || isConnecting;
+  const busy = isPending;
 
   function handleRefresh() {
     setError(null);
@@ -73,15 +62,6 @@ export function CheckingPage({
           aria-label={accounts.length > 0 ? "Refresh Checking" : "Load Checking"}
         >
           <RiRefreshLine />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={connect}
-          disabled={busy}
-        >
-          <RiAddLine data-icon="inline-start" />
-          Account
         </Button>
       </div>
 

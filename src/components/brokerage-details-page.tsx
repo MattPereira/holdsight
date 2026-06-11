@@ -1,18 +1,15 @@
 "use client";
 
-import { RiAddLine, RiRefreshLine } from "@remixicon/react";
+import { RiRefreshLine } from "@remixicon/react";
 import { useMemo, useState, useTransition } from "react";
 
 import {
-  createBrokerageLinkToken,
-  linkBrokerageAccount,
   loadBrokerageBalances,
   removeBrokerage,
 } from "@/app/actions";
 import { BrokerageDetailsTable } from "@/components/brokerage-details-table";
 import { PortfolioAllocations } from "@/components/portfolio-allocations";
 import { Button } from "@/components/ui/button";
-import { usePlaidConnect } from "@/components/use-plaid-connect";
 import type { CurrentBrokerageAccount } from "@/lib/brokerage/balances";
 import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 import type { BalancesResult } from "@/lib/portfolio/types";
@@ -47,21 +44,13 @@ export function BrokerageDetailsPage({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const { connect, isConnecting } = usePlaidConnect({
-    purpose: "brokerage",
-    createLinkToken: createBrokerageLinkToken,
-    linkAccount: linkBrokerageAccount,
-    onLinked: (result) => setAccounts(result.accounts),
-    onError: setError,
-  });
-
   const summary = useMemo(
     () => portfolioAssetSummary(toBalancesResults(accounts)),
     [accounts],
   );
 
   const hasHoldings = accounts.some((account) => account.balances.length > 0);
-  const busy = isPending || isConnecting;
+  const busy = isPending;
 
   function handleRefresh() {
     setError(null);
@@ -96,15 +85,6 @@ export function BrokerageDetailsPage({
           }
         >
           <RiRefreshLine />
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={connect}
-          disabled={busy}
-        >
-          <RiAddLine data-icon="inline-start" />
-          Account
         </Button>
       </div>
 

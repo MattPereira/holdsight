@@ -241,7 +241,8 @@ export async function createDepositoryLinkToken(): Promise<PlaidLinkTokenActionR
 
 /**
  * Exchange the public_token, persist the Item, then populate brokerage holdings
- * for that Investments Item.
+ * for that Investments Item. If the user also selected depository accounts in
+ * Plaid's OAuth account picker, save those too.
  */
 export async function linkBrokerageAccount(
   publicToken: string,
@@ -273,6 +274,16 @@ export async function linkBrokerageAccount(
       await applyItemHoldings(plaidItemId, holdings);
     }
 
+    const depository = await getDepositoryAccounts(exchange.accessToken);
+    if (depository.status === "ready" && depository.accounts.length > 0) {
+      await saveDepositoryAccounts(
+        userId,
+        plaidItemId,
+        institution.institutionName,
+        depository.accounts,
+      );
+    }
+
     let error: string | null = null;
     if (holdings.status === "error") error = holdings.message;
     else if (holdings.status === "login_required") {
@@ -288,7 +299,8 @@ export async function linkBrokerageAccount(
 
 /**
  * Exchange the public_token, persist the Item, then populate checking/savings
- * balances for that depository Item.
+ * balances for that depository Item. If Plaid also initialized Investments for
+ * selected brokerage accounts, save those holdings too.
  */
 export async function linkDepositoryAccount(
   publicToken: string,
@@ -318,6 +330,18 @@ export async function linkDepositoryAccount(
         institution.institutionName,
         depository.accounts,
       );
+    }
+
+    const brokerageLabel = institution.institutionName ?? "Brokerage";
+    const holdings = await getHoldings(exchange.accessToken);
+    if (holdings.status === "ready" && holdings.accounts.length > 0) {
+      await saveBrokerageAccounts(
+        userId,
+        plaidItemId,
+        brokerageLabel,
+        holdings.accounts,
+      );
+      await applyItemHoldings(plaidItemId, holdings);
     }
 
     let error: string | null = null;

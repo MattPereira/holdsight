@@ -68,12 +68,14 @@ export function readPlaidLinkError(
  */
 export function usePlaidConnect<TLinkedResult>({
   purpose,
+  returnTo,
   createLinkToken,
   linkAccount,
   onLinked,
   onError,
 }: {
   purpose: PlaidConnectPurpose;
+  returnTo?: string;
   createLinkToken: () => Promise<PlaidLinkTokenActionResult>;
   linkAccount: (
     publicToken: string,
@@ -129,11 +131,11 @@ export function usePlaidConnect<TLinkedResult>({
       savePlaidLinkSession({
         purpose,
         linkToken: result.linkToken,
-        returnTo: window.location.pathname,
+        returnTo: returnTo ?? window.location.pathname,
       });
       setLinkToken(result.linkToken);
     });
-  }, [createLinkToken, onError, purpose]);
+  }, [createLinkToken, onError, purpose, returnTo]);
 
   return { connect, isPending, isConnecting: isPending || Boolean(linkToken) };
 }
