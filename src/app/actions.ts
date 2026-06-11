@@ -15,6 +15,7 @@ import {
 } from "@/lib/hyper-core/balances";
 import {
   ensureUserKrakenAccount,
+  removeUserKrakenAccount,
   saveUserKrakenCredentials,
 } from "@/lib/exchange/kraken/accounts";
 import {
@@ -234,6 +235,20 @@ export async function saveKrakenCredentials(input: {
           : "Failed to save Kraken credentials.",
     };
   }
+}
+
+export async function removeKrakenAccount(
+  investmentAccountId: string,
+): Promise<{ error: string | null }> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return { error: "You must be signed in to remove an account." };
+  }
+
+  await removeUserKrakenAccount(userId, investmentAccountId);
+  revalidatePath("/");
+  revalidatePath("/exchange");
+  return { error: null };
 }
 
 /* -------------------------------- plaid -------------------------------- */

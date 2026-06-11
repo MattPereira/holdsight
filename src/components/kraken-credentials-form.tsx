@@ -1,10 +1,25 @@
 "use client";
 
-import { RiKey2Line, RiSettings3Line } from "@remixicon/react";
+import {
+  RiDeleteBinLine,
+  RiKey2Line,
+  RiSettings3Line,
+} from "@remixicon/react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { saveKrakenCredentials } from "@/app/actions";
+import { removeKrakenAccount, saveKrakenCredentials } from "@/app/actions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -22,8 +37,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import type { SavedKrakenAccount } from "@/lib/exchange/kraken/accounts";
 
-export function KrakenCredentialsForm() {
+export function KrakenCredentialsForm({
+  accounts,
+}: {
+  accounts: SavedKrakenAccount[];
+}) {
   const router = useRouter();
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
@@ -44,6 +64,16 @@ export function KrakenCredentialsForm() {
         setApiSecret("");
         router.refresh();
       }
+    });
+  }
+
+  function handleRemove(investmentAccountId: string) {
+    setMessage("");
+    setError(null);
+    startTransition(async () => {
+      const result = await removeKrakenAccount(investmentAccountId);
+      setError(result.error);
+      if (!result.error) router.refresh();
     });
   }
 
@@ -107,6 +137,53 @@ export function KrakenCredentialsForm() {
               </div>
             </FieldGroup>
           </form>
+
+          {accounts.length > 0 ? (
+            <ul className="divide-y rounded-lg border">
+              {accounts.map((account) => {
+                const name = account.label ?? account.exchange;
+                return (
+                  <li
+                    key={account.id}
+                    className="flex items-center justify-between gap-3 px-3 py-2"
+                  >
+                    <span className="truncate text-sm font-medium">{name}</span>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label={`Remove ${name}`}
+                          disabled={isPending}
+                        >
+                          <RiDeleteBinLine />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove {name}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This deletes the stored API credentials and synced
+                            balances for this exchange. You can reconnect later,
+                            but this can&apos;t be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleRemove(account.id)}
+                          >
+                            Remove
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
         </div>
       </SheetContent>
     </Sheet>

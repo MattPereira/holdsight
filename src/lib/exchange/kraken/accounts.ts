@@ -114,6 +114,26 @@ export async function saveUserKrakenCredentials(
   return account;
 }
 
+/**
+ * Disconnect a Kraken account: delete the investment account, which cascades
+ * its exchange row, stored API credentials, and balances. Scoped to the user
+ * and the centralized-exchange kind so it can't touch other account types.
+ */
+export async function removeUserKrakenAccount(
+  userId: string,
+  investmentAccountId: string,
+): Promise<void> {
+  await db
+    .delete(investmentAccounts)
+    .where(
+      and(
+        eq(investmentAccounts.id, investmentAccountId),
+        eq(investmentAccounts.userId, userId),
+        eq(investmentAccounts.kind, "centralized_exchange"),
+      ),
+    );
+}
+
 export async function getUserKrakenCredentials(
   userId: string,
   investmentAccountId: string,

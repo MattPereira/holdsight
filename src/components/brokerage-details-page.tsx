@@ -3,11 +3,9 @@
 import { RiRefreshLine } from "@remixicon/react";
 import { useMemo, useState, useTransition } from "react";
 
-import {
-  loadBrokerageBalances,
-  removeBrokerage,
-} from "@/app/actions";
+import { loadBrokerageBalances } from "@/app/actions";
 import { BrokerageDetailsTable } from "@/components/brokerage-details-table";
+import { BrokerageManager } from "@/components/brokerage-manager";
 import { PortfolioAllocations } from "@/components/portfolio-allocations";
 import { Button } from "@/components/ui/button";
 import type { CurrentBrokerageAccount } from "@/lib/brokerage/balances";
@@ -49,7 +47,11 @@ export function BrokerageDetailsPage({
     [accounts],
   );
 
-  const hasHoldings = accounts.some((account) => account.balances.length > 0);
+  const accountsWithHoldings = useMemo(
+    () => accounts.filter((account) => account.balances.length > 0),
+    [accounts],
+  );
+  const hasHoldings = accountsWithHoldings.length > 0;
   const busy = isPending;
 
   function handleRefresh() {
@@ -61,19 +63,10 @@ export function BrokerageDetailsPage({
     });
   }
 
-  function handleRemove(plaidItemId: string) {
-    setError(null);
-    startTransition(async () => {
-      const result = await removeBrokerage(plaidItemId);
-      setAccounts(result.accounts);
-      setError(result.error);
-    });
-  }
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
-        <h1 className="text-xl font-semibold">Brokerage</h1>
+        <h1 className="text-xl font-semibold">Brokerage Accounts</h1>
         <Button
           type="button"
           variant="outline"
@@ -86,6 +79,11 @@ export function BrokerageDetailsPage({
         >
           <RiRefreshLine />
         </Button>
+        <BrokerageManager
+          accounts={accounts}
+          onAccountsChange={setAccounts}
+          onError={setError}
+        />
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
@@ -104,13 +102,8 @@ export function BrokerageDetailsPage({
           )}
 
           <div className="flex flex-col gap-6">
-            {accounts.map((account) => (
-              <BrokerageDetailsTable
-                key={account.id}
-                account={account}
-                onRemove={handleRemove}
-                disabled={busy}
-              />
+            {accountsWithHoldings.map((account) => (
+              <BrokerageDetailsTable key={account.id} account={account} />
             ))}
           </div>
         </div>

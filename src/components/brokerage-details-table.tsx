@@ -1,6 +1,3 @@
-import { RiDeleteBinLine } from "@remixicon/react";
-
-import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -122,12 +119,8 @@ function MobileList({ balances }: { balances: BrokerageBalance[] }) {
  */
 export function BrokerageDetailsTable({
   account,
-  onRemove,
-  disabled,
 }: {
   account: CurrentBrokerageAccount;
-  onRemove: (plaidItemId: string) => void;
-  disabled: boolean;
 }) {
   const { balances } = account;
   const heading = account.label ?? account.institutionName ?? account.brokerage;
@@ -143,23 +136,9 @@ export function BrokerageDetailsTable({
             </span>
           ) : null}
         </span>
-        <div className="flex items-baseline gap-2">
-          <span className="text-sm font-medium tabular-nums">
-            {formatUsd(accountTotal(balances))}
-          </span>
-          {account.plaidItemId ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`Remove ${heading}`}
-              onClick={() => onRemove(account.plaidItemId!)}
-              disabled={disabled}
-            >
-              <RiDeleteBinLine />
-            </Button>
-          ) : null}
-        </div>
+        <span className="text-sm font-medium tabular-nums">
+          {formatUsd(accountTotal(balances))}
+        </span>
       </div>
       {balances.length > 0 ? (
         <>
