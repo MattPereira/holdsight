@@ -379,7 +379,7 @@ export function PortfolioAllocations({
         isGroup: row.isGroup,
         color: row.color,
         members: row.members.map((member) => ({
-          key: member.symbol,
+          key: member.key,
           symbol: member.symbol,
           name: member.name,
           amount: member.amount,

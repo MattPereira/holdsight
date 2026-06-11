@@ -1,5 +1,6 @@
 export type InvestmentBalance = {
   sourceBalanceId?: string;
+  aggregationKey?: string;
   symbol: string; // "HYPE", "BHYP", "VVV", "DIEM", "USDC", "SGOV", ect..
   name?: string;
   chainId: string;

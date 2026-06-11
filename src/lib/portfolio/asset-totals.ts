@@ -1,6 +1,7 @@
 import type { BalancesResult } from "@/lib/portfolio/types";
 
 export type AssetTotal = {
+  key: string;
   symbol: string;
   name?: string;
   amount: number;
@@ -78,7 +79,7 @@ export function applyAssetGroups(
       }
     } else {
       rows.push({
-        key: total.symbol,
+        key: total.key,
         label: total.symbol,
         name: total.name,
         amount: total.amount,
@@ -93,7 +94,7 @@ export function applyAssetGroups(
     if (members.length < 2) {
       rows.push(
         ...members.map((member) => ({
-          key: member.symbol,
+          key: member.key,
           label: member.symbol,
           name: member.name,
           amount: member.amount,
@@ -158,6 +159,12 @@ function totalAssetSymbol(symbol: string): string {
   return symbol.trim();
 }
 
+function totalAssetKey(
+  balance: Extract<BalancesResult, { status: "ready" }>["balances"][number],
+): string {
+  return balance.aggregationKey ?? totalAssetSymbol(balance.symbol);
+}
+
 export function walletTotal(result: BalancesResult): number {
   return result.status === "ready"
     ? result.balances.reduce((sum, balance) => sum + balance.valueUsd, 0)
@@ -176,14 +183,16 @@ export function aggregateAssetTotals(results: BalancesResult[]): AssetTotal[] {
 
     for (const balance of result.balances) {
       const symbol = totalAssetSymbol(balance.symbol);
-      const total = totals.get(symbol);
+      const key = totalAssetKey(balance);
+      const total = totals.get(key);
 
       if (total) {
         total.amount += balance.amount;
         total.valueUsd += balance.valueUsd;
         total.name ??= balance.name;
       } else {
-        totals.set(symbol, {
+        totals.set(key, {
+          key,
           symbol,
           name: balance.name,
           amount: balance.amount,

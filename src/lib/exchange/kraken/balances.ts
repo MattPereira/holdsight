@@ -75,18 +75,25 @@ export async function replaceKrakenAccountBalances(
   });
 }
 
-function toInvestmentBalance(row: {
-  sourceBalanceId: string | null;
-  symbol: string;
-  name: string | null;
-  amount: string;
-  priceUsd: string;
-  valueUsd: string;
-}): InvestmentBalance {
+function toInvestmentBalance(
+  row: {
+    sourceBalanceId: string | null;
+    symbol: string;
+    name: string | null;
+    amount: string;
+    priceUsd: string;
+    valueUsd: string;
+  },
+  account: SavedKrakenAccount,
+): InvestmentBalance {
+  const symbol = row.symbol.trim();
+  const isUsd = symbol.toUpperCase() === "USD";
+
   return {
     sourceBalanceId: row.sourceBalanceId ?? undefined,
-    symbol: row.symbol,
-    name: row.name ?? undefined,
+    aggregationKey: isUsd ? `kraken-cash:${account.id}:USD` : undefined,
+    symbol,
+    name: isUsd ? "Kraken Cash" : row.name ?? undefined,
     chainId: "kraken",
     amount: Number(row.amount),
     priceUsd: Number(row.priceUsd),
@@ -138,7 +145,7 @@ export async function getCurrentKrakenBalances(
     results.push({
       status: "ready",
       address,
-      balances: balances.map(toInvestmentBalance),
+      balances: balances.map((balance) => toInvestmentBalance(balance, account)),
     });
   }
 

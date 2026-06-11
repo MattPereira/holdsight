@@ -603,6 +603,7 @@ export async function loadPortfolioSummary(): Promise<PortfolioAssetSummary> {
 
   await syncUserKrakenAccounts(userId);
   await syncUserBrokerageBalances(userId);
+  await syncUserDepositoryBalances(userId);
 
   return portfolioAssetSummary(await getCurrentPortfolioBalances(userId));
 }
