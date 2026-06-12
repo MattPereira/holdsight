@@ -61,11 +61,11 @@ export function NavUser({ name, email }: { name: string; email: string }) {
 
   const depositoryConnect = usePlaidConnect({
     purpose: "depository",
-    returnTo: "/checking",
+    returnTo: "/banking",
     createLinkToken: createDepositoryLinkToken,
     linkAccount: linkDepositoryAccount,
     onLinked: () => {
-      router.push("/checking");
+      router.push("/banking");
       router.refresh();
     },
     onError: setConnectError,

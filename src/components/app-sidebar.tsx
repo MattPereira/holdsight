@@ -4,8 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   RiArrowRightSLine,
-  RiBankCardLine,
-  RiCashLine,
+  RiBankLine,
   RiFocus3Line,
   RiFundsBoxLine,
   RiHome4Line,
@@ -88,19 +87,10 @@ export function AppSidebar({ name, email }: { name: string; email: string }) {
                 size="lg"
                 className="text-base [&>svg]:size-5"
               >
-                <Link href="/checking">
-                  <RiCashLine />
-                  <span>Checking</span>
+                <Link href="/banking">
+                  <RiBankLine />
+                  <span>Banking</span>
                 </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                size="lg"
-                className="text-base [&>svg]:size-5"
-              >
-                <RiBankCardLine />
-                <span>Credit Card</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
