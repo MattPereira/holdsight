@@ -41,6 +41,7 @@ import {
   type PlaidAccountFamily,
 } from "@/lib/plaid/client";
 import {
+  PlaidRevokeError,
   removeUserPlaidItem,
   upsertPlaidItem,
 } from "@/lib/plaid/items";
@@ -548,6 +549,12 @@ export async function loadCreditCardAccounts(): Promise<CreditCardActionResult> 
   return { accounts: await getUserCreditCardAccounts(userId), error: null };
 }
 
+// Shown when revoking the Item at Plaid fails transiently and we deliberately
+// leave the local rows intact so the user can retry rather than orphaning a
+// still-live authorization.
+const PLAID_REVOKE_RETRY_MESSAGE =
+  "Couldn't reach the institution to disconnect. Please try again.";
+
 /**
  * Unlink a Plaid Item and delete all of its accounts.
  * Returns the user's remaining brokerage accounts (called from that page).
@@ -560,7 +567,17 @@ export async function removeBrokerage(
     return { accounts: [], error: "You must be signed in to remove an account." };
   }
 
-  await removeUserPlaidItem(userId, plaidItemId);
+  try {
+    await removeUserPlaidItem(userId, plaidItemId);
+  } catch (error) {
+    if (error instanceof PlaidRevokeError) {
+      return {
+        accounts: await getCurrentBrokerageBalances(userId),
+        error: PLAID_REVOKE_RETRY_MESSAGE,
+      };
+    }
+    throw error;
+  }
   revalidatePath("/");
   return { accounts: await getCurrentBrokerageBalances(userId), error: null };
 }
@@ -577,7 +594,17 @@ export async function removeDepository(
     return { accounts: [], error: "You must be signed in to remove an account." };
   }
 
-  await removeUserPlaidItem(userId, plaidItemId);
+  try {
+    await removeUserPlaidItem(userId, plaidItemId);
+  } catch (error) {
+    if (error instanceof PlaidRevokeError) {
+      return {
+        accounts: await getUserDepositoryAccounts(userId),
+        error: PLAID_REVOKE_RETRY_MESSAGE,
+      };
+    }
+    throw error;
+  }
   revalidatePath("/");
   return { accounts: await getUserDepositoryAccounts(userId), error: null };
 }
@@ -594,7 +621,17 @@ export async function removeCreditCard(
     return { accounts: [], error: "You must be signed in to remove an account." };
   }
 
-  await removeUserPlaidItem(userId, plaidItemId);
+  try {
+    await removeUserPlaidItem(userId, plaidItemId);
+  } catch (error) {
+    if (error instanceof PlaidRevokeError) {
+      return {
+        accounts: await getUserCreditCardAccounts(userId),
+        error: PLAID_REVOKE_RETRY_MESSAGE,
+      };
+    }
+    throw error;
+  }
   revalidatePath("/");
   return { accounts: await getUserCreditCardAccounts(userId), error: null };
 }

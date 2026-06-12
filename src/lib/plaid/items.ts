@@ -10,8 +10,24 @@ import {
   investmentAccounts,
   plaidItems,
 } from "@/db/schema/investment-accounts";
-import { removeItem } from "@/lib/plaid/client";
+import { readPlaidError, removeItem } from "@/lib/plaid/client";
 import { decrypt, encrypt } from "@/lib/plaid/crypto";
+
+/**
+ * Thrown when revoking an Item at Plaid fails for a transient/unknown reason
+ * (network, 5xx, rate limit) — i.e. the authorization may still be live, so the
+ * caller must NOT delete local rows. Callers surface this as a retryable error.
+ */
+export class PlaidRevokeError extends Error {
+  constructor(
+    message: string,
+    readonly code: string | null,
+    readonly httpStatus: number,
+  ) {
+    super(message);
+    this.name = "PlaidRevokeError";
+  }
+}
 
 export type SavedPlaidItem = {
   id: string;
@@ -163,12 +179,23 @@ export async function removeUserPlaidItem(
 
   if (!item) return;
 
-  // Best-effort revoke. A stale sandbox token will 400 against the production
-  // API — we still want the local rows gone, so swallow the error.
+  // Revoke at Plaid before touching the DB: the access token we need to revoke
+  // lives in the row we're about to delete, so a delete-first ordering would
+  // make a failed revoke permanently unrecoverable (a live, billable auth with
+  // no local record). Only swallow errors that mean the Item/token is already
+  // gone at Plaid; treat anything else as retryable so the row survives.
   try {
     await removeItem(decrypt(item.accessTokenEncrypted));
-  } catch {
-    /* best-effort: proceed with local deletion regardless */
+  } catch (error) {
+    const { code, message, httpStatus } = readPlaidError(error);
+    // ITEM_NOT_FOUND / INVALID_ACCESS_TOKEN: the authorization no longer exists
+    // (e.g. a stale sandbox token revoked against production). Nothing live to
+    // leak, so proceed with local deletion.
+    const alreadyRevoked =
+      code === "ITEM_NOT_FOUND" || code === "INVALID_ACCESS_TOKEN";
+    if (!alreadyRevoked) {
+      throw new PlaidRevokeError(message, code, httpStatus);
+    }
   }
 
   const accounts = await db
