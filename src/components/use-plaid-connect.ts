@@ -3,13 +3,11 @@ import { usePlaidLink, type PlaidLinkOnSuccess } from "react-plaid-link";
 
 import type { PlaidLinkTokenActionResult } from "@/app/actions";
 
-export type PlaidConnectPurpose = "brokerage" | "depository";
-
 const PLAID_LINK_SESSION_STORAGE_KEY = "plaid_link_session";
-const PLAID_LINK_ERROR_STORAGE_KEY_PREFIX = "plaid_link_error";
+const PLAID_LINK_ERROR_STORAGE_KEY = "plaid_link_error";
 
 export type PlaidLinkSession = {
-  purpose: PlaidConnectPurpose;
+  families: string[];
   linkToken: string;
   returnTo: string;
 };
@@ -25,7 +23,8 @@ export function readPlaidLinkSession(): PlaidLinkSession | null {
   try {
     const parsed = JSON.parse(raw) as Partial<PlaidLinkSession>;
     if (
-      (parsed.purpose === "brokerage" || parsed.purpose === "depository") &&
+      Array.isArray(parsed.families) &&
+      parsed.families.every((family) => typeof family === "string") &&
       typeof parsed.linkToken === "string" &&
       typeof parsed.returnTo === "string"
     ) {
@@ -43,38 +42,31 @@ export function clearPlaidLinkSession(): void {
   localStorage.removeItem(PLAID_LINK_SESSION_STORAGE_KEY);
 }
 
-export function savePlaidLinkError(
-  purpose: PlaidConnectPurpose,
-  message: string | null,
-): void {
-  const key = `${PLAID_LINK_ERROR_STORAGE_KEY_PREFIX}:${purpose}`;
-  if (message) localStorage.setItem(key, message);
-  else localStorage.removeItem(key);
+export function savePlaidLinkError(message: string | null): void {
+  if (message) localStorage.setItem(PLAID_LINK_ERROR_STORAGE_KEY, message);
+  else localStorage.removeItem(PLAID_LINK_ERROR_STORAGE_KEY);
 }
 
-export function readPlaidLinkError(
-  purpose: PlaidConnectPurpose,
-): string | null {
-  const key = `${PLAID_LINK_ERROR_STORAGE_KEY_PREFIX}:${purpose}`;
-  const message = localStorage.getItem(key);
-  localStorage.removeItem(key);
+export function readPlaidLinkError(): string | null {
+  const message = localStorage.getItem(PLAID_LINK_ERROR_STORAGE_KEY);
+  localStorage.removeItem(PLAID_LINK_ERROR_STORAGE_KEY);
   return message;
 }
 
 /**
  * Drives one Plaid Link connect flow: fetch a link_token, open Plaid's UI, then
  * exchange the public_token server-side. Handles the OAuth redirect resume.
- * Shared by brokerage and checking; each page passes its own server actions.
+ * The caller owns the selected account families.
  */
 export function usePlaidConnect<TLinkedResult>({
-  purpose,
+  families,
   returnTo,
   createLinkToken,
   linkAccount,
   onLinked,
   onError,
 }: {
-  purpose: PlaidConnectPurpose;
+  families: string[];
   returnTo?: string;
   createLinkToken: () => Promise<PlaidLinkTokenActionResult>;
   linkAccount: (
@@ -87,8 +79,8 @@ export function usePlaidConnect<TLinkedResult>({
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    onError(readPlaidLinkError(purpose));
-  }, [onError, purpose]);
+    onError(readPlaidLinkError());
+  }, [onError]);
 
   const onSuccess = useCallback<PlaidLinkOnSuccess>(
     (publicToken) => {
@@ -129,13 +121,13 @@ export function usePlaidConnect<TLinkedResult>({
       // Persist before opening: an OAuth institution will navigate away and we
       // need this token back when the browser returns.
       savePlaidLinkSession({
-        purpose,
+        families,
         linkToken: result.linkToken,
         returnTo: returnTo ?? window.location.pathname,
       });
       setLinkToken(result.linkToken);
     });
-  }, [createLinkToken, onError, purpose, returnTo]);
+  }, [createLinkToken, families, onError, returnTo]);
 
   return { connect, isPending, isConnecting: isPending || Boolean(linkToken) };
 }

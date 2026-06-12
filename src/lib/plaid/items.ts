@@ -3,6 +3,7 @@ import "server-only";
 import { and, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
+import { creditAccounts } from "@/db/schema/credit-accounts";
 import { depositoryAccounts } from "@/db/schema/depository-accounts";
 import {
   brokerageAccounts,
@@ -125,10 +126,30 @@ export async function getUserDepositoryPlaidItems(
   return uniqueItems(rows);
 }
 
+export async function getUserCreditCardPlaidItems(
+  userId: string,
+): Promise<SavedPlaidItem[]> {
+  const rows = await db
+    .select({
+      id: plaidItems.id,
+      itemId: plaidItems.itemId,
+      accessTokenEncrypted: plaidItems.accessTokenEncrypted,
+      institutionName: plaidItems.institutionName,
+      status: plaidItems.status,
+    })
+    .from(plaidItems)
+    .innerJoin(creditAccounts, eq(creditAccounts.plaidItemId, plaidItems.id))
+    .where(eq(plaidItems.userId, userId))
+    .orderBy(desc(plaidItems.createdAt));
+
+  return uniqueItems(rows);
+}
+
 /**
  * Unlink a Plaid Item: revoke it at Plaid (best-effort) and delete it locally.
  * Deleting the investment accounts cascades to their brokerage rows + balances;
- * deleting the Item row cascades to its depository accounts. Scoped to the user.
+ * deleting the Item row cascades to its depository and credit-card accounts.
+ * Scoped to the user.
  */
 export async function removeUserPlaidItem(
   userId: string,

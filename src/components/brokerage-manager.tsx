@@ -1,13 +1,9 @@
 "use client";
 
-import { RiAddLine, RiDeleteBinLine, RiSettings3Line } from "@remixicon/react";
+import { RiDeleteBinLine, RiSettings3Line } from "@remixicon/react";
 import { useMemo, useTransition } from "react";
 
-import {
-  createBrokerageLinkToken,
-  linkBrokerageAccount,
-  removeBrokerage,
-} from "@/app/actions";
+import { removeBrokerage } from "@/app/actions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,7 +24,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { usePlaidConnect } from "@/components/use-plaid-connect";
 import type { CurrentBrokerageAccount } from "@/lib/brokerage/balances";
 
 const usdFormat = new Intl.NumberFormat("en-US", {
@@ -79,21 +74,12 @@ export function BrokerageManager({
 }) {
   const [isRemoving, startRemove] = useTransition();
 
-  const brokerageConnect = usePlaidConnect({
-    purpose: "brokerage",
-    returnTo: "/brokerage",
-    createLinkToken: createBrokerageLinkToken,
-    linkAccount: linkBrokerageAccount,
-    onLinked: (result) => onAccountsChange(result.accounts),
-    onError,
-  });
-
   const institutions = useMemo(
     () => groupByInstitution(accounts),
     [accounts],
   );
 
-  const busy = isRemoving || brokerageConnect.isConnecting;
+  const busy = isRemoving;
 
   function handleRemove(plaidItemId: string) {
     onError(null);
@@ -119,21 +105,10 @@ export function BrokerageManager({
         <SheetHeader>
           <SheetTitle>Brokerage Accounts</SheetTitle>
           <SheetDescription>
-            Connect a brokerage or disconnect a linked institution.
+            Disconnect a linked institution.
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4">
-          <Button
-            type="button"
-            onClick={() => brokerageConnect.connect()}
-            disabled={busy}
-          >
-            <RiAddLine data-icon="inline-start" />
-            {brokerageConnect.isConnecting
-              ? "Connecting..."
-              : "Connect brokerage"}
-          </Button>
-
           {institutions.length > 0 ? (
             <ul className="divide-y rounded-lg border">
               {institutions.map((institution) => (

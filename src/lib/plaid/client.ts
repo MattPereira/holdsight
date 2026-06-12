@@ -3,15 +3,24 @@ import "server-only";
 import {
   Configuration,
   CountryCode,
+  CreditAccountSubtype,
   DepositoryAccountSubtype,
   InvestmentAccountSubtype,
+  type LinkTokenAccountFilters,
   PlaidApi,
   PlaidEnvironments,
   Products,
   type AccountBase,
 } from "plaid";
 
-export type PlaidLinkPurpose = "brokerage" | "depository";
+export const plaidAccountFamilies = [
+  "checking",
+  "savings",
+  "credit_card",
+  "brokerage",
+] as const;
+
+export type PlaidAccountFamily = (typeof plaidAccountFamilies)[number];
 
 type PlaidEnv = "sandbox" | "production";
 
@@ -86,33 +95,102 @@ export function readPlaidError(error: unknown): {
   };
 }
 
+const PLAID_ACCOUNT_FAMILY_SET = new Set<string>(plaidAccountFamilies);
+
+export function normalizePlaidAccountFamilies(
+  families: readonly string[],
+): PlaidAccountFamily[] {
+  const normalized: PlaidAccountFamily[] = [];
+  for (const family of families) {
+    if (!PLAID_ACCOUNT_FAMILY_SET.has(family)) continue;
+    if (normalized.includes(family as PlaidAccountFamily)) continue;
+    normalized.push(family as PlaidAccountFamily);
+  }
+  return normalized;
+}
+
+function selectedProducts(families: readonly PlaidAccountFamily[]): Products[] {
+  const products: Products[] = [];
+
+  for (const family of families) {
+    const product =
+      family === "checking" || family === "savings"
+        ? Products.Auth
+        : family === "credit_card"
+          ? Products.Liabilities
+          : Products.Investments;
+
+    if (!products.includes(product)) products.push(product);
+  }
+
+  return products;
+}
+
+function accountFiltersForFamilies(
+  families: readonly PlaidAccountFamily[],
+): LinkTokenAccountFilters {
+  const accountFilters: LinkTokenAccountFilters = {};
+  const depositorySubtypes: DepositoryAccountSubtype[] = [];
+
+  if (families.includes("checking")) {
+    depositorySubtypes.push(DepositoryAccountSubtype.Checking);
+  }
+  if (families.includes("savings")) {
+    depositorySubtypes.push(DepositoryAccountSubtype.Savings);
+  }
+  if (depositorySubtypes.length > 0) {
+    accountFilters.depository = { account_subtypes: depositorySubtypes };
+  }
+
+  if (families.includes("credit_card")) {
+    accountFilters.credit = {
+      account_subtypes: [CreditAccountSubtype.CreditCard],
+    };
+  }
+
+  if (families.includes("brokerage")) {
+    accountFilters.investment = {
+      account_subtypes: [InvestmentAccountSubtype.All],
+    };
+  }
+
+  return accountFilters;
+}
+
+function linkTokenProducts(families: readonly PlaidAccountFamily[]): {
+  products: Products[];
+  requiredIfSupportedProducts: Products[];
+} {
+  const products = selectedProducts(families);
+  const [primaryProduct, ...requiredIfSupportedProducts] = products;
+
+  if (!primaryProduct) {
+    throw new Error("At least one supported Plaid account family is required");
+  }
+
+  return {
+    products: [primaryProduct],
+    requiredIfSupportedProducts,
+  };
+}
+
 /**
  * Create a short-lived link_token used to boot the Plaid Link UI on the client.
- * Brokerage and depository use separate Items so each flow can request the
- * smallest product set that matches the accounts being linked.
+ * With multiple selected products, the first product initializes Link and the
+ * rest are required when the institution/account supports them, preserving
+ * wider institution compatibility.
  */
 export async function createLinkToken(
   userId: string,
-  purpose: PlaidLinkPurpose,
+  families: readonly PlaidAccountFamily[],
 ): Promise<string> {
   // OAuth institutions (e.g. Schwab) require a redirect_uri that exactly
   // matches one registered in the Plaid Dashboard. Only send it when set so
   // non-OAuth / sandbox flows that don't need it still work.
   const redirectUri = process.env.PLAID_REDIRECT_URI;
 
-  const products =
-    purpose === "brokerage" ? [Products.Investments] : [Products.Auth];
-  const accountFilters =
-    purpose === "brokerage"
-      ? { investment: { account_subtypes: [InvestmentAccountSubtype.All] } }
-      : {
-          depository: {
-            account_subtypes: [
-              DepositoryAccountSubtype.Checking,
-              DepositoryAccountSubtype.Savings,
-            ],
-          },
-        };
+  const { products, requiredIfSupportedProducts } = linkTokenProducts(families);
+  const accountFilters = accountFiltersForFamilies(families);
 
   const res = await getClient().linkTokenCreate({
     user: { client_user_id: userId },
@@ -121,6 +199,9 @@ export async function createLinkToken(
     country_codes: [CountryCode.Us],
     language: "en",
     account_filters: accountFilters,
+    ...(requiredIfSupportedProducts.length > 0
+      ? { required_if_supported_products: requiredIfSupportedProducts }
+      : {}),
     ...(redirectUri ? { redirect_uri: redirectUri } : {}),
   });
 

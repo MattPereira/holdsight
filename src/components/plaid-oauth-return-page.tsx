@@ -4,12 +4,7 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { usePlaidLink, type PlaidLinkOnSuccess } from "react-plaid-link";
 
-import {
-  linkBrokerageAccount,
-  linkDepositoryAccount,
-  type BrokerageActionResult,
-  type DepositoryActionResult,
-} from "@/app/actions";
+import { linkPlaidAccounts, type PlaidAccountsActionResult } from "@/app/actions";
 import {
   clearPlaidLinkSession,
   readPlaidLinkSession,
@@ -20,10 +15,8 @@ import {
 function linkAccount(
   session: PlaidLinkSession,
   publicToken: string,
-): Promise<BrokerageActionResult | DepositoryActionResult> {
-  return session.purpose === "brokerage"
-    ? linkBrokerageAccount(publicToken)
-    : linkDepositoryAccount(publicToken);
+): Promise<PlaidAccountsActionResult> {
+  return linkPlaidAccounts(publicToken, session.families);
 }
 
 export function PlaidOAuthReturnPage() {
@@ -36,7 +29,7 @@ export function PlaidOAuthReturnPage() {
 
   const finish = useCallback(
     (error: string | null) => {
-      if (session) savePlaidLinkError(session.purpose, error);
+      if (session) savePlaidLinkError(error);
       clearPlaidLinkSession();
       router.replace(returnTo);
     },

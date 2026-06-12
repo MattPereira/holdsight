@@ -8,12 +8,6 @@ import {
   RiLogoutBoxRLine,
 } from "@remixicon/react";
 
-import {
-  createBrokerageLinkToken,
-  createDepositoryLinkToken,
-  linkBrokerageAccount,
-  linkDepositoryAccount,
-} from "@/app/actions";
 import { authClient } from "@/lib/auth/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -30,7 +24,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { usePlaidConnect } from "@/components/use-plaid-connect";
+import { PlaidAccountsConnectSheet } from "@/components/plaid-accounts-connect-sheet";
 
 function initials(name: string) {
   return name
@@ -45,34 +39,7 @@ export function NavUser({ name, email }: { name: string; email: string }) {
   const { isMobile } = useSidebar();
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
-  const [connectError, setConnectError] = useState<string | null>(null);
-
-  const brokerageConnect = usePlaidConnect({
-    purpose: "brokerage",
-    returnTo: "/brokerage",
-    createLinkToken: createBrokerageLinkToken,
-    linkAccount: linkBrokerageAccount,
-    onLinked: () => {
-      router.push("/brokerage");
-      router.refresh();
-    },
-    onError: setConnectError,
-  });
-
-  const depositoryConnect = usePlaidConnect({
-    purpose: "depository",
-    returnTo: "/banking",
-    createLinkToken: createDepositoryLinkToken,
-    linkAccount: linkDepositoryAccount,
-    onLinked: () => {
-      router.push("/banking");
-      router.refresh();
-    },
-    onError: setConnectError,
-  });
-
-  const isConnecting =
-    brokerageConnect.isConnecting || depositoryConnect.isConnecting;
+  const [connectSheetOpen, setConnectSheetOpen] = useState(false);
 
   async function handleSignOut() {
     setIsPending(true);
@@ -125,28 +92,10 @@ export function NavUser({ name, email }: { name: string; email: string }) {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              disabled={isConnecting}
-              onSelect={() => brokerageConnect.connect()}
-            >
+            <DropdownMenuItem onSelect={() => setConnectSheetOpen(true)}>
               <RiAddLine />
-              {isConnecting ? "Connecting..." : "Brokerage account"}
+              Connect accounts
             </DropdownMenuItem>
-            <DropdownMenuItem
-              disabled={isConnecting}
-              onSelect={() => depositoryConnect.connect()}
-            >
-              <RiAddLine />
-              {isConnecting ? "Connecting..." : "Checking account"}
-            </DropdownMenuItem>
-            {connectError ? (
-              <>
-                <DropdownMenuSeparator />
-                <p className="px-2 py-1 text-xs text-destructive">
-                  {connectError}
-                </p>
-              </>
-            ) : null}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} disabled={isPending}>
               <RiLogoutBoxRLine />
@@ -154,6 +103,10 @@ export function NavUser({ name, email }: { name: string; email: string }) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <PlaidAccountsConnectSheet
+          open={connectSheetOpen}
+          onOpenChange={setConnectSheetOpen}
+        />
       </SidebarMenuItem>
     </SidebarMenu>
   );

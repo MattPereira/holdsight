@@ -36,7 +36,9 @@ import {
   exchangePublicToken,
   getDepositoryAccounts,
   getInstitution,
+  normalizePlaidAccountFamilies,
   readPlaidError,
+  type PlaidAccountFamily,
 } from "@/lib/plaid/client";
 import {
   removeUserPlaidItem,
@@ -56,6 +58,13 @@ import {
   type DepositoryAccountRow,
 } from "@/lib/depository/accounts";
 import { syncUserDepositoryBalances } from "@/lib/depository/balances";
+import {
+  getUserCreditCardAccounts,
+  saveCreditCardAccounts,
+  type CreditCardAccountRow,
+} from "@/lib/credit-card/accounts";
+import { getCreditCardAccounts } from "@/lib/credit-card/client";
+import { syncUserCreditCardAccounts } from "@/lib/credit-card/balances";
 import {
   portfolioAssetSummary,
   type AssetGroup,
@@ -293,6 +302,18 @@ export type DepositoryActionResult = {
   error: string | null;
 };
 
+export type CreditCardActionResult = {
+  accounts: CreditCardAccountRow[];
+  error: string | null;
+};
+
+export type PlaidAccountsActionResult = {
+  brokerageAccounts: CurrentBrokerageAccount[];
+  depositoryAccounts: DepositoryAccountRow[];
+  creditCardAccounts: CreditCardAccountRow[];
+  error: string | null;
+};
+
 export type PlaidLinkTokenActionResult = {
   linkToken: string | null;
   error: string | null;
@@ -303,17 +324,58 @@ function plaidActionErrorMessage(error: unknown, fallback: string): string {
   return code ? `${code}: ${message}` : (message ?? fallback);
 }
 
-/**
- * Create a brokerage Plaid link_token so the client can open Plaid Link.
- */
-export async function createBrokerageLinkToken(): Promise<PlaidLinkTokenActionResult> {
+function accountFamilyError(families: PlaidAccountFamily[]): string | null {
+  return families.length > 0
+    ? null
+    : "Select at least one supported account type.";
+}
+
+async function currentPlaidAccounts(
+  userId: string,
+  error: string | null,
+): Promise<PlaidAccountsActionResult> {
+  const [brokerageAccounts, depositoryAccounts, creditCardAccounts] =
+    await Promise.all([
+      getCurrentBrokerageBalances(userId),
+      getUserDepositoryAccounts(userId),
+      getUserCreditCardAccounts(userId),
+    ]);
+
+  return {
+    brokerageAccounts,
+    depositoryAccounts,
+    creditCardAccounts,
+    error,
+  };
+}
+
+function plaidResultError(
+  result:
+    | Awaited<ReturnType<typeof getHoldings>>
+    | Awaited<ReturnType<typeof getDepositoryAccounts>>
+    | Awaited<ReturnType<typeof getCreditCardAccounts>>,
+): string | null {
+  if (result.status === "error") return result.message;
+  if (result.status === "login_required") {
+    return "Plaid needs you to finish signing in. Please try linking again.";
+  }
+  return null;
+}
+
+async function createPlaidLinkTokenForFamilies(
+  familiesInput: readonly string[],
+): Promise<PlaidLinkTokenActionResult> {
   const userId = await getCurrentUserId();
   if (!userId) {
     return { linkToken: null, error: "You must be signed in to link an account." };
   }
 
+  const families = normalizePlaidAccountFamilies(familiesInput);
+  const inputError = accountFamilyError(families);
+  if (inputError) return { linkToken: null, error: inputError };
+
   try {
-    const linkToken = await createLinkToken(userId, "brokerage");
+    const linkToken = await createLinkToken(userId, families);
     return { linkToken, error: null };
   } catch (error) {
     return {
@@ -324,141 +386,123 @@ export async function createBrokerageLinkToken(): Promise<PlaidLinkTokenActionRe
 }
 
 /**
- * Create a depository Plaid link_token so the client can open Plaid Link.
+ * Create a Plaid link_token for the selected account families.
  */
-export async function createDepositoryLinkToken(): Promise<PlaidLinkTokenActionResult> {
+export async function createPlaidAccountsLinkToken(
+  families: readonly string[],
+): Promise<PlaidLinkTokenActionResult> {
+  return createPlaidLinkTokenForFamilies(families);
+}
+
+async function linkPlaidAccountsForFamilies({
+  publicToken,
+  familiesInput,
+  errorFamiliesInput,
+}: {
+  publicToken: string;
+  familiesInput: readonly string[];
+  errorFamiliesInput?: readonly string[];
+}): Promise<PlaidAccountsActionResult> {
   const userId = await getCurrentUserId();
   if (!userId) {
-    return { linkToken: null, error: "You must be signed in to link an account." };
-  }
-
-  try {
-    const linkToken = await createLinkToken(userId, "depository");
-    return { linkToken, error: null };
-  } catch (error) {
     return {
-      linkToken: null,
-      error: plaidActionErrorMessage(error, "Failed to start Plaid Link."),
+      brokerageAccounts: [],
+      depositoryAccounts: [],
+      creditCardAccounts: [],
+      error: "You must be signed in to link an account.",
     };
   }
-}
 
-/**
- * Exchange the public_token, persist the Item, then populate brokerage holdings
- * for that Investments Item. If the user also selected depository accounts in
- * Plaid's OAuth account picker, save those too.
- */
-export async function linkBrokerageAccount(
-  publicToken: string,
-): Promise<BrokerageActionResult> {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return { accounts: [], error: "You must be signed in to link an account." };
-  }
-
-  const current = async (error: string | null): Promise<BrokerageActionResult> => ({
-    accounts: await getCurrentBrokerageBalances(userId),
-    error,
-  });
+  const families = normalizePlaidAccountFamilies(familiesInput);
+  const errorFamilies = normalizePlaidAccountFamilies(
+    errorFamiliesInput ?? familiesInput,
+  );
+  const inputError = accountFamilyError(families);
+  if (inputError) return currentPlaidAccounts(userId, inputError);
 
   try {
     const exchange = await exchangePublicToken(publicToken);
     const institution = await getInstitution(exchange.accessToken);
     const plaidItemId = await upsertPlaidItem(userId, exchange, institution);
-    const brokerageLabel = institution.institutionName ?? "Brokerage";
+    const errors: string[] = [];
 
-    const holdings = await getHoldings(exchange.accessToken);
-    if (holdings.status === "ready") {
-      await saveBrokerageAccounts(
-        userId,
-        plaidItemId,
-        brokerageLabel,
-        holdings.accounts,
-      );
-      await applyItemHoldings(plaidItemId, holdings);
+    if (families.includes("checking") || families.includes("savings")) {
+      const depository = await getDepositoryAccounts(exchange.accessToken);
+      if (depository.status === "ready") {
+        const accounts = depository.accounts.filter((account) =>
+          families.includes(account.kind),
+        );
+        if (accounts.length > 0) {
+          await saveDepositoryAccounts(
+            userId,
+            plaidItemId,
+            institution.institutionName,
+            accounts,
+          );
+        }
+      } else if (
+        errorFamilies.includes("checking") ||
+        errorFamilies.includes("savings")
+      ) {
+        const message = plaidResultError(depository);
+        if (message) errors.push(message);
+      }
     }
 
-    const depository = await getDepositoryAccounts(exchange.accessToken);
-    if (depository.status === "ready" && depository.accounts.length > 0) {
-      await saveDepositoryAccounts(
-        userId,
-        plaidItemId,
-        institution.institutionName,
-        depository.accounts,
-      );
+    if (families.includes("brokerage")) {
+      const holdings = await getHoldings(exchange.accessToken);
+      if (holdings.status === "ready" && holdings.accounts.length > 0) {
+        await saveBrokerageAccounts(
+          userId,
+          plaidItemId,
+          institution.institutionName ?? "Brokerage",
+          holdings.accounts,
+        );
+        await applyItemHoldings(plaidItemId, holdings);
+      } else if (errorFamilies.includes("brokerage")) {
+        const message = plaidResultError(holdings);
+        if (message) errors.push(message);
+      }
     }
 
-    let error: string | null = null;
-    if (holdings.status === "error") error = holdings.message;
-    else if (holdings.status === "login_required") {
-      error = "Plaid needs you to finish signing in. Please try linking again.";
+    if (families.includes("credit_card")) {
+      const creditCards = await getCreditCardAccounts(exchange.accessToken);
+      if (creditCards.status === "ready") {
+        await saveCreditCardAccounts(
+          userId,
+          plaidItemId,
+          institution.institutionName,
+          creditCards.accounts,
+        );
+      } else if (errorFamilies.includes("credit_card")) {
+        const message = plaidResultError(creditCards);
+        if (message) errors.push(message);
+      }
     }
 
     revalidatePath("/");
-    return current(error);
+    revalidatePath("/brokerage");
+    revalidatePath("/banking");
+    return currentPlaidAccounts(userId, errors[0] ?? null);
   } catch (error) {
-    return current(plaidActionErrorMessage(error, "Failed to link account."));
+    return currentPlaidAccounts(
+      userId,
+      plaidActionErrorMessage(error, "Failed to link account."),
+    );
   }
 }
 
 /**
- * Exchange the public_token, persist the Item, then populate checking/savings
- * balances for that depository Item. If Plaid also initialized Investments for
- * selected brokerage accounts, save those holdings too.
+ * Exchange the public_token and save selected supported account families.
  */
-export async function linkDepositoryAccount(
+export async function linkPlaidAccounts(
   publicToken: string,
-): Promise<DepositoryActionResult> {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return { accounts: [], error: "You must be signed in to link an account." };
-  }
-
-  const current = async (
-    error: string | null,
-  ): Promise<DepositoryActionResult> => ({
-    accounts: await getUserDepositoryAccounts(userId),
-    error,
+  families: readonly string[],
+): Promise<PlaidAccountsActionResult> {
+  return linkPlaidAccountsForFamilies({
+    publicToken,
+    familiesInput: families,
   });
-
-  try {
-    const exchange = await exchangePublicToken(publicToken);
-    const institution = await getInstitution(exchange.accessToken);
-    const plaidItemId = await upsertPlaidItem(userId, exchange, institution);
-
-    const depository = await getDepositoryAccounts(exchange.accessToken);
-    if (depository.status === "ready") {
-      await saveDepositoryAccounts(
-        userId,
-        plaidItemId,
-        institution.institutionName,
-        depository.accounts,
-      );
-    }
-
-    const brokerageLabel = institution.institutionName ?? "Brokerage";
-    const holdings = await getHoldings(exchange.accessToken);
-    if (holdings.status === "ready" && holdings.accounts.length > 0) {
-      await saveBrokerageAccounts(
-        userId,
-        plaidItemId,
-        brokerageLabel,
-        holdings.accounts,
-      );
-      await applyItemHoldings(plaidItemId, holdings);
-    }
-
-    let error: string | null = null;
-    if (depository.status === "error") error = depository.message;
-    else if (depository.status === "login_required") {
-      error = "Plaid needs you to finish signing in. Please try linking again.";
-    }
-
-    revalidatePath("/");
-    return current(error);
-  } catch (error) {
-    return current(plaidActionErrorMessage(error, "Failed to link account."));
-  }
 }
 
 /**
@@ -491,7 +535,21 @@ export async function loadDepositoryBalances(): Promise<DepositoryActionResult> 
 }
 
 /**
- * Unlink a Plaid Item and delete all of its accounts (brokerage + depository).
+ * Refresh credit-card balances and liability details for every linked Plaid Item.
+ */
+export async function loadCreditCardAccounts(): Promise<CreditCardActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return { accounts: [], error: "You must be signed in to view balances." };
+  }
+
+  await syncUserCreditCardAccounts(userId);
+  revalidatePath("/");
+  return { accounts: await getUserCreditCardAccounts(userId), error: null };
+}
+
+/**
+ * Unlink a Plaid Item and delete all of its accounts.
  * Returns the user's remaining brokerage accounts (called from that page).
  */
 export async function removeBrokerage(
@@ -508,7 +566,7 @@ export async function removeBrokerage(
 }
 
 /**
- * Unlink a Plaid Item and delete all of its accounts (brokerage + depository).
+ * Unlink a Plaid Item and delete all of its accounts.
  * Returns the user's remaining depository accounts (called from that page).
  */
 export async function removeDepository(
@@ -522,6 +580,23 @@ export async function removeDepository(
   await removeUserPlaidItem(userId, plaidItemId);
   revalidatePath("/");
   return { accounts: await getUserDepositoryAccounts(userId), error: null };
+}
+
+/**
+ * Unlink a Plaid Item and delete all of its accounts.
+ * Returns the user's remaining credit-card accounts.
+ */
+export async function removeCreditCard(
+  plaidItemId: string,
+): Promise<CreditCardActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return { accounts: [], error: "You must be signed in to remove an account." };
+  }
+
+  await removeUserPlaidItem(userId, plaidItemId);
+  revalidatePath("/");
+  return { accounts: await getUserCreditCardAccounts(userId), error: null };
 }
 
 export type AssetGroupActionResult = {
@@ -604,6 +679,7 @@ export async function loadPortfolioSummary(): Promise<PortfolioAssetSummary> {
   await syncUserKrakenAccounts(userId);
   await syncUserBrokerageBalances(userId);
   await syncUserDepositoryBalances(userId);
+  await syncUserCreditCardAccounts(userId);
 
   return portfolioAssetSummary(await getCurrentPortfolioBalances(userId));
 }
