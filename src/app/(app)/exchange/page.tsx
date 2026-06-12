@@ -3,13 +3,10 @@ import { KrakenCredentialsForm } from "@/components/kraken-credentials-form";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getUserKrakenAccounts } from "@/lib/exchange/kraken/accounts";
 import { getCurrentKrakenBalances } from "@/lib/exchange/kraken/balances";
-import { getUserAssetGroups } from "@/lib/portfolio/groups";
 
 export default async function ExchangePage() {
   const userId = await getCurrentUserId();
-  const [krakenAccounts, groups] = userId
-    ? await Promise.all([getUserKrakenAccounts(userId), getUserAssetGroups(userId)])
-    : [[], []];
+  const krakenAccounts = userId ? await getUserKrakenAccounts(userId) : [];
   const balanceResults = await getCurrentKrakenBalances(krakenAccounts);
   const balanceResultsKey = balanceResults
     .map((result) =>
@@ -30,7 +27,6 @@ export default async function ExchangePage() {
         source="kraken"
         title="Exchange"
         headerAction={<KrakenCredentialsForm accounts={krakenAccounts} />}
-        initialGroups={groups}
       />
     </div>
   );

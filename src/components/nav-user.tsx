@@ -6,7 +6,10 @@ import {
   RiAddLine,
   RiExpandUpDownLine,
   RiLogoutBoxRLine,
+  RiMoonLine,
+  RiSunLine,
 } from "@remixicon/react";
+import { useTheme } from "next-themes";
 
 import { authClient } from "@/lib/auth/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -38,6 +41,8 @@ function initials(name: string) {
 export function NavUser({ name, email }: { name: string; email: string }) {
   const { isMobile } = useSidebar();
   const router = useRouter();
+  const { resolvedTheme, setTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
   const [isPending, setIsPending] = useState(false);
   const [connectSheetOpen, setConnectSheetOpen] = useState(false);
 
@@ -95,6 +100,16 @@ export function NavUser({ name, email }: { name: string; email: string }) {
             <DropdownMenuItem onSelect={() => setConnectSheetOpen(true)}>
               <RiAddLine />
               Connect accounts
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(event) => {
+                // Keep the menu open so toggling theme feels immediate.
+                event.preventDefault();
+                setTheme(isDark ? "light" : "dark");
+              }}
+            >
+              {isDark ? <RiSunLine /> : <RiMoonLine />}
+              {isDark ? "Light mode" : "Dark mode"}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} disabled={isPending}>

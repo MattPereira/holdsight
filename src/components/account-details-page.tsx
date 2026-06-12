@@ -10,12 +10,12 @@ import {
 } from "@/app/actions";
 import { AccountDetailsTable } from "@/components/account-details-table";
 import { PortfolioAllocations } from "@/components/portfolio-allocations";
-import { PortfolioAllocationsSettings } from "@/components/portfolio-allocations-settings";
-import { Button } from "@/components/ui/button";
 import {
-  portfolioAssetSummary,
-  type AssetGroup,
-} from "@/lib/portfolio/asset-totals";
+  usePortfolioSettings,
+  usePublishAvailableSymbols,
+} from "@/components/portfolio-settings-context";
+import { Button } from "@/components/ui/button";
+import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 import type { BalancesResult } from "@/lib/portfolio/types";
 
 /* ------------------------------ container ------------------------------ */
@@ -25,18 +25,18 @@ export function AccountDetailsPage({
   source,
   title,
   headerAction,
-  initialGroups = [],
 }: {
   initialResults: BalancesResult[];
   source: "evm" | "hypercore" | "kraken" | "onchain";
   title: string;
   headerAction?: React.ReactNode;
-  initialGroups?: AssetGroup[];
 }) {
   const [results, setResults] = useState<BalancesResult[]>(initialResults);
-  const [groups, setGroups] = useState<AssetGroup[]>(initialGroups);
+  const { groups } = usePortfolioSettings();
   const [isPending, startTransition] = useTransition();
   const summary = useMemo(() => portfolioAssetSummary(results), [results]);
+
+  usePublishAvailableSymbols(summary.totals.map((total) => total.symbol));
 
   function handleLoad() {
     startTransition(async () => {
@@ -66,11 +66,6 @@ export function AccountDetailsPage({
           <RiRefreshLine />
         </Button>
         {headerAction}
-        <PortfolioAllocationsSettings
-          groups={groups}
-          availableSymbols={summary.totals.map((total) => total.symbol)}
-          onGroupsChange={setGroups}
-        />
       </div>
 
       {results.length > 0 && (

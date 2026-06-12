@@ -7,13 +7,13 @@ import { loadBrokerageBalances } from "@/app/actions";
 import { BrokerageDetailsTable } from "@/components/brokerage-details-table";
 import { BrokerageManager } from "@/components/brokerage-manager";
 import { PortfolioAllocations } from "@/components/portfolio-allocations";
-import { PortfolioAllocationsSettings } from "@/components/portfolio-allocations-settings";
+import {
+  usePortfolioSettings,
+  usePublishAvailableSymbols,
+} from "@/components/portfolio-settings-context";
 import { Button } from "@/components/ui/button";
 import type { CurrentBrokerageAccount } from "@/lib/brokerage/balances";
-import {
-  portfolioAssetSummary,
-  type AssetGroup,
-} from "@/lib/portfolio/asset-totals";
+import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 import type { BalancesResult } from "@/lib/portfolio/types";
 
 // Reuse the portfolio summary/allocations machinery, which speaks in
@@ -38,14 +38,12 @@ function toBalancesResults(
 
 export function BrokerageDetailsPage({
   initialAccounts,
-  initialGroups,
 }: {
   initialAccounts: CurrentBrokerageAccount[];
-  initialGroups: AssetGroup[];
 }) {
   const [accounts, setAccounts] =
     useState<CurrentBrokerageAccount[]>(initialAccounts);
-  const [groups, setGroups] = useState<AssetGroup[]>(initialGroups);
+  const { groups } = usePortfolioSettings();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -53,6 +51,8 @@ export function BrokerageDetailsPage({
     () => portfolioAssetSummary(toBalancesResults(accounts)),
     [accounts],
   );
+
+  usePublishAvailableSymbols(summary.totals.map((total) => total.symbol));
 
   const accountsWithHoldings = useMemo(
     () => accounts.filter((account) => account.balances.length > 0),
@@ -90,11 +90,6 @@ export function BrokerageDetailsPage({
           accounts={accounts}
           onAccountsChange={setAccounts}
           onError={setError}
-        />
-        <PortfolioAllocationsSettings
-          groups={groups}
-          availableSymbols={summary.totals.map((total) => total.symbol)}
-          onGroupsChange={setGroups}
         />
       </div>
 

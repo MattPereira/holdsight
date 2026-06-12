@@ -20,6 +20,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { usePortfolioSettings } from "@/components/portfolio-settings-context";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
@@ -51,15 +52,8 @@ function symbolKey(symbol: string): string {
   return symbol.trim().toUpperCase();
 }
 
-export function PortfolioAllocationsSettings({
-  groups,
-  availableSymbols,
-  onGroupsChange,
-}: {
-  groups: AssetGroup[];
-  availableSymbols: string[];
-  onGroupsChange: (groups: AssetGroup[]) => void;
-}) {
+export function PortfolioAllocationsSettings() {
+  const { groups, availableSymbols, setGroups } = usePortfolioSettings();
   const [editor, setEditor] = useState<EditorState>({ mode: "idle" });
 
   return (
@@ -70,8 +64,8 @@ export function PortfolioAllocationsSettings({
     >
       <SheetTrigger asChild>
         <Button
-          variant="outline"
-          size="icon-sm"
+          variant="ghost"
+          size="icon"
           aria-label="Portfolio overview settings"
         >
           <RiSettings3Line />
@@ -88,7 +82,7 @@ export function PortfolioAllocationsSettings({
           <AssetGroupManager
             groups={groups}
             availableSymbols={availableSymbols}
-            onGroupsChange={onGroupsChange}
+            onGroupsChange={setGroups}
             editor={editor}
             setEditor={setEditor}
           />

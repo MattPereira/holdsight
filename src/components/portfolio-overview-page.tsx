@@ -4,23 +4,23 @@ import { RiRefreshLine } from "@remixicon/react";
 import { useState, useTransition } from "react";
 import { loadPortfolioSummary } from "@/app/actions";
 import { PortfolioAllocations } from "@/components/portfolio-allocations";
-import { PortfolioAllocationsSettings } from "@/components/portfolio-allocations-settings";
+import {
+  usePortfolioSettings,
+  usePublishAvailableSymbols,
+} from "@/components/portfolio-settings-context";
 import { Button } from "@/components/ui/button";
-import type {
-  AssetGroup,
-  PortfolioAssetSummary,
-} from "@/lib/portfolio/asset-totals";
+import type { PortfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 
 export function PortfolioOverviewPage({
   initialSummary,
-  initialGroups,
 }: {
   initialSummary: PortfolioAssetSummary;
-  initialGroups: AssetGroup[];
 }) {
   const [summary, setSummary] = useState<PortfolioAssetSummary>(initialSummary);
-  const [groups, setGroups] = useState<AssetGroup[]>(initialGroups);
+  const { groups } = usePortfolioSettings();
   const [isPending, startTransition] = useTransition();
+
+  usePublishAvailableSymbols(summary.totals.map((total) => total.symbol));
 
   function handleLoad() {
     startTransition(async () => {
@@ -43,11 +43,6 @@ export function PortfolioOverviewPage({
         >
           <RiRefreshLine />
         </Button>
-        <PortfolioAllocationsSettings
-          groups={groups}
-          availableSymbols={summary.totals.map((total) => total.symbol)}
-          onGroupsChange={setGroups}
-        />
       </div>
 
       <PortfolioAllocations
