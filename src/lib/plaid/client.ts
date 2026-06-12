@@ -112,15 +112,21 @@ export function normalizePlaidAccountFamilies(
 function selectedProducts(families: readonly PlaidAccountFamily[]): Products[] {
   const products: Products[] = [];
 
-  for (const family of families) {
-    const product =
-      family === "checking" || family === "savings"
-        ? Products.Auth
-        : family === "credit_card"
-          ? Products.Liabilities
-          : Products.Investments;
+  if (families.includes("brokerage")) {
+    products.push(Products.Investments);
+  }
 
-    if (!products.includes(product)) products.push(product);
+  if (families.includes("credit_card")) {
+    products.push(Products.Liabilities);
+  }
+
+  for (const family of families) {
+    if (
+      (family === "checking" || family === "savings") &&
+      !products.includes(Products.Auth)
+    ) {
+      products.push(Products.Auth);
+    }
   }
 
   return products;
@@ -176,9 +182,9 @@ function linkTokenProducts(families: readonly PlaidAccountFamily[]): {
 
 /**
  * Create a short-lived link_token used to boot the Plaid Link UI on the client.
- * With multiple selected products, the first product initializes Link and the
- * rest are required when the institution/account supports them, preserving
- * wider institution compatibility.
+ * With multiple selected products, the highest-signal product initializes Link
+ * and the rest are required when the institution/account supports them,
+ * preserving wider institution compatibility.
  */
 export async function createLinkToken(
   userId: string,
@@ -191,6 +197,15 @@ export async function createLinkToken(
 
   const { products, requiredIfSupportedProducts } = linkTokenProducts(families);
   const accountFilters = accountFiltersForFamilies(families);
+
+  console.info("[plaid:create-link-token]", {
+    env: getPlaidEnv(),
+    families,
+    products,
+    requiredIfSupportedProducts,
+    accountFilters,
+    hasRedirectUri: Boolean(redirectUri),
+  });
 
   const res = await getClient().linkTokenCreate({
     user: { client_user_id: userId },

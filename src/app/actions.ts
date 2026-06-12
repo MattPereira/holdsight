@@ -427,12 +427,26 @@ async function linkPlaidAccountsForFamilies({
     const plaidItemId = await upsertPlaidItem(userId, exchange, institution);
     const errors: string[] = [];
 
+    console.info("[plaid:link-start]", {
+      families,
+      institutionId: institution.institutionId,
+      institutionName: institution.institutionName,
+    });
+
     if (families.includes("checking") || families.includes("savings")) {
       const depository = await getDepositoryAccounts(exchange.accessToken);
       if (depository.status === "ready") {
         const accounts = depository.accounts.filter((account) =>
           families.includes(account.kind),
         );
+        console.info("[plaid:depository-accounts]", {
+          requestedFamilies: families.filter(
+            (family) => family === "checking" || family === "savings",
+          ),
+          plaidAccountCount: depository.accounts.length,
+          selectedAccountCount: accounts.length,
+          kinds: accounts.map((account) => account.kind),
+        });
         await saveDepositoryAccounts(
           userId,
           plaidItemId,
@@ -444,6 +458,10 @@ async function linkPlaidAccountsForFamilies({
         errorFamilies.includes("savings")
       ) {
         const message = plaidResultError(depository);
+        console.warn("[plaid:depository-error]", {
+          status: depository.status,
+          message,
+        });
         if (message) errors.push(message);
       }
     }
@@ -451,6 +469,14 @@ async function linkPlaidAccountsForFamilies({
     if (families.includes("brokerage")) {
       const holdings = await getHoldings(exchange.accessToken);
       if (holdings.status === "ready") {
+        console.info("[plaid:brokerage-accounts]", {
+          accountCount: holdings.accounts.length,
+          balanceCount: holdings.accounts.reduce(
+            (count, account) => count + account.balances.length,
+            0,
+          ),
+          accountTypes: holdings.accounts.map((account) => account.accountType),
+        });
         await saveBrokerageAccounts(
           userId,
           plaidItemId,
@@ -460,6 +486,10 @@ async function linkPlaidAccountsForFamilies({
         await applyItemHoldings(plaidItemId, holdings);
       } else if (errorFamilies.includes("brokerage")) {
         const message = plaidResultError(holdings);
+        console.warn("[plaid:brokerage-error]", {
+          status: holdings.status,
+          message,
+        });
         if (message) errors.push(message);
       }
     }
@@ -467,6 +497,9 @@ async function linkPlaidAccountsForFamilies({
     if (families.includes("credit_card")) {
       const creditCards = await getCreditCardAccounts(exchange.accessToken);
       if (creditCards.status === "ready") {
+        console.info("[plaid:credit-card-accounts]", {
+          accountCount: creditCards.accounts.length,
+        });
         await saveCreditCardAccounts(
           userId,
           plaidItemId,
@@ -475,6 +508,10 @@ async function linkPlaidAccountsForFamilies({
         );
       } else if (errorFamilies.includes("credit_card")) {
         const message = plaidResultError(creditCards);
+        console.warn("[plaid:credit-card-error]", {
+          status: creditCards.status,
+          message,
+        });
         if (message) errors.push(message);
       }
     }
