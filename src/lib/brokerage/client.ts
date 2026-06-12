@@ -130,9 +130,15 @@ export async function getHoldings(accessToken: string): Promise<HoldingsResult> 
     const securitiesById = new Map(
       res.data.securities.map((security) => [security.security_id, security]),
     );
+    const investmentAccountIds = new Set(
+      res.data.accounts
+        .filter((account) => account.type === "investment")
+        .map((account) => account.account_id),
+    );
 
-    const accounts: BrokerageAccountHoldings[] = res.data.accounts.map(
-      (account) => ({
+    const accounts: BrokerageAccountHoldings[] = res.data.accounts
+      .filter((account) => investmentAccountIds.has(account.account_id))
+      .map((account) => ({
         externalAccountId: account.account_id,
         accountName: account.name,
         accountType: toAccountType(account.subtype),
@@ -140,12 +146,13 @@ export async function getHoldings(accessToken: string): Promise<HoldingsResult> 
         balances: buildBalances(
           account,
           res.data.holdings.filter(
-            (holding) => holding.account_id === account.account_id,
+            (holding) =>
+              holding.account_id === account.account_id &&
+              investmentAccountIds.has(holding.account_id),
           ),
           securitiesById,
         ),
-      }),
-    );
+      }));
 
     return { status: "ready", accounts };
   } catch (error) {

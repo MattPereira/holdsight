@@ -433,14 +433,12 @@ async function linkPlaidAccountsForFamilies({
         const accounts = depository.accounts.filter((account) =>
           families.includes(account.kind),
         );
-        if (accounts.length > 0) {
-          await saveDepositoryAccounts(
-            userId,
-            plaidItemId,
-            institution.institutionName,
-            accounts,
-          );
-        }
+        await saveDepositoryAccounts(
+          userId,
+          plaidItemId,
+          institution.institutionName,
+          accounts,
+        );
       } else if (
         errorFamilies.includes("checking") ||
         errorFamilies.includes("savings")
@@ -452,7 +450,7 @@ async function linkPlaidAccountsForFamilies({
 
     if (families.includes("brokerage")) {
       const holdings = await getHoldings(exchange.accessToken);
-      if (holdings.status === "ready" && holdings.accounts.length > 0) {
+      if (holdings.status === "ready") {
         await saveBrokerageAccounts(
           userId,
           plaidItemId,

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, notInArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -45,6 +45,35 @@ export async function saveBrokerageAccounts(
 ): Promise<ItemAccountLink[]> {
   return db.transaction(async (tx) => {
     const links: ItemAccountLink[] = [];
+    const currentExternalAccountIds = accounts.map(
+      (account) => account.externalAccountId,
+    );
+
+    const staleAccounts = await tx
+      .select({ id: brokerageAccounts.investmentAccountId })
+      .from(brokerageAccounts)
+      .innerJoin(
+        investmentAccounts,
+        eq(brokerageAccounts.investmentAccountId, investmentAccounts.id),
+      )
+      .where(
+        and(
+          eq(investmentAccounts.userId, userId),
+          eq(brokerageAccounts.plaidItemId, plaidItemId),
+          currentExternalAccountIds.length > 0
+            ? notInArray(
+                brokerageAccounts.externalAccountId,
+                currentExternalAccountIds,
+              )
+            : undefined,
+        ),
+      );
+
+    for (const account of staleAccounts) {
+      await tx
+        .delete(investmentAccounts)
+        .where(eq(investmentAccounts.id, account.id));
+    }
 
     for (const account of accounts) {
       // Reuse the existing investment account if we've seen this Plaid

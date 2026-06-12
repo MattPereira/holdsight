@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, notInArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -53,6 +53,25 @@ export async function saveCreditCardAccounts(
   accounts: PlaidCreditCardAccount[],
 ): Promise<void> {
   await db.transaction(async (tx) => {
+    const currentExternalAccountIds = accounts.map(
+      (account) => account.externalAccountId,
+    );
+
+    await tx
+      .delete(creditAccounts)
+      .where(
+        and(
+          eq(creditAccounts.userId, userId),
+          eq(creditAccounts.plaidItemId, plaidItemId),
+          currentExternalAccountIds.length > 0
+            ? notInArray(
+                creditAccounts.externalAccountId,
+                currentExternalAccountIds,
+              )
+            : undefined,
+        ),
+      );
+
     for (const account of accounts) {
       const [existing] = await tx
         .select({ id: creditAccounts.id })
