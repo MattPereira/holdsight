@@ -1,6 +1,11 @@
 import "server-only";
 
-import { type Holding, type InvestmentAccount, type Security } from "plaid";
+import {
+  AccountType,
+  type Holding,
+  type InvestmentAccount,
+  type Security,
+} from "plaid";
 
 import { getClient, readPlaidError } from "@/lib/plaid/client";
 import type {
@@ -53,6 +58,13 @@ function isPlaidCashSecurity(security: Security | undefined): boolean {
   return (
     security?.type === "cash" ||
     security?.ticker_symbol?.toUpperCase().startsWith("CUR:") === true
+  );
+}
+
+function isInvestmentAccount(account: InvestmentAccount): boolean {
+  return (
+    account.type === AccountType.Investment ||
+    account.type === AccountType.Brokerage
   );
 }
 
@@ -132,7 +144,7 @@ export async function getHoldings(accessToken: string): Promise<HoldingsResult> 
     );
     const investmentAccountIds = new Set(
       res.data.accounts
-        .filter((account) => account.type === "investment")
+        .filter(isInvestmentAccount)
         .map((account) => account.account_id),
     );
 
