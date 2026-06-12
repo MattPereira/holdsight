@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import {
   loadCreditCardAccounts,
   loadDepositoryBalances,
+  removeCreditCard,
   removeDepository,
 } from "@/app/actions";
 import { DepositoryManager } from "@/components/depository-manager";
@@ -24,20 +25,8 @@ function accountLabel(account: DepositoryAccountRow): string {
 }
 
 function creditCardProvider(account: CreditCardAccountRow): string {
-  return account.institutionName ?? account.label ?? "Credit card";
-}
-
-function formatDueDate(date: string | null): string {
-  if (!date) return "No due date";
-
-  const [year, month, day] = date.split("-").map(Number);
-  if (!year || !month || !day) return date;
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(year, month - 1, day));
+  const name = account.institutionName ?? account.label ?? "Credit card";
+  return account.accountMask ? `${name} ••${account.accountMask}` : name;
 }
 
 export function BankingPage({
@@ -56,6 +45,16 @@ export function BankingPage({
 
   const busy = isPending;
   const hasAccounts = accounts.length > 0 || creditCardAccounts.length > 0;
+
+  const checkingTotal = accounts.reduce(
+    (sum, account) => sum + account.currentBalance,
+    0,
+  );
+  const creditCardTotal = creditCardAccounts.reduce(
+    (sum, account) => sum + account.currentBalance,
+    0,
+  );
+  const netBalance = checkingTotal - creditCardTotal;
 
   function handleRefresh() {
     setError(null);
@@ -77,6 +76,15 @@ export function BankingPage({
     });
   }
 
+  function handleRemoveCreditCard(plaidItemId: string) {
+    setError(null);
+    startTransition(async () => {
+      const result = await removeCreditCard(plaidItemId);
+      setCreditCardAccounts(result.accounts);
+      setError(result.error);
+    });
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
@@ -93,7 +101,9 @@ export function BankingPage({
         </Button>
         <DepositoryManager
           accounts={accounts}
+          creditCardAccounts={creditCardAccounts}
           onRemove={handleRemove}
+          onRemoveCreditCard={handleRemoveCreditCard}
           disabled={busy}
         />
       </div>
@@ -135,15 +145,10 @@ export function BankingPage({
                     key={account.id}
                     className="flex items-center justify-between gap-3 px-4 py-3"
                   >
-                    <div className="flex min-w-0 flex-col">
-                      <span className="truncate">
-                        {creditCardProvider(account)}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        Due {formatDueDate(account.nextPaymentDueDate)}
-                      </span>
-                    </div>
-                    <span className="tabular-nums">
+                    <span className="truncate">
+                      {creditCardProvider(account)}
+                    </span>
+                    <span className="tabular-nums text-red-600 dark:text-red-400">
                       {usdFormat.format(account.currentBalance)}
                     </span>
                   </li>
@@ -151,6 +156,13 @@ export function BankingPage({
               </ul>
             </div>
           ) : null}
+
+          <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted px-4 py-3 font-medium">
+            <span>Net Balance</span>
+            <span className="tabular-nums">
+              {usdFormat.format(netBalance)}
+            </span>
+          </div>
         </div>
       )}
     </div>
