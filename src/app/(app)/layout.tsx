@@ -1,7 +1,9 @@
+import Link from "next/link";
+
 import { AppSidebar } from "@/components/app-sidebar";
 import { LoginForm } from "@/components/login-form";
-import { PortfolioAllocationsSettings } from "@/components/portfolio-allocations-settings";
 import { PortfolioSettingsProvider } from "@/components/portfolio-settings-context";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   SidebarInset,
   SidebarProvider,
@@ -38,11 +40,14 @@ export default async function AppLayout({
         <PortfolioSettingsProvider initialGroups={groups}>
           <header className="relative flex h-14 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
-            <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 font-anta text-xl font-medium">
+            <Link
+              href="/"
+              className="absolute left-1/2 -translate-x-1/2 font-anta text-xl font-medium"
+            >
               Holdsight
-            </span>
+            </Link>
             <div className="ml-auto">
-              <PortfolioAllocationsSettings />
+              <ThemeToggle />
             </div>
           </header>
           <div className="p-6 md:p-10">{children}</div>

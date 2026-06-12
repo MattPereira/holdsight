@@ -4,6 +4,7 @@ import { RiRefreshLine } from "@remixicon/react";
 import { useState, useTransition } from "react";
 import { loadPortfolioSummary } from "@/app/actions";
 import { PortfolioAllocations } from "@/components/portfolio-allocations";
+import { PortfolioAllocationsSettings } from "@/components/portfolio-allocations-settings";
 import {
   usePortfolioSettings,
   usePublishAvailableSymbols,
@@ -43,6 +44,7 @@ export function PortfolioOverviewPage({
         >
           <RiRefreshLine />
         </Button>
+        <PortfolioAllocationsSettings />
       </div>
 
       <PortfolioAllocations

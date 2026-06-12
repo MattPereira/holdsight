@@ -64,8 +64,9 @@ export function PortfolioAllocationsSettings() {
     >
       <SheetTrigger asChild>
         <Button
-          variant="ghost"
-          size="icon"
+          type="button"
+          variant="outline"
+          size="icon-sm"
           aria-label="Portfolio overview settings"
         >
           <RiSettings3Line />

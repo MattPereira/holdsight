@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  RiAddLine,
+  RiLinksLine,
   RiExpandUpDownLine,
   RiLogoutBoxRLine,
   RiMoonLine,
@@ -98,8 +98,8 @@ export function NavUser({ name, email }: { name: string; email: string }) {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => setConnectSheetOpen(true)}>
-              <RiAddLine />
-              Connect accounts
+              <RiLinksLine />
+              Plaid connections
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={(event) => {

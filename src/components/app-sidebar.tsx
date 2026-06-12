@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   RiArrowRightSLine,
   RiBankLine,
-  RiFocus3Line,
   RiFundsBoxLine,
   RiHome4Line,
 } from "@remixicon/react";
@@ -41,7 +40,6 @@ export function AppSidebar({ name, email }: { name: string; email: string }) {
           href="/"
           className="flex flex-1 items-center gap-2 px-2 py-1.5 text-left leading-tight"
         >
-          <RiFocus3Line className="size-5 shrink-0" />
           <span className="truncate font-anta text-2xl font-medium">
             Holdsight
           </span>
