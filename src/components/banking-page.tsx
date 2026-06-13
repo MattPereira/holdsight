@@ -8,11 +8,13 @@ import {
   loadDepositoryBalances,
   removeCreditCard,
   removeDepository,
+  type ManualBalanceActionResult,
 } from "@/app/actions";
 import { DepositoryManager } from "@/components/depository-manager";
 import { Button } from "@/components/ui/button";
 import type { CreditCardAccountRow } from "@/lib/credit-card/accounts";
 import type { DepositoryAccountRow } from "@/lib/depository/accounts";
+import type { ManualBalanceItemRow } from "@/lib/manual-balance/items";
 
 const usdFormat = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -24,6 +26,10 @@ function accountLabel(account: DepositoryAccountRow): string {
   return account.accountMask ? `${name} ••${account.accountMask}` : name;
 }
 
+function depositoryType(account: DepositoryAccountRow): string {
+  return account.kind === "savings" ? "Savings Account" : "Checking Account";
+}
+
 function creditCardProvider(account: CreditCardAccountRow): string {
   const name = account.institutionName ?? account.label ?? "Credit card";
   return account.accountMask ? `${name} ••${account.accountMask}` : name;
@@ -32,29 +38,47 @@ function creditCardProvider(account: CreditCardAccountRow): string {
 export function BankingPage({
   initialAccounts,
   initialCreditCardAccounts,
+  initialManualItems,
 }: {
   initialAccounts: DepositoryAccountRow[];
   initialCreditCardAccounts: CreditCardAccountRow[];
+  initialManualItems: ManualBalanceItemRow[];
 }) {
   const [accounts, setAccounts] =
     useState<DepositoryAccountRow[]>(initialAccounts);
-  const [creditCardAccounts, setCreditCardAccounts] =
-    useState<CreditCardAccountRow[]>(initialCreditCardAccounts);
+  const [creditCardAccounts, setCreditCardAccounts] = useState<
+    CreditCardAccountRow[]
+  >(initialCreditCardAccounts);
+  const [manualItems, setManualItems] =
+    useState<ManualBalanceItemRow[]>(initialManualItems);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const busy = isPending;
-  const hasAccounts = accounts.length > 0 || creditCardAccounts.length > 0;
 
-  const checkingTotal = accounts.reduce(
-    (sum, account) => sum + account.currentBalance,
-    0,
+  const manualAssets = manualItems.filter((item) => item.kind === "asset");
+  const manualLiabilities = manualItems.filter(
+    (item) => item.kind === "liability",
   );
-  const creditCardTotal = creditCardAccounts.reduce(
-    (sum, account) => sum + account.currentBalance,
-    0,
-  );
-  const netBalance = checkingTotal - creditCardTotal;
+
+  const hasAssets = accounts.length > 0 || manualAssets.length > 0;
+  const hasLiabilities =
+    creditCardAccounts.length > 0 || manualLiabilities.length > 0;
+  const hasAnything = hasAssets || hasLiabilities;
+
+  const checkingTotal = accounts
+    .filter((account) => account.kind === "checking")
+    .reduce((sum, account) => sum + account.currentBalance, 0);
+  const assetTotal =
+    accounts.reduce((sum, account) => sum + account.currentBalance, 0) +
+    manualAssets.reduce((sum, item) => sum + item.amount, 0);
+  const liabilityTotal =
+    creditCardAccounts.reduce(
+      (sum, account) => sum + account.currentBalance,
+      0,
+    ) + manualLiabilities.reduce((sum, item) => sum + item.amount, 0);
+  const netCash = checkingTotal - liabilityTotal;
+  const netBalance = assetTotal - liabilityTotal;
 
   function handleRefresh() {
     setError(null);
@@ -85,6 +109,11 @@ export function BankingPage({
     });
   }
 
+  function handleManualResult(result: ManualBalanceActionResult) {
+    setManualItems(result.items);
+    setError(result.error);
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
@@ -102,33 +131,56 @@ export function BankingPage({
         <DepositoryManager
           accounts={accounts}
           creditCardAccounts={creditCardAccounts}
+          manualItems={manualItems}
           onRemove={handleRemove}
           onRemoveCreditCard={handleRemoveCreditCard}
+          onManualResult={handleManualResult}
           disabled={busy}
         />
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {!hasAccounts ? (
+      {!hasAnything ? (
         <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-          No bank accounts or credit cards linked yet. Connect an account to
-          load balances.
+          No bank accounts or credit cards linked yet. Connect an account or add
+          a manual item to track balances.
         </p>
       ) : (
         <div className="flex flex-col gap-6">
-          {accounts.length > 0 ? (
+          {hasAssets ? (
             <div className="flex flex-col gap-2">
-              <h2 className="px-1 font-medium">Checking Accounts</h2>
+              <h2 className="px-1 font-medium">Assets</h2>
               <ul className="divide-y rounded-lg border">
                 {accounts.map((account) => (
                   <li
                     key={account.id}
                     className="flex items-center justify-between gap-3 px-4 py-3"
                   >
-                    <span className="truncate">{accountLabel(account)}</span>
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate">{accountLabel(account)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {depositoryType(account)}
+                      </span>
+                    </div>
                     <span className="tabular-nums">
                       {usdFormat.format(account.currentBalance)}
+                    </span>
+                  </li>
+                ))}
+                {manualAssets.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 px-4 py-3"
+                  >
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate">{item.symbol}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {item.name}
+                      </span>
+                    </div>
+                    <span className="tabular-nums">
+                      {usdFormat.format(item.amount)}
                     </span>
                   </li>
                 ))}
@@ -136,20 +188,41 @@ export function BankingPage({
             </div>
           ) : null}
 
-          {creditCardAccounts.length > 0 ? (
+          {hasLiabilities ? (
             <div className="flex flex-col gap-2">
-              <h2 className="px-1 font-medium">Credit Cards</h2>
+              <h2 className="px-1 font-medium">Liabilities</h2>
               <ul className="divide-y rounded-lg border">
                 {creditCardAccounts.map((account) => (
                   <li
                     key={account.id}
                     className="flex items-center justify-between gap-3 px-4 py-3"
                   >
-                    <span className="truncate">
-                      {creditCardProvider(account)}
-                    </span>
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate">
+                        {creditCardProvider(account)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Credit Card
+                      </span>
+                    </div>
                     <span className="tabular-nums text-red-600 dark:text-red-400">
                       {usdFormat.format(account.currentBalance)}
+                    </span>
+                  </li>
+                ))}
+                {manualLiabilities.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 px-4 py-3"
+                  >
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate">{item.symbol}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {item.name}
+                      </span>
+                    </div>
+                    <span className="tabular-nums text-red-600 dark:text-red-400">
+                      {usdFormat.format(item.amount)}
                     </span>
                   </li>
                 ))}
@@ -157,11 +230,19 @@ export function BankingPage({
             </div>
           ) : null}
 
-          <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted px-4 py-3 font-medium">
-            <span>Net Balance</span>
-            <span className="tabular-nums">
-              {usdFormat.format(netBalance)}
-            </span>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted px-4 py-3 font-medium">
+              <span>Net Cash</span>
+              <span className="tabular-nums">
+                {usdFormat.format(netCash)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted px-4 py-3 font-medium">
+              <span>Net Assets</span>
+              <span className="tabular-nums">
+                {usdFormat.format(netBalance)}
+              </span>
+            </div>
           </div>
         </div>
       )}

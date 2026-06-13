@@ -172,7 +172,7 @@ function AllocationDonutChart({
                     y={(cy ?? 0) + 14}
                     className="fill-muted-foreground text-xs"
                   >
-                    Total Assets
+                    Net Assets
                   </tspan>
                 </text>
               );

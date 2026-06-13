@@ -67,6 +67,14 @@ import {
 import { getCreditCardAccounts } from "@/lib/credit-card/client";
 import { syncUserCreditCardAccounts } from "@/lib/credit-card/balances";
 import {
+  createManualBalanceItem,
+  getUserManualBalanceItems,
+  removeUserManualBalanceItem,
+  updateUserManualBalanceItem,
+  type ManualBalanceItemInput,
+  type ManualBalanceItemRow,
+} from "@/lib/manual-balance/items";
+import {
   portfolioAssetSummary,
   type AssetGroup,
   type PortfolioAssetSummary,
@@ -632,6 +640,65 @@ export async function removeCreditCard(
   }
   revalidatePath("/");
   return { accounts: await getUserCreditCardAccounts(userId), error: null };
+}
+
+/* --------------------------- manual balances --------------------------- */
+
+export type ManualBalanceActionResult = {
+  items: ManualBalanceItemRow[];
+  error: string | null;
+};
+
+async function unauthorizedManualBalanceResult(): Promise<ManualBalanceActionResult> {
+  return {
+    items: [],
+    error: "You must be signed in to manage manual items.",
+  };
+}
+
+export async function addManualBalanceItem(
+  input: ManualBalanceItemInput,
+): Promise<ManualBalanceActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) return unauthorizedManualBalanceResult();
+
+  const result = await createManualBalanceItem(userId, input);
+  const items = await getUserManualBalanceItems(userId);
+  if (result.error) return { items, error: result.error };
+
+  revalidatePath("/");
+  revalidatePath("/banking");
+  return { items, error: null };
+}
+
+export async function updateManualBalanceItem(
+  itemId: string,
+  input: ManualBalanceItemInput,
+): Promise<ManualBalanceActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) return unauthorizedManualBalanceResult();
+
+  const result = await updateUserManualBalanceItem(userId, itemId, input);
+  const items = await getUserManualBalanceItems(userId);
+  if (result.error) return { items, error: result.error };
+
+  revalidatePath("/");
+  revalidatePath("/banking");
+  return { items, error: null };
+}
+
+export async function removeManualBalanceItem(
+  itemId: string,
+): Promise<ManualBalanceActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) return unauthorizedManualBalanceResult();
+
+  await removeUserManualBalanceItem(userId, itemId);
+  const items = await getUserManualBalanceItems(userId);
+
+  revalidatePath("/");
+  revalidatePath("/banking");
+  return { items, error: null };
 }
 
 export type AssetGroupActionResult = {

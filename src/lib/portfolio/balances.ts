@@ -8,11 +8,19 @@ import {
   getUserDepositoryAccounts,
   type DepositoryAccountRow,
 } from "@/lib/depository/accounts";
+import {
+  getUserCreditCardAccounts,
+  type CreditCardAccountRow,
+} from "@/lib/credit-card/accounts";
 import { getUserKrakenAccounts } from "@/lib/exchange/kraken/accounts";
 import { getCurrentKrakenBalances } from "@/lib/exchange/kraken/balances";
 import { getCurrentEvmBalances } from "@/lib/evm/balances";
 import { getUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
 import { getCurrentHyperCoreSpotBalancesByAccountId } from "@/lib/hyper-core/balances";
+import {
+  getUserManualBalanceItems,
+  type ManualBalanceItemRow,
+} from "@/lib/manual-balance/items";
 import type { BalancesResult } from "@/lib/portfolio/types";
 
 function brokerageAccountToBalancesResult(
@@ -53,48 +61,70 @@ function brokerageCashName(account: CurrentBrokerageAccount): string {
 
 function depositoryAccountsToBalancesResult(
   accounts: DepositoryAccountRow[],
+  creditCardAccounts: CreditCardAccountRow[],
+  manualItems: ManualBalanceItemRow[],
 ): BalancesResult | null {
   const checkingAccounts = accounts.filter(
     (account) => account.kind === "checking" && account.currency === "USD",
   );
-  const total = checkingAccounts.reduce(
+  const checkingTotal = checkingAccounts.reduce(
     (sum, account) => sum + account.currentBalance,
     0,
   );
+  const liabilityTotal =
+    creditCardAccounts.reduce(
+      (sum, account) => sum + account.currentBalance,
+      0,
+    ) +
+    manualItems.reduce(
+      (sum, item) => sum + (item.kind === "liability" ? item.amount : 0),
+      0,
+    );
+  const netCash = checkingTotal - liabilityTotal;
 
-  if (total === 0) return null;
+  if (netCash === 0) return null;
 
   return {
     status: "ready",
     address: "Depository",
     balances: [
       {
-        sourceBalanceId: "depository-checking-usd",
+        sourceBalanceId: "net-cash-usd",
         aggregationKey: `depository-checking:${checkingAccounts
           .map((account) => account.id)
           .sort()
-          .join(":")}`,
+          .join(":")}:net-liabilities`,
         symbol: "USD",
-        name: checkingAccountAssetName(checkingAccounts),
+        name: "Net Cash",
         chainId: "depository",
-        amount: total,
+        amount: netCash,
         priceUsd: 1,
-        valueUsd: total,
+        valueUsd: netCash,
       },
     ],
   };
 }
 
-function checkingAccountAssetName(accounts: DepositoryAccountRow[]): string {
-  if (accounts.length !== 1) return "Checking Accounts";
+function manualAssetsToBalancesResult(
+  items: ManualBalanceItemRow[],
+): BalancesResult | null {
+  const manualAssets = items.filter((item) => item.kind === "asset");
+  if (manualAssets.length === 0) return null;
 
-  const account = accounts[0];
-  const institutionName = account.institutionName?.trim();
-  if (institutionName && /\bschwab\b/i.test(institutionName)) {
-    return "Schwab Checking";
-  }
-
-  return account.label?.trim() || institutionName || "Checking";
+  return {
+    status: "ready",
+    address: "Manual Assets",
+    balances: manualAssets.map((item) => ({
+      sourceBalanceId: `manual-asset:${item.id}`,
+      aggregationKey: `manual-asset:${item.id}`,
+      symbol: item.symbol,
+      name: item.name,
+      chainId: "manual",
+      amount: item.amount,
+      priceUsd: 1,
+      valueUsd: item.amount,
+    })),
+  };
 }
 
 export async function getCurrentPortfolioBalances(
@@ -106,12 +136,16 @@ export async function getCurrentPortfolioBalances(
     krakenAccounts,
     brokerageAccounts,
     depositoryAccounts,
+    creditCardAccounts,
+    manualItems,
   ] = await Promise.all([
     getCurrentEvmBalances(userId),
     getUserHyperCoreAccounts(userId),
     getUserKrakenAccounts(userId),
     getCurrentBrokerageBalances(userId),
     getUserDepositoryAccounts(userId),
+    getUserCreditCardAccounts(userId),
+    getUserManualBalanceItems(userId),
   ]);
   const hyperCoreAccountByAddress = new Map(
     hyperCoreAccounts.map((account) => [account.address, account]),
@@ -138,13 +172,18 @@ export async function getCurrentPortfolioBalances(
   const brokerageResults = brokerageAccounts.map(
     brokerageAccountToBalancesResult,
   );
-  const depositoryResult =
-    depositoryAccountsToBalancesResult(depositoryAccounts);
+  const depositoryResult = depositoryAccountsToBalancesResult(
+    depositoryAccounts,
+    creditCardAccounts,
+    manualItems,
+  );
+  const manualAssetsResult = manualAssetsToBalancesResult(manualItems);
 
   return [
     ...walletResults,
     ...krakenResults,
     ...brokerageResults,
     ...(depositoryResult ? [depositoryResult] : []),
+    ...(manualAssetsResult ? [manualAssetsResult] : []),
   ];
 }
