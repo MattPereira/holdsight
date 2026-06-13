@@ -5,13 +5,20 @@ import { useState, useTransition } from "react";
 
 import {
   loadCreditCardAccounts,
+  loadBrokerageBalances,
   loadDepositoryBalances,
+  loadKrakenBalances,
+  loadOnChainBalances,
   removeCreditCard,
   removeDepository,
   type ManualBalanceActionResult,
 } from "@/app/actions";
 import { DepositoryManager } from "@/components/depository-manager";
 import { Button } from "@/components/ui/button";
+import {
+  aggregateAssetRows,
+  type AggregateAssetRow,
+} from "@/lib/balance-sheet/aggregate-assets";
 import type { CreditCardAccountRow } from "@/lib/credit-card/accounts";
 import type { DepositoryAccountRow } from "@/lib/depository/accounts";
 import type { ManualBalanceItemRow } from "@/lib/manual-balance/items";
@@ -39,10 +46,12 @@ export function BankingPage({
   initialAccounts,
   initialCreditCardAccounts,
   initialManualItems,
+  initialAggregateAssetRows,
 }: {
   initialAccounts: DepositoryAccountRow[];
   initialCreditCardAccounts: CreditCardAccountRow[];
   initialManualItems: ManualBalanceItemRow[];
+  initialAggregateAssetRows: AggregateAssetRow[];
 }) {
   const [accounts, setAccounts] =
     useState<DepositoryAccountRow[]>(initialAccounts);
@@ -51,6 +60,9 @@ export function BankingPage({
   >(initialCreditCardAccounts);
   const [manualItems, setManualItems] =
     useState<ManualBalanceItemRow[]>(initialManualItems);
+  const [aggregateAssets, setAggregateAssets] = useState<AggregateAssetRow[]>(
+    initialAggregateAssetRows,
+  );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -61,7 +73,10 @@ export function BankingPage({
     (item) => item.kind === "liability",
   );
 
-  const hasAssets = accounts.length > 0 || manualAssets.length > 0;
+  const hasAssets =
+    accounts.length > 0 ||
+    manualAssets.length > 0 ||
+    aggregateAssets.length > 0;
   const hasLiabilities =
     creditCardAccounts.length > 0 || manualLiabilities.length > 0;
   const hasAnything = hasAssets || hasLiabilities;
@@ -71,7 +86,8 @@ export function BankingPage({
     .reduce((sum, account) => sum + account.currentBalance, 0);
   const assetTotal =
     accounts.reduce((sum, account) => sum + account.currentBalance, 0) +
-    manualAssets.reduce((sum, item) => sum + item.amount, 0);
+    manualAssets.reduce((sum, item) => sum + item.amount, 0) +
+    aggregateAssets.reduce((sum, row) => sum + row.valueUsd, 0);
   const liabilityTotal =
     creditCardAccounts.reduce(
       (sum, account) => sum + account.currentBalance,
@@ -83,11 +99,33 @@ export function BankingPage({
   function handleRefresh() {
     setError(null);
     startTransition(async () => {
-      const depositoryResult = await loadDepositoryBalances();
-      const creditCardResult = await loadCreditCardAccounts();
+      const [
+        depositoryResult,
+        creditCardResult,
+        onChainResults,
+        exchangeResults,
+        brokerageResult,
+      ] = await Promise.all([
+        loadDepositoryBalances(),
+        loadCreditCardAccounts(),
+        loadOnChainBalances(),
+        loadKrakenBalances(),
+        loadBrokerageBalances(),
+      ]);
       setAccounts(depositoryResult.accounts);
       setCreditCardAccounts(creditCardResult.accounts);
-      setError(depositoryResult.error ?? creditCardResult.error);
+      setAggregateAssets(
+        aggregateAssetRows({
+          onChainResults,
+          exchangeResults,
+          brokerageAccounts: brokerageResult.accounts,
+        }),
+      );
+      setError(
+        depositoryResult.error ??
+          creditCardResult.error ??
+          brokerageResult.error,
+      );
     });
   }
 
@@ -186,6 +224,22 @@ export function BankingPage({
                     </span>
                   </li>
                 ))}
+                {aggregateAssets.map((row) => (
+                  <li
+                    key={row.id}
+                    className="flex items-center justify-between gap-3 px-4 py-3"
+                  >
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate">{row.label}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {row.description}
+                      </span>
+                    </div>
+                    <span className="tabular-nums">
+                      {usdFormat.format(row.valueUsd)}
+                    </span>
+                  </li>
+                ))}
               </ul>
             </div>
           ) : null}
@@ -232,19 +286,31 @@ export function BankingPage({
             </div>
           ) : null}
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted px-4 py-3 font-medium">
-              <span>Net Cash</span>
-              <span className="tabular-nums">
-                {usdFormat.format(netCash)}
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted px-4 py-3 font-medium">
-              <span>Net Assets</span>
-              <span className="tabular-nums">
-                {usdFormat.format(netBalance)}
-              </span>
-            </div>
+          <div className="flex flex-col gap-2">
+            <ul className="divide-y rounded-lg border bg-muted">
+              <li className="flex items-center justify-between gap-3 px-4 py-3 font-medium">
+                <div className="flex min-w-0 flex-col">
+                  <span>Net Cash</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    Checking - Liabilities
+                  </span>
+                </div>
+                <span className="tabular-nums">
+                  {usdFormat.format(netCash)}
+                </span>
+              </li>
+              <li className="flex items-center justify-between gap-3 px-4 py-3 font-medium">
+                <div className="flex min-w-0 flex-col">
+                  <span>Net Assets</span>
+                  <span className="text-xs font-normal text-muted-foreground">
+                    Assets - Liabilities
+                  </span>
+                </div>
+                <span className="tabular-nums">
+                  {usdFormat.format(netBalance)}
+                </span>
+              </li>
+            </ul>
           </div>
         </div>
       )}
