@@ -68,17 +68,6 @@ function isInvestmentAccount(account: InvestmentAccount): boolean {
   );
 }
 
-function countByTypeAndSubtype(accounts: InvestmentAccount[]): Record<string, number> {
-  const counts: Record<string, number> = {};
-
-  for (const account of accounts) {
-    const key = `${account.type}:${account.subtype ?? "none"}`;
-    counts[key] = (counts[key] ?? 0) + 1;
-  }
-
-  return counts;
-}
-
 function cashCurrencySymbol(
   holding: Holding,
   security: Security | undefined,
@@ -158,14 +147,6 @@ export async function getHoldings(accessToken: string): Promise<HoldingsResult> 
         .filter(isInvestmentAccount)
         .map((account) => account.account_id),
     );
-
-    console.info("[plaid:holdings]", {
-      rawAccountCount: res.data.accounts.length,
-      investmentAccountCount: investmentAccountIds.size,
-      holdingCount: res.data.holdings.length,
-      securityCount: res.data.securities.length,
-      accountTypeCounts: countByTypeAndSubtype(res.data.accounts),
-    });
 
     const accounts: BrokerageAccountHoldings[] = res.data.accounts
       .filter((account) => investmentAccountIds.has(account.account_id))

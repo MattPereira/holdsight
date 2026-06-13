@@ -198,15 +198,6 @@ export async function createLinkToken(
   const { products, requiredIfSupportedProducts } = linkTokenProducts(families);
   const accountFilters = accountFiltersForFamilies(families);
 
-  console.info("[plaid:create-link-token]", {
-    env: getPlaidEnv(),
-    families,
-    products,
-    requiredIfSupportedProducts,
-    accountFilters,
-    hasRedirectUri: Boolean(redirectUri),
-  });
-
   const res = await getClient().linkTokenCreate({
     user: { client_user_id: userId },
     client_name: "Holdsight",
