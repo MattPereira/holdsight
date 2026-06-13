@@ -4,9 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   RiArrowRightSLine,
-  RiBankLine,
   RiFundsBoxLine,
-  RiHome4Line,
+  RiScales3Line,
 } from "@remixicon/react";
 
 import { NavUser } from "@/components/nav-user";
@@ -85,19 +84,10 @@ export function AppSidebar({ name, email }: { name: string; email: string }) {
                 size="lg"
                 className="text-base [&>svg]:size-5"
               >
-                <Link href="/banking">
-                  <RiBankLine />
-                  <span>Banking</span>
+                <Link href="/balance-sheet">
+                  <RiScales3Line />
+                  <span>Balance Sheet</span>
                 </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                size="lg"
-                className="text-base [&>svg]:size-5"
-              >
-                <RiHome4Line />
-                <span>Property</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

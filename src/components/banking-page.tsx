@@ -117,14 +117,16 @@ export function BankingPage({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
-        <h1 className="text-xl font-semibold">Banking</h1>
+        <h1 className="text-xl font-semibold">Balance Sheet</h1>
         <Button
           type="button"
           variant="outline"
           size="icon-sm"
           onClick={handleRefresh}
           disabled={busy}
-          aria-label={accounts.length > 0 ? "Refresh Banking" : "Load Banking"}
+          aria-label={
+            accounts.length > 0 ? "Refresh Balance Sheet" : "Load Balance Sheet"
+          }
         >
           <RiRefreshLine />
         </Button>

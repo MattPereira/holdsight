@@ -489,7 +489,7 @@ async function linkPlaidAccountsForFamilies({
 
     revalidatePath("/");
     revalidatePath("/brokerage");
-    revalidatePath("/banking");
+    revalidatePath("/balance-sheet");
     return currentPlaidAccounts(userId, errors[0] ?? null);
   } catch (error) {
     return currentPlaidAccounts(
@@ -667,7 +667,7 @@ export async function addManualBalanceItem(
   if (result.error) return { items, error: result.error };
 
   revalidatePath("/");
-  revalidatePath("/banking");
+  revalidatePath("/balance-sheet");
   return { items, error: null };
 }
 
@@ -683,7 +683,7 @@ export async function updateManualBalanceItem(
   if (result.error) return { items, error: result.error };
 
   revalidatePath("/");
-  revalidatePath("/banking");
+  revalidatePath("/balance-sheet");
   return { items, error: null };
 }
 
@@ -697,7 +697,7 @@ export async function removeManualBalanceItem(
   const items = await getUserManualBalanceItems(userId);
 
   revalidatePath("/");
-  revalidatePath("/banking");
+  revalidatePath("/balance-sheet");
   return { items, error: null };
 }
 
