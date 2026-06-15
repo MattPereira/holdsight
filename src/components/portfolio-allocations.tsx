@@ -1,7 +1,6 @@
 "use client";
 
-import { RiArrowRightSLine } from "@remixicon/react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Label, Pie, PieChart } from "recharts";
 
 import {
@@ -10,6 +9,13 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import {
+  CollapsibleLineItem,
+  LineItemGroup,
+  LineItemRow,
+  NestedLineItem,
+  NestedLineItems,
+} from "@/components/ui/line-item";
 import { cn } from "@/lib/utils";
 import {
   applyAssetGroups,
@@ -184,138 +190,6 @@ function AllocationDonutChart({
   );
 }
 
-function SummaryList({
-  rows,
-  totalValue,
-  expanded,
-  onToggle,
-  colorByKey,
-}: {
-  rows: HoldingsDisplayRow[];
-  totalValue: number;
-  expanded: Set<string>;
-  onToggle: (key: string) => void;
-  colorByKey?: Map<string, string>;
-}) {
-  return (
-    <ul className="divide-y overflow-hidden rounded-lg border">
-      {rows.map((row) => {
-        const weight = weightOf(row.valueUsd, totalValue);
-        const isExpanded = expanded.has(row.key);
-        const members = row.members ?? [];
-        const color = colorByKey?.get(row.key);
-        const header = (
-          <>
-            <span className="flex min-w-0 items-center gap-3">
-              <ColorSwatch color={color} className="size-9 rounded-md" />
-              <span className="flex min-w-0 flex-col">
-                <span
-                  className="min-w-0 truncate text-base font-semibold"
-                  title={row.symbol}
-                >
-                  {row.symbol}
-                </span>
-                {row.name ? (
-                  <span
-                    className="min-w-0 truncate text-xs text-muted-foreground"
-                    title={row.name}
-                  >
-                    {row.name}
-                  </span>
-                ) : null}
-              </span>
-              {row.isGroup ? (
-                <RiArrowRightSLine
-                  className={cn(
-                    "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
-                    isExpanded && "rotate-90",
-                  )}
-                />
-              ) : null}
-            </span>
-            <span className="flex shrink-0 flex-col items-end">
-              <span className="text-base font-semibold tabular-nums">
-                {percentFormat.format(weight)}
-              </span>
-              <span className="text-xs tabular-nums text-muted-foreground">
-                {formatUsd(row.valueUsd)}
-              </span>
-            </span>
-          </>
-        );
-        return (
-          <li key={row.key}>
-            {row.isGroup ? (
-              <button
-                type="button"
-                onClick={() => onToggle(row.key)}
-                aria-expanded={isExpanded}
-                className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
-              >
-                {header}
-              </button>
-            ) : (
-              <div className="flex items-center justify-between gap-4 px-4 py-3">
-                {header}
-              </div>
-            )}
-            {row.isGroup ? (
-              <div
-                className={cn(
-                  "grid transition-[grid-template-rows] duration-200 ease-out",
-                  isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
-                )}
-              >
-                <div className="overflow-hidden">
-                  <ul className="relative flex flex-col gap-2 pb-3 pl-16 pr-4 before:absolute before:bottom-3 before:left-[34px] before:top-0 before:w-px before:bg-border">
-                    {members.map((member) => {
-                      const memberWeight = weightOf(
-                        member.valueUsd,
-                        totalValue,
-                      );
-                      return (
-                        <li
-                          key={member.key}
-                          className="flex items-center justify-between gap-4 text-sm"
-                        >
-                          <span className="flex min-w-0 flex-col">
-                            <span
-                              className="min-w-0 truncate font-medium"
-                              title={member.symbol}
-                            >
-                              {member.symbol}
-                            </span>
-                            {member.name ? (
-                              <span
-                                className="min-w-0 truncate text-xs text-muted-foreground"
-                                title={member.name}
-                              >
-                                {member.name}
-                              </span>
-                            ) : null}
-                          </span>
-                          <span className="flex shrink-0 flex-col items-end">
-                            <span className="font-medium tabular-nums">
-                              {percentFormat.format(memberWeight)}
-                            </span>
-                            <span className="text-xs tabular-nums text-muted-foreground">
-                              {formatUsd(member.valueUsd)}
-                            </span>
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              </div>
-            ) : null}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
 function HoldingsRows({
   rows,
   totalValue,
@@ -325,28 +199,52 @@ function HoldingsRows({
   totalValue: number;
   colorByKey?: Map<string, string>;
 }) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  function toggle(key: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  }
-
   return (
-    <SummaryList
-      rows={rows}
-      totalValue={totalValue}
-      expanded={expanded}
-      onToggle={toggle}
-      colorByKey={colorByKey}
-    />
+    <LineItemGroup type="multiple">
+      <div className="flex items-center gap-3 border-b bg-muted/50 px-4 py-3 font-medium">
+        <span>Allocations</span>
+      </div>
+      {rows.map((row) => {
+        const fields = {
+          leading: (
+            <ColorSwatch
+              color={colorByKey?.get(row.key)}
+              className="size-9 rounded-md"
+            />
+          ),
+          label: row.symbol,
+          labelTitle: row.symbol,
+          sublabel: row.name,
+          sublabelTitle: row.name,
+          value: percentFormat.format(weightOf(row.valueUsd, totalValue)),
+          secondaryValue: formatUsd(row.valueUsd),
+        };
+
+        if (!row.isGroup) {
+          return <LineItemRow key={row.key} {...fields} />;
+        }
+
+        return (
+          <CollapsibleLineItem key={row.key} id={row.key} {...fields}>
+            <NestedLineItems>
+              {(row.members ?? []).map((member) => (
+                <NestedLineItem
+                  key={member.key}
+                  label={member.symbol}
+                  labelTitle={member.symbol}
+                  sublabel={member.name}
+                  sublabelTitle={member.name}
+                  value={percentFormat.format(
+                    weightOf(member.valueUsd, totalValue),
+                  )}
+                  secondaryValue={formatUsd(member.valueUsd)}
+                />
+              ))}
+            </NestedLineItems>
+          </CollapsibleLineItem>
+        );
+      })}
+    </LineItemGroup>
   );
 }
 
