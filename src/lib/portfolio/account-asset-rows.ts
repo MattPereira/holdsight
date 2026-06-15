@@ -79,7 +79,11 @@ function brokerageRows(
   return accounts
     .map((account) => ({
       id: account.id,
-      label: account.institutionName,
+      label:
+        account.institutionName?.trim() ||
+        account.label?.trim() ||
+        account.brokerage ||
+        "Brokerage account",
       description: brokerageDescription(account),
       valueUsd: account.balances.reduce(
         (sum, balance) => sum + balance.valueUsd,

@@ -32,7 +32,7 @@ function creditCardProvider(account: CreditCardAccountRow): string {
   return account.accountMask ? `${name} ••${account.accountMask}` : name;
 }
 
-export function AccountsSection({
+export function PortfolioAccountsList({
   accounts,
   creditCardAccounts,
   manualItems,

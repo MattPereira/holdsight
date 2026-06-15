@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { loadPortfolioPageData } from "@/app/actions";
-import { AccountsSection } from "@/components/accounts-section";
+import { PortfolioAccountsList } from "@/components/portfolio-accounts-list";
 import { useAssetGroups } from "@/components/asset-groups-context";
 import { PortfolioAllocations } from "@/components/portfolio-allocations";
 import { Button } from "@/components/ui/button";
@@ -100,7 +100,7 @@ export function PortfolioPage({
         </div>
       </div>
 
-      <AccountsSection
+      <PortfolioAccountsList
         accounts={accounts}
         creditCardAccounts={creditCardAccounts}
         manualItems={manualItems}
