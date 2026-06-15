@@ -394,7 +394,7 @@ export function PortfolioAllocations({
   }
 
   return (
-    <section className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-center">
+    <section className="grid grid-cols-1 lg:grid-cols-2 lg:items-center">
       <AllocationDonutChart
         grandTotalValue={grandTotalValue}
         totals={visibleTotals}

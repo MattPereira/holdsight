@@ -73,15 +73,25 @@ export function AccountsSection({
   const hasCashPosition = hasDepository || hasLiabilities;
   const hasAnything = hasAssets || hasLiabilities;
 
-  const checkingTotal = accounts
-    .filter((account) => account.kind === "checking")
-    .reduce((sum, account) => sum + account.currentBalance, 0);
+  const depositoryTotal = accounts.reduce(
+    (sum, account) => sum + account.currentBalance,
+    0,
+  );
   const liabilityTotal =
     creditCardAccounts.reduce(
       (sum, account) => sum + account.currentBalance,
       0,
     ) + manualLiabilities.reduce((sum, item) => sum + item.amount, 0);
-  const netCash = checkingTotal - liabilityTotal;
+  const bankTotal = depositoryTotal - liabilityTotal;
+
+  const manualAssetsTotal = manualAssets.reduce(
+    (sum, item) => sum + item.amount,
+    0,
+  );
+  const investmentTotal = investmentAccountSections.reduce(
+    (sum, section) => sum + section.valueUsd,
+    0,
+  );
 
   function handleRemove(plaidItemId: string) {
     onError(null);
@@ -134,8 +144,14 @@ export function AccountsSection({
             <div className="flex flex-col gap-5">
               {manualAssets.length > 0 ? (
                 <section>
-                  <h2 className="px-2 font-medium mb-3">Manual Assets</h2>
+                  <h2 className="px-2 font-medium mb-3">Other Assets</h2>
                   <ul className="divide-y border rounded-lg">
+                    <li className="flex items-center justify-between gap-3 bg-muted/50 px-4 py-3 font-semibold">
+                      <span>Total</span>
+                      <span className="tabular-nums">
+                        {usdFormat.format(manualAssetsTotal)}
+                      </span>
+                    </li>
                     {manualAssets.map((item) => (
                       <li
                         key={item.id}
@@ -156,119 +172,101 @@ export function AccountsSection({
                 </section>
               ) : null}
 
-              {investmentAccountSections.map((row) => (
-                <section key={row.id}>
-                  <h2 className="px-2 font-medium mb-3">{row.label}</h2>
+              {investmentAccountSections.length > 0 ? (
+                <section>
                   <ul className="divide-y border rounded-lg">
-                    {row.children.map((child) => (
-                      <li
-                        key={child.id}
-                        className="flex items-center justify-between gap-3 px-4 py-3"
-                      >
-                        <div className="flex min-w-0 flex-col">
-                          <span className="truncate">{child.label}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {child.description}
-                          </span>
-                        </div>
-                        <span className="tabular-nums">
-                          {usdFormat.format(child.valueUsd)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
-            </div>
-          ) : null}
-
-          <div className="flex flex-col gap-2">
-            {hasCashPosition ? (
-              <div className="overflow-hidden rounded-lg flex flex-col gap-5">
-                {hasDepository ? (
-                  <section>
-                    <h2 className="px-2 font-medium mb-3">Depository</h2>
-                    <ul className="divide-y border rounded-lg">
-                      {accounts.map((account) => (
+                    <li className="flex items-center justify-between gap-3 bg-muted/50 px-4 py-3 font-semibold">
+                      <span>Investments</span>
+                      <span className="tabular-nums">
+                        {usdFormat.format(investmentTotal)}
+                      </span>
+                    </li>
+                    {investmentAccountSections.flatMap((row) =>
+                      row.children.map((child) => (
                         <li
-                          key={account.id}
+                          key={child.id}
                           className="flex items-center justify-between gap-3 px-4 py-3"
                         >
                           <div className="flex min-w-0 flex-col">
-                            <span className="truncate">
-                              {accountLabel(account)}
-                            </span>
+                            <span className="truncate">{child.label}</span>
                             <span className="text-xs text-muted-foreground">
-                              {depositoryType(account)}
+                              {child.description}
                             </span>
                           </div>
                           <span className="tabular-nums">
-                            {usdFormat.format(account.currentBalance)}
+                            {usdFormat.format(child.valueUsd)}
                           </span>
                         </li>
-                      ))}
-                    </ul>
-                  </section>
-                ) : null}
+                      )),
+                    )}
+                  </ul>
+                </section>
+              ) : null}
+            </div>
+          ) : null}
 
-                {hasLiabilities ? (
-                  <section>
-                    <h2 className="px-2 font-medium mb-3">Liabilities</h2>
-                    <ul className="divide-y border rounded-lg">
-                      {creditCardAccounts.map((account) => (
-                        <li
-                          key={account.id}
-                          className="flex items-center justify-between gap-3 px-4 py-3"
-                        >
-                          <div className="flex min-w-0 flex-col">
-                            <span className="truncate">
-                              {creditCardProvider(account)}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              Credit Card
-                            </span>
-                          </div>
-                          <span className="tabular-nums text-red-600 dark:text-red-400">
-                            {usdFormat.format(account.currentBalance)}
-                          </span>
-                        </li>
-                      ))}
-                      {manualLiabilities.map((item) => (
-                        <li
-                          key={item.id}
-                          className="flex items-center justify-between gap-3 px-4 py-3"
-                        >
-                          <div className="flex min-w-0 flex-col">
-                            <span className="truncate">{item.symbol}</span>
-                            <span className="text-xs text-muted-foreground">
-                              {item.name}
-                            </span>
-                          </div>
-                          <span className="tabular-nums text-red-600 dark:text-red-400">
-                            {usdFormat.format(item.amount)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                ) : null}
-
-                <div className="border rounded-lg bg-muted">
-                  <div className="flex items-center justify-between gap-3 px-4 py-3 font-medium">
+          {hasCashPosition ? (
+            <section>
+              <ul className="divide-y border rounded-lg">
+                <li className="flex items-center justify-between gap-3 bg-muted/50 px-4 py-3 font-semibold">
+                  <span>Liquid Cash</span>
+                  <span className="tabular-nums">
+                    {usdFormat.format(bankTotal)}
+                  </span>
+                </li>
+                {accounts.map((account) => (
+                  <li
+                    key={account.id}
+                    className="flex items-center justify-between gap-3 px-4 py-3"
+                  >
                     <div className="flex min-w-0 flex-col">
-                      <span>Liquid Cash</span>
-                      <span className="text-xs font-normal text-muted-foreground">
-                        Checking - Liabilities
+                      <span className="truncate">{accountLabel(account)}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {depositoryType(account)}
                       </span>
                     </div>
                     <span className="tabular-nums">
-                      {usdFormat.format(netCash)}
+                      {usdFormat.format(account.currentBalance)}
                     </span>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </div>
+                  </li>
+                ))}
+                {creditCardAccounts.map((account) => (
+                  <li
+                    key={account.id}
+                    className="flex items-center justify-between gap-3 px-4 py-3"
+                  >
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate">
+                        {creditCardProvider(account)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Credit Card
+                      </span>
+                    </div>
+                    <span className="tabular-nums text-red-600 dark:text-red-400">
+                      {usdFormat.format(account.currentBalance)}
+                    </span>
+                  </li>
+                ))}
+                {manualLiabilities.map((item) => (
+                  <li
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 px-4 py-3"
+                  >
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate">{item.symbol}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {item.name}
+                      </span>
+                    </div>
+                    <span className="tabular-nums text-red-600 dark:text-red-400">
+                      {usdFormat.format(item.amount)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </div>
       )}
     </div>

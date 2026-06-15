@@ -62,16 +62,12 @@ function brokerageTotal(accounts: CurrentBrokerageAccount[]): number {
   );
 }
 
-function brokerageLabel(account: CurrentBrokerageAccount): string {
-  return account.label ?? account.institutionName ?? account.brokerage;
-}
-
 function brokerageDescription(account: CurrentBrokerageAccount): string {
   const institutionName = account.institutionName?.trim();
   const accountType = account.accountType.trim();
 
   if (institutionName && accountType) {
-    return `${institutionName} ${accountType}`;
+    return `${accountType.split("_").join(" ")}`;
   }
 
   return accountType || "Brokerage account";
@@ -83,7 +79,7 @@ function brokerageRows(
   return accounts
     .map((account) => ({
       id: account.id,
-      label: brokerageLabel(account),
+      label: account.institutionName,
       description: brokerageDescription(account),
       valueUsd: account.balances.reduce(
         (sum, balance) => sum + balance.valueUsd,
@@ -108,14 +104,14 @@ export function investmentAccountSections({
       label: "On Chain",
       description: "Wallet assets",
       valueUsd: balancesTotal(onChainResults),
-      children: resultRows(onChainResults, "Wallet assets"),
+      children: resultRows(onChainResults, "Evm wallet"),
     },
     {
       id: "exchange",
       label: "Exchange",
       description: "Exchange assets",
       valueUsd: balancesTotal(exchangeResults),
-      children: resultRows(exchangeResults, "Exchange assets"),
+      children: resultRows(exchangeResults, "Exchange account"),
     },
     {
       id: "brokerage",
