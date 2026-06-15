@@ -7,10 +7,7 @@ import { loadBrokerageBalances } from "@/app/actions";
 import { BrokerageDetailsTable } from "@/components/brokerage-details-table";
 import { BrokerageManager } from "@/components/brokerage-manager";
 import { PortfolioAllocations } from "@/components/portfolio-allocations";
-import {
-  usePortfolioSettings,
-  usePublishAvailableSymbols,
-} from "@/components/portfolio-settings-context";
+import { useAssetGroups } from "@/components/asset-groups-context";
 import { Button } from "@/components/ui/button";
 import type { CurrentBrokerageAccount } from "@/lib/brokerage/balances";
 import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
@@ -43,7 +40,7 @@ export function BrokerageDetailsPage({
 }) {
   const [accounts, setAccounts] =
     useState<CurrentBrokerageAccount[]>(initialAccounts);
-  const { groups } = usePortfolioSettings();
+  const { groups } = useAssetGroups();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -51,8 +48,6 @@ export function BrokerageDetailsPage({
     () => portfolioAssetSummary(toBalancesResults(accounts)),
     [accounts],
   );
-
-  usePublishAvailableSymbols(summary.totals.map((total) => total.symbol));
 
   const accountsWithHoldings = useMemo(
     () => accounts.filter((account) => account.balances.length > 0),

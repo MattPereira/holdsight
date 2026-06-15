@@ -10,10 +10,7 @@ import {
 } from "@/app/actions";
 import { AccountDetailsTable } from "@/components/account-details-table";
 import { PortfolioAllocations } from "@/components/portfolio-allocations";
-import {
-  usePortfolioSettings,
-  usePublishAvailableSymbols,
-} from "@/components/portfolio-settings-context";
+import { useAssetGroups } from "@/components/asset-groups-context";
 import { Button } from "@/components/ui/button";
 import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 import type { BalancesResult } from "@/lib/portfolio/types";
@@ -32,11 +29,9 @@ export function AccountDetailsPage({
   headerAction?: React.ReactNode;
 }) {
   const [results, setResults] = useState<BalancesResult[]>(initialResults);
-  const { groups } = usePortfolioSettings();
+  const { groups } = useAssetGroups();
   const [isPending, startTransition] = useTransition();
   const summary = useMemo(() => portfolioAssetSummary(results), [results]);
-
-  usePublishAvailableSymbols(summary.totals.map((total) => total.symbol));
 
   function handleLoad() {
     startTransition(async () => {

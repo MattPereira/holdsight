@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { LoginForm } from "@/components/login-form";
-import { PortfolioSettingsProvider } from "@/components/portfolio-settings-context";
+import { AssetGroupsProvider } from "@/components/asset-groups-context";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   SidebarInset,
@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/sidebar";
 import { getCurrentSession } from "@/lib/auth/session";
 import { getUserAssetGroups } from "@/lib/portfolio/groups";
+import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
+import { getCurrentPortfolioBalances } from "@/lib/portfolio/balances";
 
 export default async function AppLayout({
   children,
@@ -31,13 +33,22 @@ export default async function AppLayout({
     );
   }
 
-  const groups = await getUserAssetGroups(session.user.id);
+  const [groups, summary] = await Promise.all([
+    getUserAssetGroups(session.user.id),
+    getCurrentPortfolioBalances(session.user.id).then(portfolioAssetSummary),
+  ]);
+  // Every symbol the user owns, so groups can be edited from any page.
+  const allSymbols = summary.totals.map((total) => total.symbol);
 
   return (
     <SidebarProvider>
-      <AppSidebar name={session.user.name} email={session.user.email} />
-      <SidebarInset>
-        <PortfolioSettingsProvider initialGroups={groups}>
+      <AssetGroupsProvider initialGroups={groups}>
+        <AppSidebar
+          name={session.user.name}
+          email={session.user.email}
+          allSymbols={allSymbols}
+        />
+        <SidebarInset>
           <header className="relative flex h-14 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
             <Link
@@ -51,8 +62,8 @@ export default async function AppLayout({
             </div>
           </header>
           <div className="p-6 md:p-10">{children}</div>
-        </PortfolioSettingsProvider>
-      </SidebarInset>
+        </SidebarInset>
+      </AssetGroupsProvider>
     </SidebarProvider>
   );
 }

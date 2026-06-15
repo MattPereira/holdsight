@@ -7,6 +7,7 @@ import {
   RiExpandUpDownLine,
   RiLogoutBoxRLine,
   RiMoonLine,
+  RiStackLine,
   RiSunLine,
 } from "@remixicon/react";
 import { useTheme } from "next-themes";
@@ -28,6 +29,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { PlaidAccountsConnectSheet } from "@/components/plaid-accounts-connect-sheet";
+import { AssetGroupSettings } from "@/components/asset-group-settings";
 
 function initials(name: string) {
   return name
@@ -38,13 +40,22 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-export function NavUser({ name, email }: { name: string; email: string }) {
+export function NavUser({
+  name,
+  email,
+  allSymbols,
+}: {
+  name: string;
+  email: string;
+  allSymbols: string[];
+}) {
   const { isMobile } = useSidebar();
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const [isPending, setIsPending] = useState(false);
   const [connectSheetOpen, setConnectSheetOpen] = useState(false);
+  const [groupsSheetOpen, setGroupsSheetOpen] = useState(false);
 
   async function handleSignOut() {
     setIsPending(true);
@@ -101,6 +112,10 @@ export function NavUser({ name, email }: { name: string; email: string }) {
               <RiLinksLine />
               Plaid connections
             </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setGroupsSheetOpen(true)}>
+              <RiStackLine />
+              Asset groups
+            </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={(event) => {
                 // Keep the menu open so toggling theme feels immediate.
@@ -121,6 +136,11 @@ export function NavUser({ name, email }: { name: string; email: string }) {
         <PlaidAccountsConnectSheet
           open={connectSheetOpen}
           onOpenChange={setConnectSheetOpen}
+        />
+        <AssetGroupSettings
+          open={groupsSheetOpen}
+          onOpenChange={setGroupsSheetOpen}
+          allSymbols={allSymbols}
         />
       </SidebarMenuItem>
     </SidebarMenu>

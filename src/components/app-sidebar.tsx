@@ -29,7 +29,15 @@ const accounts: { label: string; href?: string }[] = [
   { label: "Brokerage", href: "/brokerage" },
 ];
 
-export function AppSidebar({ name, email }: { name: string; email: string }) {
+export function AppSidebar({
+  name,
+  email,
+  allSymbols,
+}: {
+  name: string;
+  email: string;
+  allSymbols: string[];
+}) {
   const [accountsOpen, setAccountsOpen] = useState(true);
 
   return (
@@ -94,7 +102,7 @@ export function AppSidebar({ name, email }: { name: string; email: string }) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser name={name} email={email} />
+        <NavUser name={name} email={email} allSymbols={allSymbols} />
       </SidebarFooter>
     </Sidebar>
   );

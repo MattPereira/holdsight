@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  RiAddLine,
-  RiDeleteBinLine,
-  RiPencilLine,
-  RiSettings3Line,
-} from "@remixicon/react";
+import { RiAddLine, RiDeleteBinLine, RiPencilLine } from "@remixicon/react";
 import { useState, useTransition } from "react";
 
 import { createGroup, deleteGroup, updateGroup } from "@/app/actions";
@@ -20,7 +15,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { usePortfolioSettings } from "@/components/portfolio-settings-context";
+import { useAssetGroups } from "@/components/asset-groups-context";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
@@ -28,7 +23,6 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import {
   ASSET_CHART_COLORS,
@@ -52,29 +46,29 @@ function symbolKey(symbol: string): string {
   return symbol.trim().toUpperCase();
 }
 
-export function PortfolioAllocationsSettings() {
-  const { groups, availableSymbols, setGroups } = usePortfolioSettings();
+export function AssetGroupSettings({
+  open,
+  onOpenChange,
+  allSymbols,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  allSymbols: string[];
+}) {
+  const { groups, setGroups } = useAssetGroups();
   const [editor, setEditor] = useState<EditorState>({ mode: "idle" });
 
   return (
     <Sheet
-      onOpenChange={(open) => {
-        if (!open) setEditor({ mode: "idle" });
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setEditor({ mode: "idle" });
+        onOpenChange(next);
       }}
     >
-      <SheetTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-sm"
-          aria-label="Portfolio overview settings"
-        >
-          <RiSettings3Line />
-        </Button>
-      </SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Portfolio Settings</SheetTitle>
+          <SheetTitle>Asset groups</SheetTitle>
           <SheetDescription>
             Group assets into a single line item
           </SheetDescription>
@@ -82,7 +76,7 @@ export function PortfolioAllocationsSettings() {
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4">
           <AssetGroupManager
             groups={groups}
-            availableSymbols={availableSymbols}
+            availableSymbols={allSymbols}
             onGroupsChange={setGroups}
             editor={editor}
             setEditor={setEditor}
