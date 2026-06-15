@@ -1,9 +1,9 @@
 import "server-only";
 
 import {
-  aggregateAssetRows,
-  type AggregateAssetRow,
-} from "@/lib/balance-sheet/aggregate-assets";
+  investmentAccountSections,
+  type InvestmentAccountSection,
+} from "@/lib/portfolio/account-asset-rows";
 import type { CreditCardAccountRow } from "@/lib/credit-card/accounts";
 import type { DepositoryAccountRow } from "@/lib/depository/accounts";
 import type { ManualBalanceItemRow } from "@/lib/manual-balance/items";
@@ -13,42 +13,42 @@ import {
   type CurrentPortfolioBalanceSnapshot,
 } from "@/lib/portfolio/balances";
 
-export type BalanceSheetData = {
+export type PortfolioAccountsData = {
   accounts: DepositoryAccountRow[];
   creditCardAccounts: CreditCardAccountRow[];
   manualItems: ManualBalanceItemRow[];
-  aggregateAssetRows: AggregateAssetRow[];
+  investmentAccountSections: InvestmentAccountSection[];
 };
 
-export type HomeBalanceData = {
+export type PortfolioHomeData = {
   portfolioSummary: ReturnType<typeof portfolioAssetSummary>;
-  balanceSheet: BalanceSheetData;
+  accountData: PortfolioAccountsData;
 };
 
-export function emptyBalanceSheetData(): BalanceSheetData {
+export function emptyPortfolioAccountsData(): PortfolioAccountsData {
   return {
     accounts: [],
     creditCardAccounts: [],
     manualItems: [],
-    aggregateAssetRows: [],
+    investmentAccountSections: [],
   };
 }
 
-export function emptyHomeBalanceData(): HomeBalanceData {
+export function emptyPortfolioHomeData(): PortfolioHomeData {
   return {
     portfolioSummary: portfolioAssetSummary([]),
-    balanceSheet: emptyBalanceSheetData(),
+    accountData: emptyPortfolioAccountsData(),
   };
 }
 
-function balanceSheetDataFromSnapshot(
+function portfolioAccountsDataFromSnapshot(
   snapshot: CurrentPortfolioBalanceSnapshot,
-): BalanceSheetData {
+): PortfolioAccountsData {
   return {
     accounts: snapshot.depositoryAccounts,
     creditCardAccounts: snapshot.creditCardAccounts,
     manualItems: snapshot.manualItems,
-    aggregateAssetRows: aggregateAssetRows({
+    investmentAccountSections: investmentAccountSections({
       onChainResults: snapshot.onChainResults,
       exchangeResults: snapshot.exchangeResults,
       brokerageAccounts: snapshot.brokerageAccounts,
@@ -56,20 +56,13 @@ function balanceSheetDataFromSnapshot(
   };
 }
 
-export async function getCurrentBalanceSheetData(
+export async function getCurrentPortfolioHomeData(
   userId: string,
-): Promise<BalanceSheetData> {
-  const snapshot = await getCurrentPortfolioBalanceSnapshot(userId);
-  return balanceSheetDataFromSnapshot(snapshot);
-}
-
-export async function getCurrentHomeBalanceData(
-  userId: string,
-): Promise<HomeBalanceData> {
+): Promise<PortfolioHomeData> {
   const snapshot = await getCurrentPortfolioBalanceSnapshot(userId);
 
   return {
     portfolioSummary: portfolioAssetSummary(snapshot.portfolioResults),
-    balanceSheet: balanceSheetDataFromSnapshot(snapshot),
+    accountData: portfolioAccountsDataFromSnapshot(snapshot),
   };
 }

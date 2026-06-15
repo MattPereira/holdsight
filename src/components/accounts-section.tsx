@@ -8,10 +8,10 @@ import {
   type ManualBalanceActionResult,
 } from "@/app/actions";
 import { DepositoryManager } from "@/components/depository-manager";
-import type { AggregateAssetRow } from "@/lib/balance-sheet/aggregate-assets";
 import type { CreditCardAccountRow } from "@/lib/credit-card/accounts";
 import type { DepositoryAccountRow } from "@/lib/depository/accounts";
 import type { ManualBalanceItemRow } from "@/lib/manual-balance/items";
+import type { InvestmentAccountSection } from "@/lib/portfolio/account-asset-rows";
 
 const usdFormat = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -36,7 +36,7 @@ export function AccountsSection({
   accounts,
   creditCardAccounts,
   manualItems,
-  aggregateAssetRows,
+  investmentAccountSections,
   error,
   busy = false,
   onAccountsChange,
@@ -47,7 +47,7 @@ export function AccountsSection({
   accounts: DepositoryAccountRow[];
   creditCardAccounts: CreditCardAccountRow[];
   manualItems: ManualBalanceItemRow[];
-  aggregateAssetRows: AggregateAssetRow[];
+  investmentAccountSections: InvestmentAccountSection[];
   error: string | null;
   busy?: boolean;
   onAccountsChange: (accounts: DepositoryAccountRow[]) => void;
@@ -66,10 +66,11 @@ export function AccountsSection({
 
   const hasDepository = accounts.length > 0;
   const hasInvestments =
-    manualAssets.length > 0 || aggregateAssetRows.length > 0;
+    manualAssets.length > 0 || investmentAccountSections.length > 0;
   const hasAssets = hasDepository || hasInvestments;
   const hasLiabilities =
     creditCardAccounts.length > 0 || manualLiabilities.length > 0;
+  const hasCashPosition = hasDepository || hasLiabilities;
   const hasAnything = hasAssets || hasLiabilities;
 
   const checkingTotal = accounts
@@ -129,126 +130,144 @@ export function AccountsSection({
         </p>
       ) : (
         <div className="flex flex-col gap-6">
-          {hasDepository ? (
-            <div className="flex flex-col gap-2">
-              <h2 className="px-1 font-medium">Depository</h2>
-              <ul className="divide-y rounded-lg border">
-                {accounts.map((account) => (
-                  <li
-                    key={account.id}
-                    className="flex items-center justify-between gap-3 px-4 py-3"
-                  >
-                    <div className="flex min-w-0 flex-col">
-                      <span className="truncate">{accountLabel(account)}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {depositoryType(account)}
-                      </span>
-                    </div>
-                    <span className="tabular-nums">
-                      {usdFormat.format(account.currentBalance)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
           {hasInvestments ? (
-            <div className="flex flex-col gap-2">
-              <h2 className="px-1 font-medium">Investments</h2>
-              <ul className="divide-y rounded-lg border">
-                {manualAssets.map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex items-center justify-between gap-3 px-4 py-3"
-                  >
-                    <div className="flex min-w-0 flex-col">
-                      <span className="truncate">{item.symbol}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {item.name}
-                      </span>
-                    </div>
-                    <span className="tabular-nums">
-                      {usdFormat.format(item.amount)}
-                    </span>
-                  </li>
-                ))}
-                {aggregateAssetRows.map((row) => (
-                  <li
-                    key={row.id}
-                    className="flex items-center justify-between gap-3 px-4 py-3"
-                  >
-                    <div className="flex min-w-0 flex-col">
-                      <span className="truncate">{row.label}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {row.description}
-                      </span>
-                    </div>
-                    <span className="tabular-nums">
-                      {usdFormat.format(row.valueUsd)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
+            <div className="flex flex-col gap-5">
+              {manualAssets.length > 0 ? (
+                <section>
+                  <h2 className="px-2 font-medium mb-3">Manual Assets</h2>
+                  <ul className="divide-y border rounded-lg">
+                    {manualAssets.map((item) => (
+                      <li
+                        key={item.id}
+                        className="flex items-center justify-between gap-3 px-4 py-3"
+                      >
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate">{item.symbol}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {item.name}
+                          </span>
+                        </div>
+                        <span className="tabular-nums">
+                          {usdFormat.format(item.amount)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
 
-          {hasLiabilities ? (
-            <div className="flex flex-col gap-2">
-              <h2 className="px-1 font-medium">Liabilities</h2>
-              <ul className="divide-y rounded-lg border">
-                {creditCardAccounts.map((account) => (
-                  <li
-                    key={account.id}
-                    className="flex items-center justify-between gap-3 px-4 py-3"
-                  >
-                    <div className="flex min-w-0 flex-col">
-                      <span className="truncate">
-                        {creditCardProvider(account)}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        Credit Card
-                      </span>
-                    </div>
-                    <span className="tabular-nums text-red-600 dark:text-red-400">
-                      {usdFormat.format(account.currentBalance)}
-                    </span>
-                  </li>
-                ))}
-                {manualLiabilities.map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex items-center justify-between gap-3 px-4 py-3"
-                  >
-                    <div className="flex min-w-0 flex-col">
-                      <span className="truncate">{item.symbol}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {item.name}
-                      </span>
-                    </div>
-                    <span className="tabular-nums text-red-600 dark:text-red-400">
-                      {usdFormat.format(item.amount)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              {investmentAccountSections.map((row) => (
+                <section key={row.id}>
+                  <h2 className="px-2 font-medium mb-3">{row.label}</h2>
+                  <ul className="divide-y border rounded-lg">
+                    {row.children.map((child) => (
+                      <li
+                        key={child.id}
+                        className="flex items-center justify-between gap-3 px-4 py-3"
+                      >
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate">{child.label}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {child.description}
+                          </span>
+                        </div>
+                        <span className="tabular-nums">
+                          {usdFormat.format(child.valueUsd)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
             </div>
           ) : null}
 
           <div className="flex flex-col gap-2">
-            <ul className="divide-y rounded-lg border bg-muted">
-              <li className="flex items-center justify-between gap-3 px-4 py-3 font-medium">
-                <div className="flex min-w-0 flex-col">
-                  <span>Net Cash</span>
-                  <span className="text-xs font-normal text-muted-foreground">
-                    Checking - Liabilities
-                  </span>
+            {hasCashPosition ? (
+              <div className="overflow-hidden rounded-lg flex flex-col gap-5">
+                {hasDepository ? (
+                  <section>
+                    <h2 className="px-2 font-medium mb-3">Depository</h2>
+                    <ul className="divide-y border rounded-lg">
+                      {accounts.map((account) => (
+                        <li
+                          key={account.id}
+                          className="flex items-center justify-between gap-3 px-4 py-3"
+                        >
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate">
+                              {accountLabel(account)}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {depositoryType(account)}
+                            </span>
+                          </div>
+                          <span className="tabular-nums">
+                            {usdFormat.format(account.currentBalance)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+
+                {hasLiabilities ? (
+                  <section>
+                    <h2 className="px-2 font-medium mb-3">Liabilities</h2>
+                    <ul className="divide-y border rounded-lg">
+                      {creditCardAccounts.map((account) => (
+                        <li
+                          key={account.id}
+                          className="flex items-center justify-between gap-3 px-4 py-3"
+                        >
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate">
+                              {creditCardProvider(account)}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              Credit Card
+                            </span>
+                          </div>
+                          <span className="tabular-nums text-red-600 dark:text-red-400">
+                            {usdFormat.format(account.currentBalance)}
+                          </span>
+                        </li>
+                      ))}
+                      {manualLiabilities.map((item) => (
+                        <li
+                          key={item.id}
+                          className="flex items-center justify-between gap-3 px-4 py-3"
+                        >
+                          <div className="flex min-w-0 flex-col">
+                            <span className="truncate">{item.symbol}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {item.name}
+                            </span>
+                          </div>
+                          <span className="tabular-nums text-red-600 dark:text-red-400">
+                            {usdFormat.format(item.amount)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+
+                <div className="border rounded-lg bg-muted">
+                  <div className="flex items-center justify-between gap-3 px-4 py-3 font-medium">
+                    <div className="flex min-w-0 flex-col">
+                      <span>Liquid Cash</span>
+                      <span className="text-xs font-normal text-muted-foreground">
+                        Checking - Liabilities
+                      </span>
+                    </div>
+                    <span className="tabular-nums">
+                      {usdFormat.format(netCash)}
+                    </span>
+                  </div>
                 </div>
-                <span className="tabular-nums">
-                  {usdFormat.format(netCash)}
-                </span>
-              </li>
-            </ul>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

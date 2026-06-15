@@ -74,10 +74,10 @@ import {
   type ManualBalanceItemRow,
 } from "@/lib/manual-balance/items";
 import {
-  emptyHomeBalanceData,
-  getCurrentHomeBalanceData,
-  type HomeBalanceData,
-} from "@/lib/balance-sheet/data";
+  emptyPortfolioHomeData,
+  getCurrentPortfolioHomeData,
+  type PortfolioHomeData,
+} from "@/lib/portfolio/page-data";
 import type { AssetGroup } from "@/lib/portfolio/asset-totals";
 import {
   createAssetGroup,
@@ -758,9 +758,9 @@ export async function deleteGroup(
   return { groups, error: null };
 }
 
-export async function loadPortfolioPageData(): Promise<HomeBalanceData> {
+export async function loadPortfolioPageData(): Promise<PortfolioHomeData> {
   const userId = await getCurrentUserId();
-  if (!userId) return emptyHomeBalanceData();
+  if (!userId) return emptyPortfolioHomeData();
 
   const syncOnChain = async () => {
     const wallets = await getUserEvmAccounts(userId);
@@ -780,5 +780,5 @@ export async function loadPortfolioPageData(): Promise<HomeBalanceData> {
     syncUserCreditCardAccounts(userId),
   ]);
 
-  return getCurrentHomeBalanceData(userId);
+  return getCurrentPortfolioHomeData(userId);
 }

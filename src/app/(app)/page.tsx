@@ -1,21 +1,21 @@
 import { PortfolioPage } from "@/components/portfolio-page";
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
-  emptyHomeBalanceData,
-  getCurrentHomeBalanceData,
-} from "@/lib/balance-sheet/data";
+  emptyPortfolioHomeData,
+  getCurrentPortfolioHomeData,
+} from "@/lib/portfolio/page-data";
 
 export default async function Home() {
   const userId = await getCurrentUserId();
   const data = userId
-    ? await getCurrentHomeBalanceData(userId)
-    : emptyHomeBalanceData();
+    ? await getCurrentPortfolioHomeData(userId)
+    : emptyPortfolioHomeData();
 
   return (
     <PortfolioPage
       initialData={{
         portfolioSummary: data.portfolioSummary,
-        balanceSheet: data.balanceSheet,
+        accountData: data.accountData,
       }}
     />
   );

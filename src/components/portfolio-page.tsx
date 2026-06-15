@@ -6,22 +6,23 @@ import { toast } from "sonner";
 
 import { loadPortfolioPageData } from "@/app/actions";
 import { AccountsSection } from "@/components/accounts-section";
-import { PortfolioOverviewPage } from "@/components/portfolio-overview-page";
+import { useAssetGroups } from "@/components/asset-groups-context";
+import { PortfolioAllocations } from "@/components/portfolio-allocations";
 import { Button } from "@/components/ui/button";
-import type { AggregateAssetRow } from "@/lib/balance-sheet/aggregate-assets";
 import type { CreditCardAccountRow } from "@/lib/credit-card/accounts";
 import type { DepositoryAccountRow } from "@/lib/depository/accounts";
 import type { ManualBalanceItemRow } from "@/lib/manual-balance/items";
+import type { InvestmentAccountSection } from "@/lib/portfolio/account-asset-rows";
 import type { PortfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 import { cn } from "@/lib/utils";
 
 export type PortfolioPageData = {
   portfolioSummary: PortfolioAssetSummary;
-  balanceSheet: {
+  accountData: {
     accounts: DepositoryAccountRow[];
     creditCardAccounts: CreditCardAccountRow[];
     manualItems: ManualBalanceItemRow[];
-    aggregateAssetRows: AggregateAssetRow[];
+    investmentAccountSections: InvestmentAccountSection[];
   };
 };
 
@@ -30,21 +31,22 @@ export function PortfolioPage({
 }: {
   initialData: PortfolioPageData;
 }) {
+  const { groups } = useAssetGroups();
   const [summary, setSummary] = useState<PortfolioAssetSummary>(
     initialData.portfolioSummary,
   );
   const [accounts, setAccounts] = useState<DepositoryAccountRow[]>(
-    initialData.balanceSheet.accounts,
+    initialData.accountData.accounts,
   );
   const [creditCardAccounts, setCreditCardAccounts] = useState<
     CreditCardAccountRow[]
-  >(initialData.balanceSheet.creditCardAccounts);
+  >(initialData.accountData.creditCardAccounts);
   const [manualItems, setManualItems] = useState<ManualBalanceItemRow[]>(
-    initialData.balanceSheet.manualItems,
+    initialData.accountData.manualItems,
   );
-  const [aggregateAssetRows, setAggregateAssetRows] = useState<
-    AggregateAssetRow[]
-  >(initialData.balanceSheet.aggregateAssetRows);
+  const [investmentAccountSections, setInvestmentAccountSections] = useState<
+    InvestmentAccountSection[]
+  >(initialData.accountData.investmentAccountSections);
   const [accountsError, setAccountsError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -55,10 +57,10 @@ export function PortfolioPage({
       try {
         const data = await loadPortfolioPageData();
         setSummary(data.portfolioSummary);
-        setAccounts(data.balanceSheet.accounts);
-        setCreditCardAccounts(data.balanceSheet.creditCardAccounts);
-        setManualItems(data.balanceSheet.manualItems);
-        setAggregateAssetRows(data.balanceSheet.aggregateAssetRows);
+        setAccounts(data.accountData.accounts);
+        setCreditCardAccounts(data.accountData.creditCardAccounts);
+        setManualItems(data.accountData.manualItems);
+        setInvestmentAccountSections(data.accountData.investmentAccountSections);
         toast.success("Portfolio updated", { id });
       } catch {
         toast.error("Couldn't refresh portfolio", { id });
@@ -68,27 +70,41 @@ export function PortfolioPage({
 
   return (
     <div className="flex flex-col gap-10">
-      <div className="flex items-center gap-2">
-        <h1 className="text-xl font-semibold">Portfolio Overview</h1>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-sm"
-          onClick={handleRefresh}
-          disabled={isPending}
-          aria-label="Refresh portfolio"
-        >
-          <RiRefreshLine className={cn(isPending && "animate-spin")} />
-        </Button>
-      </div>
+      <div className="flex flex-col">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-semibold">Portfolio</h1>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon-sm"
+            onClick={handleRefresh}
+            disabled={isPending}
+            aria-label="Refresh portfolio"
+          >
+            <RiRefreshLine className={cn(isPending && "animate-spin")} />
+          </Button>
+        </div>
 
-      <PortfolioOverviewPage summary={summary} busy={isPending} />
+        <div
+          aria-busy={isPending}
+          className={cn(
+            "transition-opacity duration-200",
+            isPending && "pointer-events-none opacity-60",
+          )}
+        >
+          <PortfolioAllocations
+            grandTotalValue={summary.grandTotalValue}
+            totals={summary.totals}
+            groups={groups}
+          />
+        </div>
+      </div>
 
       <AccountsSection
         accounts={accounts}
         creditCardAccounts={creditCardAccounts}
         manualItems={manualItems}
-        aggregateAssetRows={aggregateAssetRows}
+        investmentAccountSections={investmentAccountSections}
         error={accountsError}
         busy={isPending}
         onAccountsChange={setAccounts}
