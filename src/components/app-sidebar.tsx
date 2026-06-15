@@ -20,9 +20,9 @@ import {
 } from "@/components/ui/sidebar";
 
 const accounts: { label: string; href?: string }[] = [
-  { label: "On Chain", href: "/on-chain" },
-  { label: "Exchange", href: "/exchange" },
-  { label: "Brokerage", href: "/brokerage" },
+  { label: "Wallets", href: "/wallets" },
+  { label: "Exchanges", href: "/exchanges" },
+  { label: "Brokerages", href: "/brokerages" },
 ];
 
 export function AppSidebar({

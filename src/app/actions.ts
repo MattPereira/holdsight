@@ -12,7 +12,7 @@ import {
   getCurrentHyperCoreBalances,
   syncHyperCoreAccounts,
 } from "@/lib/hyper-core/balances";
-import { mergeOnChainBalanceResults } from "@/lib/on-chain/balances";
+import { mergeWalletBalanceResults } from "@/lib/wallets/balances";
 import {
   ensureUserKrakenAccount,
   removeUserKrakenAccount,
@@ -202,7 +202,7 @@ export async function loadHyperCoreBalances(): Promise<BalancesResult[]> {
   return getCurrentHyperCoreBalances(hyperCoreAccounts);
 }
 
-export async function loadOnChainBalances(): Promise<BalancesResult[]> {
+export async function loadWalletBalances(): Promise<BalancesResult[]> {
   const userId = await getCurrentUserId();
   if (!userId) return unauthorizedBalancesResult();
 
@@ -228,7 +228,7 @@ export async function loadOnChainBalances(): Promise<BalancesResult[]> {
     getCurrentHyperCoreBalances(hyperCoreAccounts),
   ]);
 
-  return mergeOnChainBalanceResults(evmResults, hyperCoreResults);
+  return mergeWalletBalanceResults(evmResults, hyperCoreResults);
 }
 
 export async function loadKrakenBalances(): Promise<BalancesResult[]> {
@@ -718,7 +718,7 @@ export async function createGroup(input: {
   if (result.error) return { groups, error: result.error };
 
   revalidatePath("/");
-  revalidatePath("/on-chain");
+  revalidatePath("/wallets");
   revalidatePath("/exchange");
   revalidatePath("/brokerage");
   return { groups, error: null };
@@ -736,7 +736,7 @@ export async function updateGroup(
   if (result.error) return { groups, error: result.error };
 
   revalidatePath("/");
-  revalidatePath("/on-chain");
+  revalidatePath("/wallets");
   revalidatePath("/exchange");
   revalidatePath("/brokerage");
   return { groups, error: null };
@@ -752,7 +752,7 @@ export async function deleteGroup(
   const groups = await getUserAssetGroups(userId);
 
   revalidatePath("/");
-  revalidatePath("/on-chain");
+  revalidatePath("/wallets");
   revalidatePath("/exchange");
   revalidatePath("/brokerage");
   return { groups, error: null };
@@ -762,7 +762,7 @@ export async function loadPortfolioPageData(): Promise<PortfolioHomeData> {
   const userId = await getCurrentUserId();
   if (!userId) return emptyPortfolioHomeData();
 
-  const syncOnChain = async () => {
+  const syncWallets = async () => {
     const wallets = await getUserEvmAccounts(userId);
     if (wallets.length === 0) return;
 
@@ -773,7 +773,7 @@ export async function loadPortfolioPageData(): Promise<PortfolioHomeData> {
   };
 
   await Promise.all([
-    syncOnChain(),
+    syncWallets(),
     syncUserKrakenAccounts(userId),
     syncUserBrokerageBalances(userId),
     syncUserDepositoryBalances(userId),

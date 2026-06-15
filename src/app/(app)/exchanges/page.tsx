@@ -25,7 +25,7 @@ export default async function ExchangePage() {
         key={balanceResultsKey}
         initialResults={balanceResults}
         source="kraken"
-        title="Exchange"
+        title="Exchanges"
         headerAction={<KrakenCredentialsForm accounts={krakenAccounts} />}
       />
     </div>

@@ -22,7 +22,7 @@ function mergeReadyResults(
   };
 }
 
-export function mergeOnChainBalanceResults(
+export function mergeWalletBalanceResults(
   evmResults: BalancesResult[],
   hyperCoreResults: BalancesResult[],
 ): BalancesResult[] {
@@ -51,7 +51,7 @@ export function mergeOnChainBalanceResults(
   return Array.from(merged.values());
 }
 
-export async function getCurrentOnChainBalances(
+export async function getCurrentWalletBalances(
   userId: string,
   wallets?: SavedEvmAccount[],
 ): Promise<BalancesResult[]> {
@@ -65,5 +65,5 @@ export async function getCurrentOnChainBalances(
     getCurrentHyperCoreBalances(hyperCoreAccounts),
   ]);
 
-  return mergeOnChainBalanceResults(evmResults, hyperCoreResults);
+  return mergeWalletBalanceResults(evmResults, hyperCoreResults);
 }

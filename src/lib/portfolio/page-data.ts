@@ -49,7 +49,7 @@ function portfolioAccountsDataFromSnapshot(
     creditCardAccounts: snapshot.creditCardAccounts,
     manualItems: snapshot.manualItems,
     investmentAccountSections: investmentAccountSections({
-      onChainResults: snapshot.onChainResults,
+      walletResults: snapshot.walletResults,
       exchangeResults: snapshot.exchangeResults,
       brokerageAccounts: snapshot.brokerageAccounts,
     }),

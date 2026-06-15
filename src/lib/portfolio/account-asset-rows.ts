@@ -94,21 +94,21 @@ function brokerageRows(
 }
 
 export function investmentAccountSections({
-  onChainResults,
+  walletResults,
   exchangeResults,
   brokerageAccounts,
 }: {
-  onChainResults: BalancesResult[];
+  walletResults: BalancesResult[];
   exchangeResults: BalancesResult[];
   brokerageAccounts: CurrentBrokerageAccount[];
 }): InvestmentAccountSection[] {
   return [
     {
-      id: "on-chain",
-      label: "On Chain",
+      id: "wallets",
+      label: "Wallets",
       description: "Wallet assets",
-      valueUsd: balancesTotal(onChainResults),
-      children: resultRows(onChainResults, "Evm wallet"),
+      valueUsd: balancesTotal(walletResults),
+      children: resultRows(walletResults, "Evm wallet"),
     },
     {
       id: "exchange",

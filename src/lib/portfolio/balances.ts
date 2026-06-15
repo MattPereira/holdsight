@@ -27,12 +27,12 @@ import {
   getUserManualBalanceItems,
   type ManualBalanceItemRow,
 } from "@/lib/manual-balance/items";
-import { mergeOnChainBalanceResults } from "@/lib/on-chain/balances";
+import { mergeWalletBalanceResults } from "@/lib/wallets/balances";
 import type { BalancesResult } from "@/lib/portfolio/types";
 
 export type CurrentPortfolioBalanceSnapshot = {
   portfolioResults: BalancesResult[];
-  onChainResults: BalancesResult[];
+  walletResults: BalancesResult[];
   exchangeResults: BalancesResult[];
   brokerageAccounts: CurrentBrokerageAccount[];
   depositoryAccounts: DepositoryAccountRow[];
@@ -112,7 +112,7 @@ function depositoryAccountsToBalancesResult(
           .sort()
           .join(":")}:net-liabilities`,
         symbol: "USD",
-        name: "Available Cash",
+        name: "Cash Balance",
         chainId: "depository",
         amount: netCash,
         priceUsd: 1,
@@ -171,31 +171,32 @@ export const getCurrentPortfolioBalanceSnapshot = cache(
       hyperCoreAccounts.map((account) => [account.address, account]),
     );
 
-    const [walletResults, hyperCoreResults, krakenResults] = await Promise.all([
-      Promise.all(
-        evmResults.map(async (result) => {
-          const hyperCoreAccount = hyperCoreAccountByAddress.get(
-            result.address,
-          );
-          const hyperCoreSpotBalances = hyperCoreAccount
-            ? await getCurrentHyperCoreSpotBalancesByAccountId(
-                hyperCoreAccount.id,
-              )
-            : [];
+    const [portfolioWalletResults, hyperCoreResults, krakenResults] =
+      await Promise.all([
+        Promise.all(
+          evmResults.map(async (result) => {
+            const hyperCoreAccount = hyperCoreAccountByAddress.get(
+              result.address,
+            );
+            const hyperCoreSpotBalances = hyperCoreAccount
+              ? await getCurrentHyperCoreSpotBalancesByAccountId(
+                  hyperCoreAccount.id,
+                )
+              : [];
 
-          if (result.status !== "ready") return result;
+            if (result.status !== "ready") return result;
 
-          return {
-            ...result,
-            balances: [...result.balances, ...hyperCoreSpotBalances].sort(
-              (a, b) => b.valueUsd - a.valueUsd,
-            ),
-          };
-        }),
-      ),
-      getCurrentHyperCoreBalances(hyperCoreAccounts),
-      getCurrentKrakenBalances(krakenAccounts),
-    ]);
+            return {
+              ...result,
+              balances: [...result.balances, ...hyperCoreSpotBalances].sort(
+                (a, b) => b.valueUsd - a.valueUsd,
+              ),
+            };
+          }),
+        ),
+        getCurrentHyperCoreBalances(hyperCoreAccounts),
+        getCurrentKrakenBalances(krakenAccounts),
+      ]);
     const brokerageResults = brokerageAccounts.map(
       brokerageAccountToBalancesResult,
     );
@@ -208,13 +209,13 @@ export const getCurrentPortfolioBalanceSnapshot = cache(
 
     return {
       portfolioResults: [
-        ...walletResults,
+        ...portfolioWalletResults,
         ...krakenResults,
         ...brokerageResults,
         ...(depositoryResult ? [depositoryResult] : []),
         ...(manualAssetsResult ? [manualAssetsResult] : []),
       ],
-      onChainResults: mergeOnChainBalanceResults(evmResults, hyperCoreResults),
+      walletResults: mergeWalletBalanceResults(evmResults, hyperCoreResults),
       exchangeResults: krakenResults,
       brokerageAccounts,
       depositoryAccounts,

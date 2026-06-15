@@ -74,10 +74,7 @@ export function BrokerageManager({
 }) {
   const [isRemoving, startRemove] = useTransition();
 
-  const institutions = useMemo(
-    () => groupByInstitution(accounts),
-    [accounts],
-  );
+  const institutions = useMemo(() => groupByInstitution(accounts), [accounts]);
 
   const busy = isRemoving;
 
@@ -103,10 +100,8 @@ export function BrokerageManager({
       </SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Brokerage Accounts</SheetTitle>
-          <SheetDescription>
-            Disconnect a linked institution.
-          </SheetDescription>
+          <SheetTitle>Brokerages</SheetTitle>
+          <SheetDescription>Disconnect a linked institution.</SheetDescription>
         </SheetHeader>
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4">
           {institutions.length > 0 ? (
@@ -122,8 +117,8 @@ export function BrokerageManager({
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {institution.accountCount}{" "}
-                      {institution.accountCount === 1 ? "account" : "accounts"} ·{" "}
-                      {usdFormat.format(institution.totalValue)}
+                      {institution.accountCount === 1 ? "account" : "accounts"}{" "}
+                      · {usdFormat.format(institution.totalValue)}
                     </span>
                   </div>
                   <AlertDialog>

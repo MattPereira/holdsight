@@ -5,7 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 import {
   loadEvmBalances,
   loadHyperCoreBalances,
-  loadOnChainBalances,
+  loadWalletBalances,
   loadKrakenBalances,
 } from "@/app/actions";
 import { AccountDetailsTable } from "@/components/account-details-table";
@@ -24,7 +24,7 @@ export function AccountDetailsPage({
   headerAction,
 }: {
   initialResults: BalancesResult[];
-  source: "evm" | "hypercore" | "kraken" | "onchain";
+  source: "evm" | "hypercore" | "kraken" | "wallets";
   title: string;
   headerAction?: React.ReactNode;
 }) {
@@ -39,8 +39,8 @@ export function AccountDetailsPage({
         ? loadEvmBalances()
         : source === "hypercore"
           ? loadHyperCoreBalances()
-          : source === "onchain"
-            ? loadOnChainBalances()
+          : source === "wallets"
+            ? loadWalletBalances()
             : loadKrakenBalances());
       setResults(data);
     });

@@ -68,7 +68,7 @@ export function BrokerageDetailsPage({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
-        <h1 className="text-xl font-semibold">Brokerage Accounts</h1>
+        <h1 className="text-xl font-semibold">Brokerages</h1>
         <Button
           type="button"
           variant="outline"
