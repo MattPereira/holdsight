@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  RiArrowRightSLine,
-  RiFundsBoxLine,
-  RiScales3Line,
-} from "@remixicon/react";
+import { RiArrowRightSLine, RiFundsBoxLine } from "@remixicon/react";
 
 import { NavUser } from "@/components/nav-user";
 import {
@@ -85,18 +81,6 @@ export function AppSidebar({
                   ))}
                 </SidebarMenuSub>
               ) : null}
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                asChild
-                size="lg"
-                className="text-base [&>svg]:size-5"
-              >
-                <Link href="/balance-sheet">
-                  <RiScales3Line />
-                  <span>Balance Sheet</span>
-                </Link>
-              </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>

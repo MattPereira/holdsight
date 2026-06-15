@@ -1,17 +1,22 @@
-import { PortfolioOverviewPage } from "@/components/portfolio-overview-page";
+import { PortfolioPage } from "@/components/portfolio-page";
 import { getCurrentUserId } from "@/lib/auth/session";
-import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
-import { getCurrentPortfolioBalances } from "@/lib/portfolio/balances";
+import {
+  emptyHomeBalanceData,
+  getCurrentHomeBalanceData,
+} from "@/lib/balance-sheet/data";
 
 export default async function Home() {
   const userId = await getCurrentUserId();
-  const summary = userId
-    ? await getCurrentPortfolioBalances(userId).then(portfolioAssetSummary)
-    : portfolioAssetSummary([]);
+  const data = userId
+    ? await getCurrentHomeBalanceData(userId)
+    : emptyHomeBalanceData();
 
   return (
-    <div className="flex flex-col gap-5">
-      <PortfolioOverviewPage initialSummary={summary} />
-    </div>
+    <PortfolioPage
+      initialData={{
+        portfolioSummary: data.portfolioSummary,
+        balanceSheet: data.balanceSheet,
+      }}
+    />
   );
 }

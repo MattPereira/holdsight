@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+
 import {
   getCurrentBrokerageBalances,
   type CurrentBrokerageAccount,
@@ -15,13 +17,28 @@ import {
 import { getUserKrakenAccounts } from "@/lib/exchange/kraken/accounts";
 import { getCurrentKrakenBalances } from "@/lib/exchange/kraken/balances";
 import { getCurrentEvmBalances } from "@/lib/evm/balances";
-import { getUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
-import { getCurrentHyperCoreSpotBalancesByAccountId } from "@/lib/hyper-core/balances";
+import { getUserEvmAccounts } from "@/lib/evm/accounts";
+import { ensureUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
+import {
+  getCurrentHyperCoreBalances,
+  getCurrentHyperCoreSpotBalancesByAccountId,
+} from "@/lib/hyper-core/balances";
 import {
   getUserManualBalanceItems,
   type ManualBalanceItemRow,
 } from "@/lib/manual-balance/items";
+import { mergeOnChainBalanceResults } from "@/lib/on-chain/balances";
 import type { BalancesResult } from "@/lib/portfolio/types";
+
+export type CurrentPortfolioBalanceSnapshot = {
+  portfolioResults: BalancesResult[];
+  onChainResults: BalancesResult[];
+  exchangeResults: BalancesResult[];
+  brokerageAccounts: CurrentBrokerageAccount[];
+  depositoryAccounts: DepositoryAccountRow[];
+  creditCardAccounts: CreditCardAccountRow[];
+  manualItems: ManualBalanceItemRow[];
+};
 
 function brokerageAccountToBalancesResult(
   account: CurrentBrokerageAccount,
@@ -127,63 +144,88 @@ function manualAssetsToBalancesResult(
   };
 }
 
+export const getCurrentPortfolioBalanceSnapshot = cache(
+  async (userId: string): Promise<CurrentPortfolioBalanceSnapshot> => {
+    const [
+      evmResults,
+      evmAccounts,
+      krakenAccounts,
+      brokerageAccounts,
+      depositoryAccounts,
+      creditCardAccounts,
+      manualItems,
+    ] = await Promise.all([
+      getCurrentEvmBalances(userId),
+      getUserEvmAccounts(userId),
+      getUserKrakenAccounts(userId),
+      getCurrentBrokerageBalances(userId),
+      getUserDepositoryAccounts(userId),
+      getUserCreditCardAccounts(userId),
+      getUserManualBalanceItems(userId),
+    ]);
+    const hyperCoreAccounts = await ensureUserHyperCoreAccounts(
+      userId,
+      evmAccounts,
+    );
+    const hyperCoreAccountByAddress = new Map(
+      hyperCoreAccounts.map((account) => [account.address, account]),
+    );
+
+    const [walletResults, hyperCoreResults, krakenResults] = await Promise.all([
+      Promise.all(
+        evmResults.map(async (result) => {
+          const hyperCoreAccount = hyperCoreAccountByAddress.get(
+            result.address,
+          );
+          const hyperCoreSpotBalances = hyperCoreAccount
+            ? await getCurrentHyperCoreSpotBalancesByAccountId(
+                hyperCoreAccount.id,
+              )
+            : [];
+
+          if (result.status !== "ready") return result;
+
+          return {
+            ...result,
+            balances: [...result.balances, ...hyperCoreSpotBalances].sort(
+              (a, b) => b.valueUsd - a.valueUsd,
+            ),
+          };
+        }),
+      ),
+      getCurrentHyperCoreBalances(hyperCoreAccounts),
+      getCurrentKrakenBalances(krakenAccounts),
+    ]);
+    const brokerageResults = brokerageAccounts.map(
+      brokerageAccountToBalancesResult,
+    );
+    const depositoryResult = depositoryAccountsToBalancesResult(
+      depositoryAccounts,
+      creditCardAccounts,
+      manualItems,
+    );
+    const manualAssetsResult = manualAssetsToBalancesResult(manualItems);
+
+    return {
+      portfolioResults: [
+        ...walletResults,
+        ...krakenResults,
+        ...brokerageResults,
+        ...(depositoryResult ? [depositoryResult] : []),
+        ...(manualAssetsResult ? [manualAssetsResult] : []),
+      ],
+      onChainResults: mergeOnChainBalanceResults(evmResults, hyperCoreResults),
+      exchangeResults: krakenResults,
+      brokerageAccounts,
+      depositoryAccounts,
+      creditCardAccounts,
+      manualItems,
+    };
+  },
+);
+
 export async function getCurrentPortfolioBalances(
   userId: string,
 ): Promise<BalancesResult[]> {
-  const [
-    evmResults,
-    hyperCoreAccounts,
-    krakenAccounts,
-    brokerageAccounts,
-    depositoryAccounts,
-    creditCardAccounts,
-    manualItems,
-  ] = await Promise.all([
-    getCurrentEvmBalances(userId),
-    getUserHyperCoreAccounts(userId),
-    getUserKrakenAccounts(userId),
-    getCurrentBrokerageBalances(userId),
-    getUserDepositoryAccounts(userId),
-    getUserCreditCardAccounts(userId),
-    getUserManualBalanceItems(userId),
-  ]);
-  const hyperCoreAccountByAddress = new Map(
-    hyperCoreAccounts.map((account) => [account.address, account]),
-  );
-
-  const walletResults = await Promise.all(
-    evmResults.map(async (result) => {
-      const hyperCoreAccount = hyperCoreAccountByAddress.get(result.address);
-      const hyperCoreSpotBalances = hyperCoreAccount
-        ? await getCurrentHyperCoreSpotBalancesByAccountId(hyperCoreAccount.id)
-        : [];
-
-      if (result.status !== "ready") return result;
-
-      return {
-        ...result,
-        balances: [...result.balances, ...hyperCoreSpotBalances].sort(
-          (a, b) => b.valueUsd - a.valueUsd,
-        ),
-      };
-    }),
-  );
-  const krakenResults = await getCurrentKrakenBalances(krakenAccounts);
-  const brokerageResults = brokerageAccounts.map(
-    brokerageAccountToBalancesResult,
-  );
-  const depositoryResult = depositoryAccountsToBalancesResult(
-    depositoryAccounts,
-    creditCardAccounts,
-    manualItems,
-  );
-  const manualAssetsResult = manualAssetsToBalancesResult(manualItems);
-
-  return [
-    ...walletResults,
-    ...krakenResults,
-    ...brokerageResults,
-    ...(depositoryResult ? [depositoryResult] : []),
-    ...(manualAssetsResult ? [manualAssetsResult] : []),
-  ];
+  return (await getCurrentPortfolioBalanceSnapshot(userId)).portfolioResults;
 }

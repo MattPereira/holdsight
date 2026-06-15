@@ -7,7 +7,6 @@ import {
   getCurrentEvmBalances,
   syncEvmWalletBalances,
 } from "@/lib/evm/balances";
-import { getCurrentPortfolioBalances } from "@/lib/portfolio/balances";
 import { ensureUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
 import {
   getCurrentHyperCoreBalances,
@@ -75,10 +74,11 @@ import {
   type ManualBalanceItemRow,
 } from "@/lib/manual-balance/items";
 import {
-  portfolioAssetSummary,
-  type AssetGroup,
-  type PortfolioAssetSummary,
-} from "@/lib/portfolio/asset-totals";
+  emptyHomeBalanceData,
+  getCurrentHomeBalanceData,
+  type HomeBalanceData,
+} from "@/lib/balance-sheet/data";
+import type { AssetGroup } from "@/lib/portfolio/asset-totals";
 import {
   createAssetGroup,
   getUserAssetGroups,
@@ -110,10 +110,6 @@ function unauthorizedBalancesResult(): BalancesResult[] {
       httpStatus: 401,
     },
   ];
-}
-
-function emptyPortfolioSummary(): PortfolioAssetSummary {
-  return { grandTotalValue: 0, totals: [] };
 }
 
 export async function addWallets(input: string): Promise<WalletActionResult> {
@@ -489,7 +485,6 @@ async function linkPlaidAccountsForFamilies({
 
     revalidatePath("/");
     revalidatePath("/brokerage");
-    revalidatePath("/balance-sheet");
     return currentPlaidAccounts(userId, errors[0] ?? null);
   } catch (error) {
     return currentPlaidAccounts(
@@ -667,7 +662,6 @@ export async function addManualBalanceItem(
   if (result.error) return { items, error: result.error };
 
   revalidatePath("/");
-  revalidatePath("/balance-sheet");
   return { items, error: null };
 }
 
@@ -683,7 +677,6 @@ export async function updateManualBalanceItem(
   if (result.error) return { items, error: result.error };
 
   revalidatePath("/");
-  revalidatePath("/balance-sheet");
   return { items, error: null };
 }
 
@@ -697,7 +690,6 @@ export async function removeManualBalanceItem(
   const items = await getUserManualBalanceItems(userId);
 
   revalidatePath("/");
-  revalidatePath("/balance-sheet");
   return { items, error: null };
 }
 
@@ -766,9 +758,9 @@ export async function deleteGroup(
   return { groups, error: null };
 }
 
-export async function loadPortfolioSummary(): Promise<PortfolioAssetSummary> {
+export async function loadPortfolioPageData(): Promise<HomeBalanceData> {
   const userId = await getCurrentUserId();
-  if (!userId) return emptyPortfolioSummary();
+  if (!userId) return emptyHomeBalanceData();
 
   const syncOnChain = async () => {
     const wallets = await getUserEvmAccounts(userId);
@@ -788,5 +780,5 @@ export async function loadPortfolioSummary(): Promise<PortfolioAssetSummary> {
     syncUserCreditCardAccounts(userId),
   ]);
 
-  return portfolioAssetSummary(await getCurrentPortfolioBalances(userId));
+  return getCurrentHomeBalanceData(userId);
 }
