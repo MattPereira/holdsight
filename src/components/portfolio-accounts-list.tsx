@@ -11,6 +11,7 @@ import { DepositoryManager } from "@/components/depository-manager";
 import {
   CollapsibleLineItem,
   LineItemGroup,
+  LineItemRow,
   NestedLineItem,
   NestedLineItems,
 } from "@/components/ui/line-item";
@@ -158,73 +159,49 @@ export function PortfolioAccountsList({
       ) : (
         <div className="flex flex-col gap-6">
           {hasInvestments ? (
-            <div className="flex flex-col gap-5">
-              {manualAssets.length > 0 ? (
-                <section>
-                  <h2 className="px-2 font-medium mb-3">Other Assets</h2>
-                  <ul className="divide-y border rounded-lg">
-                    <li className="flex items-center justify-between gap-3 bg-muted/50 px-4 py-3 font-medium">
-                      <span>Total</span>
-                      <span className="tabular-nums">
-                        {usdFormat.format(manualAssetsTotal)}
-                      </span>
-                    </li>
-                    {manualAssets.map((item) => (
-                      <li
-                        key={item.id}
-                        className="flex items-center justify-between gap-3 px-4 py-3"
-                      >
-                        <div className="flex min-w-0 flex-col">
-                          <span className="truncate">{item.symbol}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {item.name}
-                          </span>
-                        </div>
-                        <span className="tabular-nums">
-                          {usdFormat.format(item.amount)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ) : null}
-
-              {investmentAccountSections.length > 0 ? (
-                <section>
-                  <LineItemGroup type="multiple">
-                    <div className="flex items-center justify-between gap-3 border-b bg-muted/50 px-4 py-3 font-medium">
-                      <span>Investments</span>
-                      <span className="tabular-nums">
-                        {usdFormat.format(investmentTotal)}
-                      </span>
-                    </div>
-                    {investmentAccountSections.map((section) => (
-                      <CollapsibleLineItem
-                        key={section.id}
-                        id={section.id}
-                        label={investmentSectionLabel(section)}
-                        labelClassName="font-medium"
-                        value={usdFormat.format(section.valueUsd)}
-                        valueClassName="font-medium"
-                      >
-                        <NestedLineItems>
-                          {section.children.map((child) => (
-                            <NestedLineItem
-                              key={child.id}
-                              label={child.label}
-                              labelTitle={child.label}
-                              sublabel={child.description}
-                              sublabelTitle={child.description}
-                              value={usdFormat.format(child.valueUsd)}
-                            />
-                          ))}
-                        </NestedLineItems>
-                      </CollapsibleLineItem>
-                    ))}
-                  </LineItemGroup>
-                </section>
-              ) : null}
-            </div>
+            <section>
+              <LineItemGroup type="multiple">
+                <div className="flex items-center justify-between gap-3 border-b bg-muted/50 px-4 py-3 font-medium">
+                  <span>Investments</span>
+                  <span className="tabular-nums">
+                    {usdFormat.format(investmentTotal + manualAssetsTotal)}
+                  </span>
+                </div>
+                {investmentAccountSections.map((section) => (
+                  <CollapsibleLineItem
+                    key={section.id}
+                    id={section.id}
+                    label={investmentSectionLabel(section)}
+                    labelClassName="font-medium"
+                    value={usdFormat.format(section.valueUsd)}
+                    valueClassName="font-medium"
+                  >
+                    <NestedLineItems>
+                      {section.children.map((child) => (
+                        <NestedLineItem
+                          key={child.id}
+                          label={child.label}
+                          labelTitle={child.label}
+                          sublabel={child.description}
+                          sublabelTitle={child.description}
+                          value={usdFormat.format(child.valueUsd)}
+                        />
+                      ))}
+                    </NestedLineItems>
+                  </CollapsibleLineItem>
+                ))}
+                {manualAssets.map((item) => (
+                  <LineItemRow
+                    key={item.id}
+                    label={item.symbol}
+                    labelClassName="font-medium"
+                    labelTitle={item.symbol}
+                    value={usdFormat.format(item.amount)}
+                    valueClassName="font-medium"
+                  />
+                ))}
+              </LineItemGroup>
+            </section>
           ) : null}
 
           {hasCashPosition ? (
@@ -273,7 +250,7 @@ export function PortfolioAccountsList({
                           labelTitle={creditCardProvider(account)}
                           sublabel="Credit Card"
                           value={usdFormat.format(account.currentBalance)}
-                          valueClassName="text-red-600 dark:text-red-400"
+                          valueClassName="text-red-600/90 dark:text-red-400/60"
                         />
                       ))}
                       {manualLiabilities.map((item) => (
@@ -283,7 +260,7 @@ export function PortfolioAccountsList({
                           labelTitle={item.symbol}
                           sublabel={item.name}
                           value={usdFormat.format(item.amount)}
-                          valueClassName="text-red-600 dark:text-red-400"
+                          valueClassName="text-red-600/90 dark:text-red-400/60"
                         />
                       ))}
                     </NestedLineItems>

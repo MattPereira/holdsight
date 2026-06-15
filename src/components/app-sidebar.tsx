@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { RiArrowRightSLine, RiFundsBoxLine } from "@remixicon/react";
+import {
+  RiExchangeFundsLine,
+  RiFundsLine,
+  RiWalletLine,
+} from "@remixicon/react";
 
 import { NavUser } from "@/components/nav-user";
 import {
@@ -14,15 +17,12 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 
-const accounts: { label: string; href?: string }[] = [
-  { label: "Wallets", href: "/wallets" },
-  { label: "Exchanges", href: "/exchanges" },
-  { label: "Brokerages", href: "/brokerages" },
+const accounts = [
+  { label: "Wallets", href: "/wallets", icon: RiWalletLine },
+  { label: "Exchanges", href: "/exchanges", icon: RiExchangeFundsLine },
+  { label: "Brokerages", href: "/brokerages", icon: RiFundsLine },
 ];
 
 export function AppSidebar({
@@ -34,10 +34,8 @@ export function AppSidebar({
   email: string;
   allSymbols: string[];
 }) {
-  const [accountsOpen, setAccountsOpen] = useState(true);
-
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="offcanvas">
       <SidebarHeader>
         <Link
           href="/"
@@ -51,37 +49,21 @@ export function AppSidebar({
       <SidebarContent>
         <SidebarGroup>
           <SidebarMenu>
-            <SidebarMenuItem
-              className="group/collapsible"
-              data-state={accountsOpen ? "open" : "closed"}
-            >
-              <SidebarMenuButton
-                type="button"
-                size="lg"
-                className="text-base [&>svg]:size-5"
-                aria-expanded={accountsOpen}
-                onClick={() => setAccountsOpen((open) => !open)}
-              >
-                <RiFundsBoxLine />
-                <span>Investments</span>
-                <RiArrowRightSLine className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-              </SidebarMenuButton>
-              {accountsOpen ? (
-                <SidebarMenuSub>
-                  {accounts.map((account) => (
-                    <SidebarMenuSubItem key={account.label}>
-                      <SidebarMenuSubButton asChild className="h-9 text-base">
-                        {account.href ? (
-                          <Link href={account.href}>{account.label}</Link>
-                        ) : (
-                          <span>{account.label}</span>
-                        )}
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  ))}
-                </SidebarMenuSub>
-              ) : null}
-            </SidebarMenuItem>
+            {accounts.map((account) => (
+              <SidebarMenuItem key={account.label}>
+                <SidebarMenuButton
+                  asChild
+                  size="lg"
+                  tooltip={account.label}
+                  className="text-base [&>svg]:size-5"
+                >
+                  <Link href={account.href}>
+                    <account.icon />
+                    <span>{account.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>

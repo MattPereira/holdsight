@@ -170,7 +170,7 @@ export function NestedLineItems({
   return (
     <ul
       className={cn(
-        "relative flex flex-col gap-2 pb-3 pl-11 pr-4 before:absolute before:bottom-3 before:left-[24px] before:top-0 before:w-px before:bg-border",
+        "relative flex flex-col gap-3 pb-4 pl-11 pr-4 before:absolute before:bottom-3 before:left-[24px] before:top-0 before:w-px before:bg-border",
         className,
       )}
       {...props}
@@ -191,7 +191,7 @@ export function NestedLineItem({
   return (
     <li className="flex items-center justify-between gap-4 text-sm">
       <span className="flex min-w-0 flex-col">
-        <span className="min-w-0 truncate font-medium" title={labelTitle}>
+        <span className="min-w-0 truncate font-normal" title={labelTitle}>
           {label}
         </span>
         {sublabel ? (
@@ -204,7 +204,12 @@ export function NestedLineItem({
         ) : null}
       </span>
       <span className="flex shrink-0 flex-col items-end">
-        <span className={cn("font-medium tabular-nums", valueClassName)}>
+        <span
+          className={cn(
+            "font-normal tabular-nums text-muted-foreground",
+            valueClassName,
+          )}
+        >
           {value}
         </span>
         {secondaryValue ? (
