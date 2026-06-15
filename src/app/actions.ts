@@ -770,18 +770,23 @@ export async function loadPortfolioSummary(): Promise<PortfolioAssetSummary> {
   const userId = await getCurrentUserId();
   if (!userId) return emptyPortfolioSummary();
 
-  const wallets = await getUserEvmAccounts(userId);
-  if (wallets.length > 0) {
+  const syncOnChain = async () => {
+    const wallets = await getUserEvmAccounts(userId);
+    if (wallets.length === 0) return;
+
     await syncEvmWalletBalances(wallets);
 
     const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
     await syncHyperCoreAccounts(hyperCoreAccounts);
-  }
+  };
 
-  await syncUserKrakenAccounts(userId);
-  await syncUserBrokerageBalances(userId);
-  await syncUserDepositoryBalances(userId);
-  await syncUserCreditCardAccounts(userId);
+  await Promise.all([
+    syncOnChain(),
+    syncUserKrakenAccounts(userId),
+    syncUserBrokerageBalances(userId),
+    syncUserDepositoryBalances(userId),
+    syncUserCreditCardAccounts(userId),
+  ]);
 
   return portfolioAssetSummary(await getCurrentPortfolioBalances(userId));
 }

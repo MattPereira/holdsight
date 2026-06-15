@@ -37,7 +37,7 @@ const compactUsdFormat = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 
-const MIN_VISIBLE_ASSET_VALUE_USD = 1;
+const MIN_VISIBLE_ASSET_VALUE_USD = 100;
 
 function weightOf(valueUsd: number, grandTotalValue: number) {
   return grandTotalValue === 0 ? 0 : valueUsd / grandTotalValue;
