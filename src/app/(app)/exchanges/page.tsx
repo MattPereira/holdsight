@@ -1,5 +1,4 @@
 import { AccountDetailsPage } from "@/components/account-details-page";
-import { KrakenCredentialsForm } from "@/components/kraken-credentials-form";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getUserKrakenAccounts } from "@/lib/exchange/kraken/accounts";
 import { getCurrentKrakenBalances } from "@/lib/exchange/kraken/balances";
@@ -26,7 +25,6 @@ export default async function ExchangePage() {
         initialResults={balanceResults}
         source="kraken"
         title="Exchanges"
-        headerAction={<KrakenCredentialsForm accounts={krakenAccounts} />}
       />
     </div>
   );

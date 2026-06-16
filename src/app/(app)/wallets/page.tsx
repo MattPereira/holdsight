@@ -1,5 +1,4 @@
 import { AccountDetailsPage } from "@/components/account-details-page";
-import { WalletManager } from "@/components/wallet-manager";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getUserEvmAccounts } from "@/lib/evm/accounts";
 import { getCurrentWalletBalances } from "@/lib/wallets/balances";
@@ -17,7 +16,6 @@ export default async function WalletsPage() {
         initialResults={balanceResults}
         source="wallets"
         title="Wallets"
-        headerAction={<WalletManager initialWallets={wallets} />}
       />
     </div>
   );

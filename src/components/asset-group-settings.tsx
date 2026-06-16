@@ -68,7 +68,7 @@ export function AssetGroupSettings({
     >
       <SheetContent side="right" className="w-full sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>Asset groups</SheetTitle>
+          <SheetTitle>Group assets</SheetTitle>
           <SheetDescription>
             Group assets into a single line item
           </SheetDescription>
@@ -130,7 +130,7 @@ function AssetGroupManager({
     <div className="flex flex-col gap-5">
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium">Asset groups</h3>
+          <h3 className="text-sm font-medium">Group assets</h3>
           {editor.mode === "idle" ? (
             <Button
               type="button"

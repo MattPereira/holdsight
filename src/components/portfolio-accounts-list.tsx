@@ -1,13 +1,10 @@
 "use client";
 
-import { useTransition } from "react";
+import { RiSettings3Line } from "@remixicon/react";
+import { useState } from "react";
 
-import {
-  removeCreditCard,
-  removeDepository,
-  type ManualBalanceActionResult,
-} from "@/app/actions";
-import { DepositoryManager } from "@/components/depository-manager";
+import { AccountConnectSheet } from "@/components/account-connect-sheet";
+import { Button } from "@/components/ui/button";
 import {
   CollapsibleLineItem,
   LineItemGroup,
@@ -55,27 +52,13 @@ export function PortfolioAccountsList({
   creditCardAccounts,
   manualItems,
   investmentAccountSections,
-  error,
-  busy = false,
-  onAccountsChange,
-  onCreditCardAccountsChange,
-  onManualItemsChange,
-  onError,
 }: {
   accounts: DepositoryAccountRow[];
   creditCardAccounts: CreditCardAccountRow[];
   manualItems: ManualBalanceItemRow[];
   investmentAccountSections: InvestmentAccountSection[];
-  error: string | null;
-  busy?: boolean;
-  onAccountsChange: (accounts: DepositoryAccountRow[]) => void;
-  onCreditCardAccountsChange: (accounts: CreditCardAccountRow[]) => void;
-  onManualItemsChange: (items: ManualBalanceItemRow[]) => void;
-  onError: (error: string | null) => void;
 }) {
-  const [isPending, startTransition] = useTransition();
-
-  const disabled = busy || isPending;
+  const [manageOpen, setManageOpen] = useState(false);
 
   const manualAssets = manualItems.filter((item) => item.kind === "asset");
   const manualLiabilities = manualItems.filter(
@@ -111,45 +94,22 @@ export function PortfolioAccountsList({
     0,
   );
 
-  function handleRemove(plaidItemId: string) {
-    onError(null);
-    startTransition(async () => {
-      const result = await removeDepository(plaidItemId);
-      onAccountsChange(result.accounts);
-      onError(result.error);
-    });
-  }
-
-  function handleRemoveCreditCard(plaidItemId: string) {
-    onError(null);
-    startTransition(async () => {
-      const result = await removeCreditCard(plaidItemId);
-      onCreditCardAccountsChange(result.accounts);
-      onError(result.error);
-    });
-  }
-
-  function handleManualResult(result: ManualBalanceActionResult) {
-    onManualItemsChange(result.items);
-    onError(result.error);
-  }
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-2">
         <h2 className="text-xl font-medium">Accounts</h2>
-        <DepositoryManager
-          accounts={accounts}
-          creditCardAccounts={creditCardAccounts}
-          manualItems={manualItems}
-          onRemove={handleRemove}
-          onRemoveCreditCard={handleRemoveCreditCard}
-          onManualResult={handleManualResult}
-          disabled={disabled}
-        />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          aria-label="Manage accounts"
+          onClick={() => setManageOpen(true)}
+        >
+          <RiSettings3Line />
+        </Button>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      <AccountConnectSheet open={manageOpen} onOpenChange={setManageOpen} />
 
       {!hasAnything ? (
         <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
@@ -208,7 +168,7 @@ export function PortfolioAccountsList({
             <section>
               <LineItemGroup type="multiple">
                 <div className="flex items-center justify-between gap-3 border-b bg-muted/50 px-4 py-3 font-medium">
-                  <span>Cash Balance</span>
+                  <span>Checking Balance</span>
                   <span className="tabular-nums">
                     {usdFormat.format(bankTotal)}
                   </span>

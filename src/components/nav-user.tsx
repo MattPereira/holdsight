@@ -28,7 +28,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { PlaidAccountsConnectSheet } from "@/components/plaid-accounts-connect-sheet";
+import { AccountConnectSheet } from "@/components/account-connect-sheet";
 import { AssetGroupSettings } from "@/components/asset-group-settings";
 
 function initials(name: string) {
@@ -110,11 +110,11 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => setConnectSheetOpen(true)}>
               <RiLinksLine />
-              Plaid connections
+              Manage accounts
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => setGroupsSheetOpen(true)}>
               <RiStackLine />
-              Asset groups
+              Group assets
             </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={(event) => {
@@ -133,7 +133,7 @@ export function NavUser({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <PlaidAccountsConnectSheet
+        <AccountConnectSheet
           open={connectSheetOpen}
           onOpenChange={setConnectSheetOpen}
         />

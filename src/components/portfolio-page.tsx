@@ -47,11 +47,23 @@ export function PortfolioPage({
   const [investmentAccountSections, setInvestmentAccountSections] = useState<
     InvestmentAccountSection[]
   >(initialData.accountData.investmentAccountSections);
-  const [accountsError, setAccountsError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // Re-seed local state whenever the server sends fresh data — e.g. after the
+  // global "Manage accounts" sheet calls router.refresh(). Adjusting state
+  // during render (React's recommended pattern) keeps the page in sync with the
+  // server without an effect.
+  const [syncedData, setSyncedData] = useState(initialData);
+  if (syncedData !== initialData) {
+    setSyncedData(initialData);
+    setSummary(initialData.portfolioSummary);
+    setAccounts(initialData.accountData.accounts);
+    setCreditCardAccounts(initialData.accountData.creditCardAccounts);
+    setManualItems(initialData.accountData.manualItems);
+    setInvestmentAccountSections(initialData.accountData.investmentAccountSections);
+  }
+
   function handleRefresh() {
-    setAccountsError(null);
     startTransition(async () => {
       const id = toast.loading("Syncing portfolio...");
       try {
@@ -105,12 +117,6 @@ export function PortfolioPage({
         creditCardAccounts={creditCardAccounts}
         manualItems={manualItems}
         investmentAccountSections={investmentAccountSections}
-        error={accountsError}
-        busy={isPending}
-        onAccountsChange={setAccounts}
-        onCreditCardAccountsChange={setCreditCardAccounts}
-        onManualItemsChange={setManualItems}
-        onError={setAccountsError}
       />
     </div>
   );

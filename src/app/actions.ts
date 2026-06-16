@@ -15,8 +15,10 @@ import {
 import { mergeWalletBalanceResults } from "@/lib/wallets/balances";
 import {
   ensureUserKrakenAccount,
+  getUserKrakenAccounts,
   removeUserKrakenAccount,
   saveUserKrakenCredentials,
+  type SavedKrakenAccount,
 } from "@/lib/exchange/kraken/accounts";
 import {
   getCurrentUserKrakenBalances,
@@ -40,9 +42,11 @@ import {
   type PlaidAccountFamily,
 } from "@/lib/plaid/client";
 import {
+  getUserPlaidItems,
   PlaidRevokeError,
   removeUserPlaidItem,
   upsertPlaidItem,
+  type SavedPlaidItem,
 } from "@/lib/plaid/items";
 import { getHoldings } from "@/lib/brokerage/client";
 import { saveBrokerageAccounts } from "@/lib/brokerage/accounts";
@@ -635,6 +639,73 @@ export async function removeCreditCard(
   }
   revalidatePath("/");
   return { accounts: await getUserCreditCardAccounts(userId), error: null };
+}
+
+/* ----------------------- account connections hub ----------------------- */
+
+export type AccountConnectionsResult = {
+  wallets: SavedEvmAccount[];
+  krakenAccounts: SavedKrakenAccount[];
+  plaidItems: SavedPlaidItem[];
+  manualItems: ManualBalanceItemRow[];
+  error: string | null;
+};
+
+/**
+ * Load every connection the user manages, for the centralized connect sheet.
+ * Fetched lazily when the sheet opens rather than on every page render.
+ */
+export async function getAccountConnections(): Promise<AccountConnectionsResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      wallets: [],
+      krakenAccounts: [],
+      plaidItems: [],
+      manualItems: [],
+      error: "You must be signed in to manage connections.",
+    };
+  }
+
+  const [wallets, krakenAccounts, plaidItems, manualItems] = await Promise.all([
+    getUserEvmAccounts(userId),
+    getUserKrakenAccounts(userId),
+    getUserPlaidItems(userId),
+    getUserManualBalanceItems(userId),
+  ]);
+
+  return { wallets, krakenAccounts, plaidItems, manualItems, error: null };
+}
+
+/**
+ * Unlink a Plaid Item (institution) and delete all of its accounts across
+ * brokerage, depository, and credit. Institution-level removal for the
+ * centralized connect sheet; returns the remaining items.
+ */
+export async function removePlaidItem(
+  plaidItemId: string,
+): Promise<{ plaidItems: SavedPlaidItem[]; error: string | null }> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      plaidItems: [],
+      error: "You must be signed in to remove a connection.",
+    };
+  }
+
+  try {
+    await removeUserPlaidItem(userId, plaidItemId);
+  } catch (error) {
+    if (error instanceof PlaidRevokeError) {
+      return {
+        plaidItems: await getUserPlaidItems(userId),
+        error: PLAID_REVOKE_RETRY_MESSAGE,
+      };
+    }
+    throw error;
+  }
+  revalidatePath("/");
+  return { plaidItems: await getUserPlaidItems(userId), error: null };
 }
 
 /* --------------------------- manual balances --------------------------- */
