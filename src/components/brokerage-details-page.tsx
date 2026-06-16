@@ -5,7 +5,6 @@ import { useMemo, useState, useTransition } from "react";
 
 import { loadBrokerageBalances } from "@/app/actions";
 import { BrokerageDetailsTable } from "@/components/brokerage-details-table";
-import { BrokerageManager } from "@/components/brokerage-manager";
 import { PortfolioAllocations } from "@/components/portfolio-allocations";
 import { useAssetGroups } from "@/components/asset-groups-context";
 import { Button } from "@/components/ui/button";
@@ -81,11 +80,6 @@ export function BrokerageDetailsPage({
         >
           <RiRefreshLine />
         </Button>
-        <BrokerageManager
-          accounts={accounts}
-          onAccountsChange={setAccounts}
-          onError={setError}
-        />
       </div>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
