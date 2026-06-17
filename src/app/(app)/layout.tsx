@@ -11,8 +11,6 @@ import {
 } from "@/components/ui/sidebar";
 import { getCurrentSession } from "@/lib/auth/session";
 import { getUserAssetGroups } from "@/lib/portfolio/groups";
-import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
-import { getCurrentPortfolioBalances } from "@/lib/portfolio/balances";
 
 export default async function AppLayout({
   children,
@@ -33,21 +31,12 @@ export default async function AppLayout({
     );
   }
 
-  const [groups, summary] = await Promise.all([
-    getUserAssetGroups(session.user.id),
-    getCurrentPortfolioBalances(session.user.id).then(portfolioAssetSummary),
-  ]);
-  // Every symbol the user owns, so groups can be edited from any page.
-  const allSymbols = summary.totals.map((total) => total.symbol);
+  const groups = await getUserAssetGroups(session.user.id);
 
   return (
     <SidebarProvider>
       <AssetGroupsProvider initialGroups={groups}>
-        <AppSidebar
-          name={session.user.name}
-          email={session.user.email}
-          allSymbols={allSymbols}
-        />
+        <AppSidebar name={session.user.name} email={session.user.email} />
         <SidebarInset>
           <header className="relative flex h-14 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />

@@ -64,13 +64,8 @@ function brokerageTotal(accounts: CurrentBrokerageAccount[]): number {
 
 function brokerageDescription(account: CurrentBrokerageAccount): string {
   const institutionName = account.institutionName?.trim();
-  const accountType = account.accountType.trim();
 
-  if (institutionName && accountType) {
-    return `${accountType.split("_").join(" ")}`;
-  }
-
-  return accountType || "Brokerage account";
+  return institutionName || account.brokerage || "Brokerage";
 }
 
 function brokerageRows(
@@ -80,8 +75,8 @@ function brokerageRows(
     .map((account) => ({
       id: account.id,
       label:
-        account.institutionName?.trim() ||
         account.label?.trim() ||
+        account.institutionName?.trim() ||
         account.brokerage ||
         "Brokerage account",
       description: brokerageDescription(account),
@@ -115,7 +110,7 @@ export function investmentAccountSections({
       label: "Exchange",
       description: "Exchange assets",
       valueUsd: balancesTotal(exchangeResults),
-      children: resultRows(exchangeResults, "Exchange account"),
+      children: resultRows(exchangeResults, "Centralized exchange"),
     },
     {
       id: "brokerage",

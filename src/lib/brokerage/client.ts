@@ -41,17 +41,24 @@ const SUBTYPE_TO_ACCOUNT_TYPE: Record<string, BrokerageAccountTypeValue> = {
   ira: "traditional_ira",
   roth: "roth_ira",
   "roth ira": "roth_ira",
+  "sarsep": "sep_ira",
   "sep ira": "sep_ira",
+  "simplified employee pension": "sep_ira",
+  "simplified employee pension ira": "sep_ira",
   "simple ira": "simple_ira",
   "401k": "401k",
   "roth 401k": "401k",
 };
 
+function normalizeSubtype(subtype: string): string {
+  return subtype.trim().toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ");
+}
+
 function toAccountType(
   subtype: string | null | undefined,
 ): BrokerageAccountTypeValue {
   if (!subtype) return "taxable";
-  return SUBTYPE_TO_ACCOUNT_TYPE[subtype] ?? "taxable";
+  return SUBTYPE_TO_ACCOUNT_TYPE[normalizeSubtype(subtype)] ?? "taxable";
 }
 
 function isPlaidCashSecurity(security: Security | undefined): boolean {

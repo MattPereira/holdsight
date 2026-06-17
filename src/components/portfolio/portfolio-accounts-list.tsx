@@ -163,7 +163,7 @@ export function PortfolioAccountsList({
             <section>
               <LineItemGroup type="multiple">
                 <div className="flex items-center justify-between gap-3 border-b bg-muted/50 px-4 py-3 font-medium">
-                  <span>Checking</span>
+                  <span>Banks</span>
                   <Button
                     asChild
                     variant="ghost"
@@ -229,7 +229,7 @@ export function PortfolioAccountsList({
                   </CollapsibleLineItem>
                 ) : null}
                 <div className="flex items-center justify-between gap-3 bg-muted/50 px-4 py-3 font-medium">
-                  <span className="">Net</span>
+                  <span className="">Checking Net</span>
                   <span className="tabular-nums">
                     {usdFormat.format(bankTotal)}
                   </span>

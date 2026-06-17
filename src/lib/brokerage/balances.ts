@@ -4,6 +4,7 @@ import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
+  brokerageAccounts,
   investmentAccounts,
   investmentBalances,
   plaidItems,
@@ -64,6 +65,11 @@ async function writeAccountBalances(
       lastSyncedAt: new Date(),
     })
     .where(eq(investmentAccounts.id, investmentAccountId));
+
+  await tx
+    .update(brokerageAccounts)
+    .set({ accountType: account.accountType })
+    .where(eq(brokerageAccounts.investmentAccountId, investmentAccountId));
 
   await tx
     .delete(investmentBalances)

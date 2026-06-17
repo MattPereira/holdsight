@@ -151,6 +151,8 @@ export function PlaidConnectPanel({
   if (view === "remove") {
     if (items.length === 0) return null;
 
+    console.log({ items });
+
     return (
       <div className="flex flex-col gap-3">
         <h3 className="text-base font-medium">Plaid institutions</h3>

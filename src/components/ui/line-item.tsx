@@ -70,10 +70,7 @@ function LineItemContent({
       </span>
       <span className="flex shrink-0 flex-col items-end">
         <span
-          className={cn(
-            "text-base font-semibold tabular-nums",
-            valueClassName,
-          )}
+          className={cn("text-base font-semibold tabular-nums", valueClassName)}
         >
           {value}
         </span>
@@ -161,8 +158,8 @@ export function CollapsibleLineItem({
   );
 }
 
-/** Indented container for a collapsible row's children, with a connector line
- *  dropping from the parent chevron column. */
+/** Indented container for a collapsible row's children, rendered as a muted,
+ *  rounded panel that visually groups the nested rows. */
 export function NestedLineItems({
   className,
   ...props
@@ -170,7 +167,7 @@ export function NestedLineItems({
   return (
     <ul
       className={cn(
-        "relative flex flex-col gap-3 pb-4 pl-11 pr-4 before:absolute before:bottom-3 before:left-[24px] before:top-0 before:w-px before:bg-border",
+        "mx-4 mb-4 flex flex-col gap-3 rounded-lg bg-muted/50 px-4 py-3",
         className,
       )}
       {...props}
@@ -189,7 +186,7 @@ export function NestedLineItem({
   secondaryValue,
 }: Omit<LineItemFields, "leading" | "labelClassName">) {
   return (
-    <li className="flex items-center justify-between gap-4 text-sm">
+    <li className="flex items-center justify-between gap-4 text-sm py-1">
       <span className="flex min-w-0 flex-col">
         <span className="min-w-0 truncate font-normal" title={labelTitle}>
           {label}
@@ -204,12 +201,7 @@ export function NestedLineItem({
         ) : null}
       </span>
       <span className="flex shrink-0 flex-col items-end">
-        <span
-          className={cn(
-            "font-normal tabular-nums text-muted-foreground",
-            valueClassName,
-          )}
-        >
+        <span className={cn("font-normal tabular-nums", valueClassName)}>
           {value}
         </span>
         {secondaryValue ? (
