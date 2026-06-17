@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { RiSettings3Line } from "@remixicon/react";
 import { Label, Pie, PieChart } from "recharts";
 
+import { AssetGroupSettings } from "@/components/portfolio/asset-group-settings";
+import { Button } from "@/components/ui/button";
 import {
   ChartContainer,
   ChartTooltip,
@@ -194,15 +197,28 @@ function HoldingsRows({
   rows,
   totalValue,
   colorByKey,
+  onOpenSettings,
 }: {
   rows: HoldingsDisplayRow[];
   totalValue: number;
   colorByKey?: Map<string, string>;
+  onOpenSettings?: () => void;
 }) {
   return (
     <LineItemGroup type="multiple">
-      <div className="flex items-center gap-3 border-b bg-muted/50 px-4 py-3 font-medium">
+      <div className="flex items-center justify-between gap-3 border-b bg-muted/50 px-4 py-3 font-medium">
         <span>Allocations</span>
+        {onOpenSettings ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Group assets"
+            onClick={onOpenSettings}
+          >
+            <RiSettings3Line />
+          </Button>
+        ) : null}
       </div>
       {rows.map((row) => {
         const fields = {
@@ -252,11 +268,16 @@ export function PortfolioAllocations({
   grandTotalValue,
   totals,
   groups = [],
+  allSymbols,
 }: {
   grandTotalValue: number;
   totals: AssetTotal[];
   groups?: AssetGroup[];
+  // When provided, a settings icon in the Allocations header opens the asset
+  // grouping sheet. Pass the user's full symbol set, not account-scoped totals.
+  allSymbols?: string[];
 }) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const visibleTotals = useMemo(
     () =>
       totals.filter((total) => total.valueUsd >= MIN_VISIBLE_ASSET_VALUE_USD),
@@ -303,8 +324,16 @@ export function PortfolioAllocations({
           rows={rows}
           totalValue={grandTotalValue}
           colorByKey={colorByKey}
+          onOpenSettings={allSymbols ? () => setSettingsOpen(true) : undefined}
         />
       </div>
+      {allSymbols ? (
+        <AssetGroupSettings
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          allSymbols={allSymbols}
+        />
+      ) : null}
     </section>
   );
 }

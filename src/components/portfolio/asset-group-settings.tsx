@@ -9,18 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useAssetGroups } from "@/components/portfolio/asset-groups-context";
-import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -69,9 +66,6 @@ export function AssetGroupSettings({
       <SheetContent side="right" className="w-full sm:max-w-md">
         <SheetHeader>
           <SheetTitle>Group assets</SheetTitle>
-          <SheetDescription>
-            Group assets into a single line item
-          </SheetDescription>
         </SheetHeader>
         <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4">
           <AssetGroupManager
@@ -129,24 +123,6 @@ function AssetGroupManager({
   return (
     <div className="flex flex-col gap-5">
       <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium">Group assets</h3>
-          {editor.mode === "idle" ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setError(null);
-                setEditor({ mode: "create" });
-              }}
-            >
-              <RiAddLine data-icon="inline-start" />
-              New group
-            </Button>
-          ) : null}
-        </div>
-
         {groups.length > 0 ? (
           <ul className="flex flex-col gap-2">
             {groups.map((group) => (
@@ -208,11 +184,27 @@ function AssetGroupManager({
             No groups yet.
           </p>
         ) : null}
+
+        <div className="flex items-center justify-end">
+          {editor.mode === "idle" ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setError(null);
+                setEditor({ mode: "create" });
+              }}
+            >
+              <RiAddLine data-icon="inline-start" />
+              New group
+            </Button>
+          ) : null}
+        </div>
       </section>
 
       {editor.mode !== "idle" ? (
         <>
-          <Separator />
           <GroupEditor
             key={editor.mode === "edit" ? editor.groupId : "create"}
             groups={groups}
@@ -307,13 +299,9 @@ function GroupEditor({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <h3 className="text-sm font-medium">
-        {editingGroup ? "Edit group" : "New group"}
-      </h3>
-
       <FieldGroup>
         <Field>
-          <FieldLabel htmlFor="group-name">Name (optional)</FieldLabel>
+          <FieldLabel htmlFor="group-name">Name</FieldLabel>
           <Input
             id="group-name"
             value={name}
@@ -322,13 +310,10 @@ function GroupEditor({
             autoComplete="off"
             disabled={isPending}
           />
-          <FieldDescription>
-            Leave blank to label the group by its assets (e.g. “HYPE + sHYPE”).
-          </FieldDescription>
         </Field>
 
         <Field>
-          <FieldLabel>Color (optional)</FieldLabel>
+          <FieldLabel>Color</FieldLabel>
           <div className="flex flex-wrap gap-2">
             <button
               type="button"

@@ -93,20 +93,6 @@ export function PortfolioAccountsList({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-2">
-        <h2 className="text-xl font-medium">Accounts</h2>
-        <Button
-          asChild
-          variant="outline"
-          size="icon-sm"
-          aria-label="Manage accounts"
-        >
-          <Link href="/connect">
-            <RiSettings3Line />
-          </Link>
-        </Button>
-      </div>
-
       {!hasAnything ? (
         <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
           No bank accounts or credit cards linked yet. Connect an account or add
@@ -119,18 +105,25 @@ export function PortfolioAccountsList({
               <LineItemGroup type="multiple">
                 <div className="flex items-center justify-between gap-3 border-b bg-muted/50 px-4 py-3 font-medium">
                   <span>Investments</span>
-                  <span className="tabular-nums">
-                    {usdFormat.format(investmentTotal + manualAssetsTotal)}
-                  </span>
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                  >
+                    <Link href="/connect" aria-label="Configure accounts">
+                      <RiSettings3Line />
+                    </Link>
+                  </Button>
                 </div>
                 {investmentAccountSections.map((section) => (
                   <CollapsibleLineItem
                     key={section.id}
                     id={section.id}
                     label={investmentSectionLabel(section)}
-                    labelClassName="font-medium"
+                    labelClassName="font-normal"
                     value={usdFormat.format(section.valueUsd)}
-                    valueClassName="font-medium"
+                    valueClassName="font-normal"
                   >
                     <NestedLineItems>
                       {section.children.map((child) => (
@@ -150,12 +143,18 @@ export function PortfolioAccountsList({
                   <LineItemRow
                     key={item.id}
                     label={item.symbol}
-                    labelClassName="font-medium"
+                    labelClassName="font-normal"
                     labelTitle={item.symbol}
                     value={usdFormat.format(item.amount)}
-                    valueClassName="font-medium"
+                    valueClassName="font-normal"
                   />
                 ))}
+                <div className="flex items-center justify-between gap-3 bg-muted/50 px-4 py-3 font-medium">
+                  <span className="">Total Assets</span>
+                  <span className="tabular-nums">
+                    {usdFormat.format(investmentTotal + manualAssetsTotal)}
+                  </span>
+                </div>
               </LineItemGroup>
             </section>
           ) : null}
@@ -164,18 +163,25 @@ export function PortfolioAccountsList({
             <section>
               <LineItemGroup type="multiple">
                 <div className="flex items-center justify-between gap-3 border-b bg-muted/50 px-4 py-3 font-medium">
-                  <span>Checking Balance</span>
-                  <span className="tabular-nums">
-                    {usdFormat.format(bankTotal)}
-                  </span>
+                  <span>Checking</span>
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                  >
+                    <Link href="/connect" aria-label="Configure accounts">
+                      <RiSettings3Line />
+                    </Link>
+                  </Button>
                 </div>
                 {hasDepository ? (
                   <CollapsibleLineItem
-                    id="banks"
-                    label="Banks"
-                    labelClassName="font-medium"
+                    id="deposits"
+                    label="Deposits"
+                    labelClassName="font-normal"
                     value={usdFormat.format(depositoryTotal)}
-                    valueClassName="font-medium"
+                    valueClassName="font-normal"
                   >
                     <NestedLineItems>
                       {accounts.map((account) => (
@@ -194,9 +200,9 @@ export function PortfolioAccountsList({
                   <CollapsibleLineItem
                     id="liabilities"
                     label="Liabilities"
-                    labelClassName="font-medium"
+                    labelClassName="font-normal"
                     value={usdFormat.format(liabilityTotal)}
-                    valueClassName="font-medium text-red-600 dark:text-red-400"
+                    valueClassName="font-normal text-red-600 dark:text-red-400"
                   >
                     <NestedLineItems>
                       {creditCardAccounts.map((account) => (
@@ -222,6 +228,12 @@ export function PortfolioAccountsList({
                     </NestedLineItems>
                   </CollapsibleLineItem>
                 ) : null}
+                <div className="flex items-center justify-between gap-3 bg-muted/50 px-4 py-3 font-medium">
+                  <span className="">Net Funds</span>
+                  <span className="tabular-nums">
+                    {usdFormat.format(bankTotal)}
+                  </span>
+                </div>
               </LineItemGroup>
             </section>
           ) : null}

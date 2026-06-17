@@ -25,15 +25,7 @@ const accounts = [
   { label: "Brokerages", href: "/brokerages", icon: RiFundsLine },
 ];
 
-export function AppSidebar({
-  name,
-  email,
-  allSymbols,
-}: {
-  name: string;
-  email: string;
-  allSymbols: string[];
-}) {
+export function AppSidebar({ name, email }: { name: string; email: string }) {
   return (
     <Sidebar collapsible="offcanvas">
       <SidebarHeader>
@@ -68,7 +60,7 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser name={name} email={email} allSymbols={allSymbols} />
+        <NavUser name={name} email={email} />
       </SidebarFooter>
     </Sidebar>
   );

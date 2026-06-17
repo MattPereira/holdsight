@@ -112,7 +112,7 @@ function depositoryAccountsToBalancesResult(
           .sort()
           .join(":")}:net-liabilities`,
         symbol: "USD",
-        name: "Checking Balance",
+        name: "Checking",
         chainId: "depository",
         amount: netCash,
         priceUsd: 1,

@@ -60,7 +60,9 @@ export function PortfolioPage({
     setAccounts(initialData.accountData.accounts);
     setCreditCardAccounts(initialData.accountData.creditCardAccounts);
     setManualItems(initialData.accountData.manualItems);
-    setInvestmentAccountSections(initialData.accountData.investmentAccountSections);
+    setInvestmentAccountSections(
+      initialData.accountData.investmentAccountSections,
+    );
   }
 
   function handleRefresh() {
@@ -72,7 +74,9 @@ export function PortfolioPage({
         setAccounts(data.accountData.accounts);
         setCreditCardAccounts(data.accountData.creditCardAccounts);
         setManualItems(data.accountData.manualItems);
-        setInvestmentAccountSections(data.accountData.investmentAccountSections);
+        setInvestmentAccountSections(
+          data.accountData.investmentAccountSections,
+        );
         toast.success("Portfolio updated", { id });
       } catch {
         toast.error("Couldn't refresh portfolio", { id });
@@ -83,15 +87,15 @@ export function PortfolioPage({
   return (
     <div className="flex flex-col gap-10">
       <div className="flex flex-col">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-start gap-2">
           <h1 className="text-xl font-semibold">Portfolio</h1>
           <Button
             type="button"
             variant="outline"
-            size="icon-sm"
+            size="sm"
+            className="px-1.5"
             onClick={handleRefresh}
             disabled={isPending}
-            aria-label="Refresh portfolio"
           >
             <RiRefreshLine className={cn(isPending && "animate-spin")} />
           </Button>
@@ -108,6 +112,7 @@ export function PortfolioPage({
             grandTotalValue={summary.grandTotalValue}
             totals={summary.totals}
             groups={groups}
+            allSymbols={summary.totals.map((total) => total.symbol)}
           />
         </div>
       </div>
