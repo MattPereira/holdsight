@@ -109,7 +109,22 @@ export function AccountConnectSheet({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md">
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-md"
+        // Plaid Link renders its modal in a portal outside this sheet. Without
+        // this guard, clicking inside Plaid's iframe reads as an outside
+        // interaction and dismisses the sheet (which unmounts Plaid too).
+        onInteractOutside={(event) => {
+          const target = event.detail.originalEvent.target;
+          if (
+            target instanceof Element &&
+            target.closest('[id^="plaid-link"]')
+          ) {
+            event.preventDefault();
+          }
+        }}
+      >
         <SheetHeader>
           <SheetTitle>Manage accounts</SheetTitle>
           <SheetDescription>
