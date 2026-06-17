@@ -30,9 +30,11 @@ import type { SavedKrakenAccount } from "@/lib/exchange/kraken/accounts";
 export function KrakenConnectPanel({
   initialAccounts,
   onConnected,
+  view = "add",
 }: {
   initialAccounts: SavedKrakenAccount[];
   onConnected: () => void;
+  view?: "add" | "remove";
 }) {
   const router = useRouter();
   const [accounts, setAccounts] = useState(initialAccounts);
@@ -72,52 +74,14 @@ export function KrakenConnectPanel({
     });
   }
 
-  return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-3">
-        <h3 className="text-base font-medium">Add accounts</h3>
-        <form onSubmit={handleSubmit}>
-          <FieldGroup>
-            <Field data-invalid={Boolean(error)}>
-              <FieldLabel htmlFor="kraken-api-key">Kraken API key</FieldLabel>
-              <Input
-                id="kraken-api-key"
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                autoComplete="off"
-                disabled={isPending}
-                aria-invalid={Boolean(error)}
-              />
-            </Field>
-            <Field data-invalid={Boolean(error)}>
-              <FieldLabel htmlFor="kraken-api-secret">Kraken secret</FieldLabel>
-              <Input
-                id="kraken-api-secret"
-                type="password"
-                value={apiSecret}
-                onChange={(event) => setApiSecret(event.target.value)}
-                autoComplete="off"
-                disabled={isPending}
-                aria-invalid={Boolean(error)}
-              />
-              <FieldDescription>
-                API key must allow query permissions
-              </FieldDescription>
-              <FieldError>{error}</FieldError>
-            </Field>
-            <Button type="submit" disabled={isPending}>
-              <RiKey2Line data-icon="inline-start" />
-              Save and sync
-            </Button>
-          </FieldGroup>
-        </form>
-      </div>
+  if (view === "remove") {
+    if (accounts.length === 0) return null;
 
-      {accounts.length > 0 ? (
-        <div className="flex flex-col gap-3">
-          <h3 className="text-base font-medium">Remove accounts</h3>
-          <ul className="divide-y rounded-lg border">
-            {accounts.map((account) => {
+    return (
+      <div className="flex flex-col gap-3">
+        <h3 className="text-base font-medium">Kraken</h3>
+        <ul className="divide-y rounded-lg border">
+          {accounts.map((account) => {
               const name = account.label ?? account.exchange;
               return (
                 <li
@@ -159,9 +123,46 @@ export function KrakenConnectPanel({
                 </li>
               );
             })}
-          </ul>
-        </div>
-      ) : null}
-    </div>
+        </ul>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <FieldGroup>
+        <Field data-invalid={Boolean(error)}>
+          <FieldLabel htmlFor="kraken-api-key">Kraken API key</FieldLabel>
+          <Input
+            id="kraken-api-key"
+            value={apiKey}
+            onChange={(event) => setApiKey(event.target.value)}
+            autoComplete="off"
+            disabled={isPending}
+            aria-invalid={Boolean(error)}
+          />
+        </Field>
+        <Field data-invalid={Boolean(error)}>
+          <FieldLabel htmlFor="kraken-api-secret">Kraken secret</FieldLabel>
+          <Input
+            id="kraken-api-secret"
+            type="password"
+            value={apiSecret}
+            onChange={(event) => setApiSecret(event.target.value)}
+            autoComplete="off"
+            disabled={isPending}
+            aria-invalid={Boolean(error)}
+          />
+          <FieldDescription>
+            API key must allow query permissions
+          </FieldDescription>
+          <FieldError>{error}</FieldError>
+        </Field>
+        <Button type="submit" disabled={isPending}>
+          <RiKey2Line data-icon="inline-start" />
+          Save and sync
+        </Button>
+      </FieldGroup>
+    </form>
   );
 }

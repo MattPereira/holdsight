@@ -23,9 +23,11 @@ function shortenAddress(address: string): string {
 export function WalletConnectPanel({
   initialWallets,
   onConnected,
+  view = "add",
 }: {
   initialWallets: SavedEvmAccount[];
   onConnected: () => void;
+  view?: "add" | "remove";
 }) {
   const router = useRouter();
   const [wallets, setWallets] = useState(initialWallets);
@@ -58,71 +60,67 @@ export function WalletConnectPanel({
     });
   }
 
-  return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-3">
-        <h3 className="text-base font-medium">Add accounts</h3>
-        <form onSubmit={handleSubmit}>
-          <FieldGroup>
-            <Field data-invalid={Boolean(error)}>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  id="wallet-addresses"
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  placeholder="0x..."
-                  autoComplete="off"
-                  aria-invalid={Boolean(error)}
-                  disabled={isPending}
-                />
-                <Button type="submit" disabled={isPending}>
-                  <RiAddLine data-icon="inline-start" />
-                  Add
-                </Button>
-              </div>
-              <FieldDescription>
-                Paste addresses separated by spaces or commas
-              </FieldDescription>
-              <FieldError>{error}</FieldError>
-            </Field>
-          </FieldGroup>
-        </form>
-      </div>
+  if (view === "remove") {
+    if (wallets.length === 0) return null;
 
+    return (
       <div className="flex flex-col gap-3">
-        <h3 className="text-base font-medium">Remove accounts</h3>
-        {wallets.length > 0 ? (
-          <ul className="divide-y rounded-lg border">
-            {wallets.map((wallet) => (
-              <li
-                key={wallet.id}
-                className="flex items-center justify-between gap-3 px-3 py-2"
-              >
-                <span className="min-w-0 truncate font-mono text-sm">
-                  <span className="sm:hidden">
-                    {shortenAddress(wallet.address)}
-                  </span>
-                  <span className="hidden sm:inline">{wallet.address}</span>
+        <h3 className="text-base font-medium">EVM wallets</h3>
+        {error ? <FieldError>{error}</FieldError> : null}
+        <ul className="divide-y rounded-lg border">
+          {wallets.map((wallet) => (
+            <li
+              key={wallet.id}
+              className="flex items-center justify-between gap-3 px-3 py-2"
+            >
+              <span className="min-w-0 truncate font-mono text-sm">
+                <span className="sm:hidden">
+                  {shortenAddress(wallet.address)}
                 </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Remove ${wallet.address}`}
-                  onClick={() => handleRemove(wallet.address)}
-                  disabled={isPending}
-                >
-                  <RiDeleteBinLine />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-            No wallets added yet.
-          </p>
-        )}
+                <span className="hidden sm:inline">{wallet.address}</span>
+              </span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Remove ${wallet.address}`}
+                onClick={() => handleRemove(wallet.address)}
+                disabled={isPending}
+              >
+                <RiDeleteBinLine />
+              </Button>
+            </li>
+          ))}
+        </ul>
       </div>
-    </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <FieldGroup>
+        <Field data-invalid={Boolean(error)}>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              id="wallet-addresses"
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              placeholder="0x..."
+              autoComplete="off"
+              aria-invalid={Boolean(error)}
+              disabled={isPending}
+            />
+            <Button type="submit" disabled={isPending}>
+              <RiAddLine data-icon="inline-start" />
+              Add
+            </Button>
+          </div>
+          <FieldDescription>
+            Paste addresses separated by spaces or commas
+          </FieldDescription>
+          <FieldError>{error}</FieldError>
+        </Field>
+      </FieldGroup>
+    </form>
   );
 }

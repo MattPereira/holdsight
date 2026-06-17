@@ -42,6 +42,15 @@ import type { SavedPlaidItem } from "@/lib/plaid/items";
 
 type AccountFamily = "checking" | "savings" | "credit_card" | "brokerage";
 
+// Same-named institutions (two "Chase" connections) are otherwise
+// indistinguishable, so surface the sync status as a disambiguating subline.
+const statusLabel: Record<SavedPlaidItem["status"], string | null> = {
+  active: "Syncing",
+  login_required: "Reconnect required",
+  error: "Sync error",
+  disabled: "Disabled",
+};
+
 const accountOptions: {
   family: AccountFamily;
   label: string;
@@ -72,9 +81,11 @@ const accountOptions: {
 export function PlaidConnectPanel({
   initialItems,
   onConnected,
+  view = "add",
 }: {
   initialItems: SavedPlaidItem[];
   onConnected: () => void;
+  view?: "add" | "remove";
 }) {
   const router = useRouter();
   const [items, setItems] = useState(initialItems);
@@ -137,96 +148,114 @@ export function PlaidConnectPanel({
     });
   }
 
-  return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-4">
-        <FieldGroup>
-          <FieldSet>
-            <FieldLegend>Add accounts</FieldLegend>
-            <div data-slot="checkbox-group" className="flex flex-col gap-2">
-              {accountOptions.map((option) => {
-                const Icon = option.icon;
-                const id = `plaid-account-family-${option.family}`;
+  if (view === "remove") {
+    if (items.length === 0) return null;
 
-                return (
-                  <FieldLabel key={option.family} htmlFor={id}>
-                    <Field orientation="horizontal">
-                      <Checkbox
-                        id={id}
-                        checked={selected.has(option.family)}
-                        onCheckedChange={() => toggleFamily(option.family)}
-                        disabled={isConnecting}
-                      />
-                      <FieldContent>
-                        <FieldTitle>
-                          <Icon />
-                          {option.label}
-                        </FieldTitle>
-                      </FieldContent>
-                    </Field>
-                  </FieldLabel>
-                );
-              })}
-            </div>
-            <FieldError>{error}</FieldError>
-          </FieldSet>
-        </FieldGroup>
-
-        <Button type="button" onClick={handleConnect} disabled={!canConnect}>
-          {isConnecting ? "Connecting..." : "Continue to Plaid"}
-        </Button>
-      </div>
-
-      {items.length > 0 ? (
-        <div className="flex flex-col gap-3">
-          <h3 className="text-base font-medium">Remove accounts</h3>
-          <ul className="divide-y rounded-lg border">
-            {items.map((item) => {
-              const name = item.institutionName ?? "Connected institution";
-              return (
-                <li
-                  key={item.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2"
-                >
-                  <span className="truncate text-sm font-medium">{name}</span>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-label={`Remove ${name}`}
-                        disabled={isRemoving}
+    return (
+      <div className="flex flex-col gap-3">
+        <h3 className="text-base font-medium">Plaid institutions</h3>
+        <FieldError>{error}</FieldError>
+        <ul className="divide-y rounded-lg border">
+          {items.map((item) => {
+            const name = item.institutionName ?? "Connected institution";
+            const status = statusLabel[item.status];
+            return (
+              <li
+                key={item.id}
+                className="flex items-center justify-between gap-3 px-3 py-2"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <RiBankLine className="size-5 shrink-0 text-muted-foreground" />
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm font-medium">{name}</span>
+                    {status ? (
+                      <span
+                        className={`text-xs ${
+                          item.status === "active"
+                            ? "text-muted-foreground"
+                            : "text-destructive"
+                        }`}
                       >
-                        <RiDeleteBinLine />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Remove {name}?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This unlinks the institution and deletes all of its
-                          synced accounts and balances — checking, savings,
-                          credit cards, and brokerage. You can reconnect later,
-                          but this can&apos;t be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => handleRemove(item.id)}
-                        >
-                          Remove
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </li>
+                        {status}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label={`Remove ${name}`}
+                      disabled={isRemoving}
+                    >
+                      <RiDeleteBinLine />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Remove {name}?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This unlinks the institution and deletes all of its
+                        synced accounts and balances — checking, savings, credit
+                        cards, and brokerage. You can reconnect later, but this
+                        can&apos;t be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleRemove(item.id)}>
+                        Remove
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <FieldGroup>
+        <FieldSet>
+          <FieldLegend>Account types</FieldLegend>
+          <div data-slot="checkbox-group" className="flex flex-col gap-2">
+            {accountOptions.map((option) => {
+              const Icon = option.icon;
+              const id = `plaid-account-family-${option.family}`;
+
+              return (
+                <FieldLabel key={option.family} htmlFor={id}>
+                  <Field orientation="horizontal">
+                    <Checkbox
+                      id={id}
+                      checked={selected.has(option.family)}
+                      onCheckedChange={() => toggleFamily(option.family)}
+                      disabled={isConnecting}
+                    />
+                    <FieldContent>
+                      <FieldTitle>
+                        <Icon />
+                        {option.label}
+                      </FieldTitle>
+                    </FieldContent>
+                  </Field>
+                </FieldLabel>
               );
             })}
-          </ul>
-        </div>
-      ) : null}
+          </div>
+          <FieldError>{error}</FieldError>
+        </FieldSet>
+      </FieldGroup>
+
+      <Button type="button" onClick={handleConnect} disabled={!canConnect}>
+        {isConnecting ? "Connecting..." : "Continue to Plaid"}
+      </Button>
     </div>
   );
 }

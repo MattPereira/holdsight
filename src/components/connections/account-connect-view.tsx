@@ -3,11 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  RiAddLine,
+  RiArrowLeftLine,
   RiBankLine,
   RiCoinsLine,
   RiExchangeFundsLine,
   RiWalletLine,
 } from "@remixicon/react";
+
+import { Button } from "@/components/ui/button";
 
 import type { AccountConnectionsResult } from "@/app/actions";
 import { KrakenConnectPanel } from "@/components/connections/connect-panels/kraken-connect-panel";
@@ -63,7 +67,14 @@ export function AccountConnectView({
   connections: AccountConnectionsResult;
 }) {
   const router = useRouter();
+  const [mode, setMode] = useState<"manage" | "add">("manage");
   const [provider, setProvider] = useState<Provider>("plaid");
+
+  const hasConnections =
+    connections.plaidItems.length > 0 ||
+    connections.wallets.length > 0 ||
+    connections.krakenAccounts.length > 0 ||
+    connections.manualItems.length > 0;
 
   // A successful connection sends the user back to the portfolio with fresh
   // data. This runs on a real page (not a modal), so Plaid Link's body-portaled
@@ -73,70 +84,142 @@ export function AccountConnectView({
     router.refresh();
   }
 
-  return (
-    <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[20rem_1fr] lg:items-start lg:gap-12">
-      {/* Left pane on desktop: page header + provider picker. */}
-      <div className="flex flex-col gap-5 lg:sticky lg:top-6">
-        <div className="flex flex-col gap-0.5">
-          <h1 className="text-xl font-medium">Manage accounts</h1>
+  if (connections.error) {
+    return <p className="text-sm text-destructive">{connections.error}</p>;
+  }
+
+  // Add flow: provider picker + the selected provider's add form. Reached from
+  // the manage view's "Add account" action.
+  if (mode === "add") {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="-ml-2 self-start"
+            onClick={() => setMode("manage")}
+          >
+            <RiArrowLeftLine data-icon="inline-start" />
+            Back
+          </Button>
+          <h1 className="text-xl font-medium">Add an account</h1>
           <p className="text-sm text-muted-foreground">
-            Connect or remove portfolio accounts
+            Choose how you want to connect
           </p>
         </div>
 
-        <RadioGroup
-          value={provider}
-          onValueChange={(value) => setProvider(value as Provider)}
-          className="gap-2"
-        >
-          {providerOptions.map((option) => {
-            const Icon = option.icon;
-            const id = `account-provider-${option.provider}`;
+        <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[20rem_1fr] lg:items-start lg:gap-12">
+          <RadioGroup
+            value={provider}
+            onValueChange={(value) => setProvider(value as Provider)}
+            className="gap-2 lg:sticky lg:top-6"
+          >
+            {providerOptions.map((option) => {
+              const Icon = option.icon;
+              const id = `account-provider-${option.provider}`;
 
-            return (
-              <FieldLabel key={option.provider} htmlFor={id}>
-                <Field orientation="horizontal">
-                  <RadioGroupItem id={id} value={option.provider} />
-                  <FieldContent>
-                    <FieldTitle>
-                      <Icon />
-                      {option.label}
-                    </FieldTitle>
-                    <FieldDescription>{option.description}</FieldDescription>
-                  </FieldContent>
-                </Field>
-              </FieldLabel>
-            );
-          })}
-        </RadioGroup>
+              return (
+                <FieldLabel key={option.provider} htmlFor={id}>
+                  <Field orientation="horizontal">
+                    <RadioGroupItem id={id} value={option.provider} />
+                    <FieldContent>
+                      <FieldTitle>
+                        <Icon />
+                        {option.label}
+                      </FieldTitle>
+                      <FieldDescription>{option.description}</FieldDescription>
+                    </FieldContent>
+                  </Field>
+                </FieldLabel>
+              );
+            })}
+          </RadioGroup>
+
+          <div className="flex flex-col">
+            {provider === "plaid" ? (
+              <PlaidConnectPanel
+                view="add"
+                initialItems={connections.plaidItems}
+                onConnected={handleConnected}
+              />
+            ) : provider === "wallet" ? (
+              <WalletConnectPanel
+                view="add"
+                initialWallets={connections.wallets}
+                onConnected={handleConnected}
+              />
+            ) : provider === "kraken" ? (
+              <KrakenConnectPanel
+                view="add"
+                initialAccounts={connections.krakenAccounts}
+                onConnected={handleConnected}
+              />
+            ) : (
+              <ManualConnectPanel
+                view="add"
+                initialItems={connections.manualItems}
+                onConnected={handleConnected}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Manage flow (default): everything connected, grouped by provider, with an
+  // "Add account" entry point. This is what a returning user wants most.
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-0.5">
+          <h1 className="text-xl font-medium">Connected accounts</h1>
+          <p className="text-sm text-muted-foreground">
+            Institutions, wallets, and items syncing to your portfolio
+          </p>
+        </div>
+        <Button type="button" onClick={() => setMode("add")}>
+          <RiAddLine data-icon="inline-start" />
+          Add account
+        </Button>
       </div>
 
-      {/* Right pane on desktop: the selected provider's form. */}
-      <div className="flex flex-col">
-        {connections.error ? (
-          <p className="text-sm text-destructive">{connections.error}</p>
-        ) : provider === "plaid" ? (
+      {hasConnections ? (
+        <div className="flex flex-col gap-6">
           <PlaidConnectPanel
+            view="remove"
             initialItems={connections.plaidItems}
             onConnected={handleConnected}
           />
-        ) : provider === "wallet" ? (
           <WalletConnectPanel
+            view="remove"
             initialWallets={connections.wallets}
             onConnected={handleConnected}
           />
-        ) : provider === "kraken" ? (
           <KrakenConnectPanel
+            view="remove"
             initialAccounts={connections.krakenAccounts}
             onConnected={handleConnected}
           />
-        ) : (
           <ManualConnectPanel
+            view="remove"
             initialItems={connections.manualItems}
             onConnected={handleConnected}
           />
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-4 rounded-lg border border-dashed px-6 py-16 text-center">
+          <p className="text-sm text-muted-foreground">
+            No accounts connected yet.
+          </p>
+          <Button type="button" onClick={() => setMode("add")}>
+            <RiAddLine data-icon="inline-start" />
+            Add your first account
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

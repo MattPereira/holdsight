@@ -32,9 +32,11 @@ const emptyForm = {
 export function ManualConnectPanel({
   initialItems,
   onConnected,
+  view = "add",
 }: {
   initialItems: ManualBalanceItemRow[];
   onConnected: () => void;
+  view?: "add" | "remove";
 }) {
   const router = useRouter();
   const [items, setItems] = useState(initialItems);
@@ -103,13 +105,8 @@ export function ManualConnectPanel({
     });
   }
 
-  return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-col gap-3">
-        <h3 className="text-base font-medium">
-          {editingId ? "Edit item" : "Add item"}
-        </h3>
-        <form onSubmit={handleSubmit} className="rounded-lg border p-3">
+  const formNode = (
+    <form onSubmit={handleSubmit} className="rounded-lg border p-3">
           <FieldGroup>
             <Field>
               <FieldLabel>Type</FieldLabel>
@@ -192,45 +189,55 @@ export function ManualConnectPanel({
             </div>
           </FieldGroup>
         </form>
-      </div>
-
-      {items.length > 0 ? (
-        <div className="flex flex-col gap-3">
-          <h3 className="text-base font-medium">Saved items</h3>
-          <ul className="divide-y rounded-lg border">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-center justify-between gap-3 px-3 py-2"
-              >
-                <button
-                  type="button"
-                  onClick={() => startEdit(item)}
-                  disabled={isPending}
-                  className="flex min-w-0 flex-1 flex-col items-start text-left"
-                >
-                  <span className="truncate text-sm font-medium">
-                    {item.name} {item.symbol}
-                  </span>
-                  <span className="text-xs text-muted-foreground capitalize">
-                    {item.kind} · {usdFormat.format(item.amount)}
-                  </span>
-                </button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Remove ${item.name}`}
-                  onClick={() => handleRemove(item.id)}
-                  disabled={isPending}
-                >
-                  <RiDeleteBinLine />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </div>
   );
+
+  if (view === "remove") {
+    if (items.length === 0) return null;
+
+    return (
+      <div className="flex flex-col gap-3">
+        <h3 className="text-base font-medium">Manual items</h3>
+        <ul className="divide-y rounded-lg border">
+          {items.map((item) => (
+            <li
+              key={item.id}
+              className="flex items-center justify-between gap-3 px-3 py-2"
+            >
+              <button
+                type="button"
+                onClick={() => startEdit(item)}
+                disabled={isPending}
+                className="flex min-w-0 flex-1 flex-col items-start text-left"
+              >
+                <span className="truncate text-sm font-medium">
+                  {item.name} {item.symbol}
+                </span>
+                <span className="text-xs text-muted-foreground capitalize">
+                  {item.kind} · {usdFormat.format(item.amount)}
+                </span>
+              </button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Remove ${item.name}`}
+                onClick={() => handleRemove(item.id)}
+                disabled={isPending}
+              >
+                <RiDeleteBinLine />
+              </Button>
+            </li>
+          ))}
+        </ul>
+        {editingId ? (
+          <div className="flex flex-col gap-2">
+            <h4 className="text-sm font-medium">Edit item</h4>
+            {formNode}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return formNode;
 }
