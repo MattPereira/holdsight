@@ -172,7 +172,7 @@ function AllocationDonutChart({
                   <tspan
                     x={cx}
                     y={(cy ?? 0) - 8}
-                    className="fill-foreground text-xl font-semibold tabular-nums"
+                    className="fill-foreground text-xl md:text-2xl font-semibold tabular-nums"
                   >
                     {compactUsdFormat.format(grandTotalValue)}
                   </tspan>
@@ -181,7 +181,7 @@ function AllocationDonutChart({
                     y={(cy ?? 0) + 14}
                     className="fill-muted-foreground text-xs"
                   >
-                    Net Assets
+                    Net Worth
                   </tspan>
                 </text>
               );

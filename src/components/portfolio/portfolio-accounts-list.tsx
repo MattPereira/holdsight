@@ -150,7 +150,7 @@ export function PortfolioAccountsList({
                   />
                 ))}
                 <div className="flex items-center justify-between gap-3 bg-muted/50 px-4 py-3 font-medium">
-                  <span className="">Total Funds</span>
+                  <span className="">Total Value</span>
                   <span className="tabular-nums">
                     {usdFormat.format(investmentTotal + manualAssetsTotal)}
                   </span>
@@ -229,7 +229,7 @@ export function PortfolioAccountsList({
                   </CollapsibleLineItem>
                 ) : null}
                 <div className="flex items-center justify-between gap-3 bg-muted/50 px-4 py-3 font-medium">
-                  <span className="">Checking Net</span>
+                  <span className="">Net Value</span>
                   <span className="tabular-nums">
                     {usdFormat.format(bankTotal)}
                   </span>
