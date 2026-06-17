@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -42,8 +43,6 @@ import type { SavedPlaidItem } from "@/lib/plaid/items";
 
 type AccountFamily = "checking" | "savings" | "credit_card" | "brokerage";
 
-// Same-named institutions (two "Chase" connections) are otherwise
-// indistinguishable, so surface the sync status as a disambiguating subline.
 const statusLabel: Record<SavedPlaidItem["status"], string | null> = {
   active: "Syncing",
   login_required: "Reconnect required",
@@ -151,16 +150,16 @@ export function PlaidConnectPanel({
   if (view === "remove") {
     if (items.length === 0) return null;
 
-    console.log({ items });
-
     return (
       <div className="flex flex-col gap-3">
-        <h3 className="text-base font-medium">Plaid institutions</h3>
+        <h3 className="text-base font-medium">Plaid connections</h3>
         <FieldError>{error}</FieldError>
         <ul className="divide-y rounded-lg border">
           {items.map((item) => {
             const name = item.institutionName ?? "Connected institution";
             const status = statusLabel[item.status];
+            const accountNames =
+              item.accountNames?.join(", ") || "No synced accounts";
             return (
               <li
                 key={item.id}
@@ -170,49 +169,58 @@ export function PlaidConnectPanel({
                   <RiBankLine className="size-5 shrink-0 text-muted-foreground" />
                   <div className="flex min-w-0 flex-col">
                     <span className="truncate text-sm font-medium">{name}</span>
-                    {status ? (
-                      <span
-                        className={`text-xs ${
-                          item.status === "active"
-                            ? "text-muted-foreground"
-                            : "text-destructive"
-                        }`}
-                      >
-                        {status}
-                      </span>
-                    ) : null}
+                    <span className="truncate text-xs text-muted-foreground">
+                      {accountNames}
+                    </span>
                   </div>
                 </div>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Remove ${name}`}
-                      disabled={isRemoving}
+                <div className="flex shrink-0 items-center gap-2">
+                  {status ? (
+                    <Badge
+                      variant={
+                        item.status === "active"
+                          ? "secondary"
+                          : item.status === "disabled"
+                            ? "outline"
+                            : "destructive"
+                      }
                     >
-                      <RiDeleteBinLine />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Remove {name}?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This unlinks the institution and deletes all of its
-                        synced accounts and balances — checking, savings, credit
-                        cards, and brokerage. You can reconnect later, but this
-                        can&apos;t be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleRemove(item.id)}>
-                        Remove
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                      {status}
+                    </Badge>
+                  ) : null}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Remove ${name}`}
+                        disabled={isRemoving}
+                      >
+                        <RiDeleteBinLine />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove {name}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This unlinks the institution and deletes all of its
+                          synced accounts and balances — checking, savings,
+                          credit cards, and brokerage. You can reconnect later,
+                          but this can&apos;t be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleRemove(item.id)}
+                        >
+                          Remove
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </li>
             );
           })}

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { creditAccounts } from "@/db/schema/credit-accounts";
@@ -35,6 +35,7 @@ export type SavedPlaidItem = {
   accessTokenEncrypted: string;
   institutionName: string | null;
   status: "active" | "login_required" | "error" | "disabled";
+  accountNames?: string[];
 };
 
 /**
@@ -76,7 +77,7 @@ export async function upsertPlaidItem(
 export async function getUserPlaidItems(
   userId: string,
 ): Promise<SavedPlaidItem[]> {
-  return db
+  const items = await db
     .select({
       id: plaidItems.id,
       itemId: plaidItems.itemId,
@@ -87,6 +88,104 @@ export async function getUserPlaidItems(
     .from(plaidItems)
     .where(eq(plaidItems.userId, userId))
     .orderBy(desc(plaidItems.createdAt));
+
+  return withAccountNames(userId, items);
+}
+
+function accountLabel(
+  label: string | null,
+  mask: string | null,
+  fallback: string,
+): string {
+  const name = label?.trim() || fallback;
+  return mask ? `${name} ••${mask}` : name;
+}
+
+async function withAccountNames(
+  userId: string,
+  items: SavedPlaidItem[],
+): Promise<SavedPlaidItem[]> {
+  if (items.length === 0) return items;
+
+  const itemIds = items.map((item) => item.id);
+  const [depositoryRows, creditRows, brokerageRows] = await Promise.all([
+    db
+      .select({
+        plaidItemId: depositoryAccounts.plaidItemId,
+        label: depositoryAccounts.label,
+        mask: depositoryAccounts.accountMask,
+        kind: depositoryAccounts.kind,
+      })
+      .from(depositoryAccounts)
+      .where(
+        and(
+          eq(depositoryAccounts.userId, userId),
+          inArray(depositoryAccounts.plaidItemId, itemIds),
+        ),
+      ),
+    db
+      .select({
+        plaidItemId: creditAccounts.plaidItemId,
+        label: creditAccounts.label,
+        mask: creditAccounts.accountMask,
+      })
+      .from(creditAccounts)
+      .where(
+        and(
+          eq(creditAccounts.userId, userId),
+          inArray(creditAccounts.plaidItemId, itemIds),
+        ),
+      ),
+    db
+      .select({
+        plaidItemId: brokerageAccounts.plaidItemId,
+        label: investmentAccounts.label,
+      })
+      .from(brokerageAccounts)
+      .innerJoin(
+        investmentAccounts,
+        eq(investmentAccounts.id, brokerageAccounts.investmentAccountId),
+      )
+      .where(
+        and(
+          eq(investmentAccounts.userId, userId),
+          inArray(brokerageAccounts.plaidItemId, itemIds),
+        ),
+      ),
+  ]);
+
+  const namesByItemId = new Map<string, string[]>();
+
+  function addName(plaidItemId: string | null, name: string): void {
+    if (!plaidItemId) return;
+    const names = namesByItemId.get(plaidItemId) ?? [];
+    names.push(name);
+    namesByItemId.set(plaidItemId, names);
+  }
+
+  for (const row of depositoryRows) {
+    addName(
+      row.plaidItemId,
+      accountLabel(
+        row.label,
+        row.mask,
+        row.kind === "savings" ? "Savings" : "Checking",
+      ),
+    );
+  }
+
+  for (const row of creditRows) {
+    addName(row.plaidItemId, accountLabel(null, row.mask, "Credit card"));
+  }
+
+  for (const row of brokerageRows) {
+    addName(row.plaidItemId, row.label?.trim() || "Brokerage");
+  }
+
+  return items.map((item) => ({
+    ...item,
+    accountNames: namesByItemId.get(item.id) ?? [],
+  }));
 }
 
 function uniqueItems(rows: SavedPlaidItem[]): SavedPlaidItem[] {

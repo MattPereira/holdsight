@@ -72,7 +72,12 @@ export function ManualConnectPanel({
       return;
     }
 
-    const input = { kind: form.kind, name: form.name, symbol: form.symbol, amount };
+    const input = {
+      kind: form.kind,
+      name: form.name,
+      symbol: form.symbol,
+      amount,
+    };
     const isEdit = Boolean(editingId);
 
     startTransition(async () => {
@@ -107,88 +112,88 @@ export function ManualConnectPanel({
 
   const formNode = (
     <form onSubmit={handleSubmit} className="rounded-lg border p-3">
-          <FieldGroup>
-            <Field>
-              <FieldLabel>Type</FieldLabel>
-              <div className="flex gap-2">
-                {(["asset", "liability"] as const).map((kind) => (
-                  <Button
-                    key={kind}
-                    type="button"
-                    size="sm"
-                    variant={form.kind === kind ? "default" : "outline"}
-                    onClick={() => setForm((prev) => ({ ...prev, kind }))}
-                    disabled={isPending}
-                    className="flex-1 capitalize"
-                  >
-                    {kind}
-                  </Button>
-                ))}
-              </div>
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="manual-name">Name</FieldLabel>
-              <Input
-                id="manual-name"
-                value={form.name}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, name: event.target.value }))
-                }
-                placeholder="Gold Bar"
+      <FieldGroup>
+        <Field>
+          <FieldLabel>Type</FieldLabel>
+          <div className="flex gap-2">
+            {(["asset", "liability"] as const).map((kind) => (
+              <Button
+                key={kind}
+                type="button"
+                size="sm"
+                variant={form.kind === kind ? "default" : "outline"}
+                onClick={() => setForm((prev) => ({ ...prev, kind }))}
                 disabled={isPending}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="manual-symbol">Symbol</FieldLabel>
-              <Input
-                id="manual-symbol"
-                value={form.symbol}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, symbol: event.target.value }))
-                }
-                placeholder="XAU"
-                autoComplete="off"
-                disabled={isPending}
-              />
-            </Field>
-            <Field data-invalid={Boolean(formError)}>
-              <FieldLabel htmlFor="manual-amount">Amount (USD)</FieldLabel>
-              <Input
-                id="manual-amount"
-                type="number"
-                step="0.01"
-                inputMode="decimal"
-                value={form.amount}
-                onChange={(event) =>
-                  setForm((prev) => ({ ...prev, amount: event.target.value }))
-                }
-                placeholder="0.00"
-                disabled={isPending}
-                aria-invalid={Boolean(formError)}
-              />
-            </Field>
-            {formError ? (
-              <p className="text-sm text-destructive">{formError}</p>
-            ) : null}
-            <div className="flex items-center gap-2">
-              <Button type="submit" size="sm" disabled={isPending}>
-                <RiAddLine data-icon="inline-start" />
-                {editingId ? "Save" : "Add item"}
+                className="flex-1 capitalize"
+              >
+                {kind}
               </Button>
-              {editingId ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={resetForm}
-                  disabled={isPending}
-                >
-                  Cancel
-                </Button>
-              ) : null}
-            </div>
-          </FieldGroup>
-        </form>
+            ))}
+          </div>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="manual-name">Name</FieldLabel>
+          <Input
+            id="manual-name"
+            value={form.name}
+            onChange={(event) =>
+              setForm((prev) => ({ ...prev, name: event.target.value }))
+            }
+            placeholder="Gold Bar"
+            disabled={isPending}
+          />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="manual-symbol">Symbol</FieldLabel>
+          <Input
+            id="manual-symbol"
+            value={form.symbol}
+            onChange={(event) =>
+              setForm((prev) => ({ ...prev, symbol: event.target.value }))
+            }
+            placeholder="XAU"
+            autoComplete="off"
+            disabled={isPending}
+          />
+        </Field>
+        <Field data-invalid={Boolean(formError)}>
+          <FieldLabel htmlFor="manual-amount">Amount (USD)</FieldLabel>
+          <Input
+            id="manual-amount"
+            type="number"
+            step="0.01"
+            inputMode="decimal"
+            value={form.amount}
+            onChange={(event) =>
+              setForm((prev) => ({ ...prev, amount: event.target.value }))
+            }
+            placeholder="0.00"
+            disabled={isPending}
+            aria-invalid={Boolean(formError)}
+          />
+        </Field>
+        {formError ? (
+          <p className="text-sm text-destructive">{formError}</p>
+        ) : null}
+        <div className="flex items-center gap-2">
+          <Button type="submit" size="sm" disabled={isPending}>
+            <RiAddLine data-icon="inline-start" />
+            {editingId ? "Save" : "Add item"}
+          </Button>
+          {editingId ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={resetForm}
+              disabled={isPending}
+            >
+              Cancel
+            </Button>
+          ) : null}
+        </div>
+      </FieldGroup>
+    </form>
   );
 
   if (view === "remove") {
@@ -196,7 +201,7 @@ export function ManualConnectPanel({
 
     return (
       <div className="flex flex-col gap-3">
-        <h3 className="text-base font-medium">Manual items</h3>
+        <h3 className="text-base font-medium">Custom</h3>
         <ul className="divide-y rounded-lg border">
           {items.map((item) => (
             <li

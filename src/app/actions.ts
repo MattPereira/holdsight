@@ -137,7 +137,9 @@ export async function addWallets(input: string): Promise<WalletActionResult> {
   };
 }
 
-export async function removeWallet(address: string): Promise<WalletActionResult> {
+export async function removeWallet(
+  address: string,
+): Promise<WalletActionResult> {
   const userId = await getCurrentUserId();
   if (!userId) return unauthorizedWalletResult();
 
@@ -376,7 +378,10 @@ async function createPlaidLinkTokenForFamilies(
 ): Promise<PlaidLinkTokenActionResult> {
   const userId = await getCurrentUserId();
   if (!userId) {
-    return { linkToken: null, error: "You must be signed in to link an account." };
+    return {
+      linkToken: null,
+      error: "You must be signed in to link an account.",
+    };
   }
 
   const families = normalizePlaidAccountFamilies(familiesInput);
@@ -569,7 +574,10 @@ export async function removeBrokerage(
 ): Promise<BrokerageActionResult> {
   const userId = await getCurrentUserId();
   if (!userId) {
-    return { accounts: [], error: "You must be signed in to remove an account." };
+    return {
+      accounts: [],
+      error: "You must be signed in to remove an account.",
+    };
   }
 
   try {
@@ -596,7 +604,10 @@ export async function removeDepository(
 ): Promise<DepositoryActionResult> {
   const userId = await getCurrentUserId();
   if (!userId) {
-    return { accounts: [], error: "You must be signed in to remove an account." };
+    return {
+      accounts: [],
+      error: "You must be signed in to remove an account.",
+    };
   }
 
   try {
@@ -623,7 +634,10 @@ export async function removeCreditCard(
 ): Promise<CreditCardActionResult> {
   const userId = await getCurrentUserId();
   if (!userId) {
-    return { accounts: [], error: "You must be signed in to remove an account." };
+    return {
+      accounts: [],
+      error: "You must be signed in to remove an account.",
+    };
   }
 
   try {
@@ -718,7 +732,7 @@ export type ManualBalanceActionResult = {
 async function unauthorizedManualBalanceResult(): Promise<ManualBalanceActionResult> {
   return {
     items: [],
-    error: "You must be signed in to manage manual items.",
+    error: "You must be signed in to manage custom items.",
   };
 }
 
@@ -839,7 +853,10 @@ export async function loadPortfolioPageData(): Promise<PortfolioHomeData> {
 
     await syncEvmWalletBalances(wallets);
 
-    const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
+    const hyperCoreAccounts = await ensureUserHyperCoreAccounts(
+      userId,
+      wallets,
+    );
     await syncHyperCoreAccounts(hyperCoreAccounts);
   };
 

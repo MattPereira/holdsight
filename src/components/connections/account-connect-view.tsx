@@ -175,12 +175,9 @@ export function AccountConnectView({
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-0.5">
-          <h1 className="text-xl font-medium">Connected accounts</h1>
-          <p className="text-sm text-muted-foreground">
-            Institutions, wallets, and items syncing to your portfolio
-          </p>
+          <h1 className="text-xl font-medium">Your accounts</h1>
         </div>
-        <Button type="button" onClick={() => setMode("add")}>
+        <Button type="button" variant="outline" onClick={() => setMode("add")}>
           <RiAddLine data-icon="inline-start" />
           Add account
         </Button>
