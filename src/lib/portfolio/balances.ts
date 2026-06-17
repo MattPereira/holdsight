@@ -67,13 +67,8 @@ function brokerageAccountToBalancesResult(
 function brokerageCashName(account: CurrentBrokerageAccount): string {
   const institutionName = account.institutionName?.trim();
   const accountLabel = account.label?.trim();
-  const accountType = account.accountType.trim().toLowerCase();
 
-  if (institutionName && /\bschwab\b/i.test(institutionName)) {
-    return accountType.includes("ira") ? "Schwab IRA Cash" : "Schwab Cash";
-  }
-
-  return `${accountLabel || institutionName || account.brokerage} Cash`;
+  return `${institutionName} ${accountLabel}`;
 }
 
 function depositoryAccountsToBalancesResult(
@@ -112,7 +107,7 @@ function depositoryAccountsToBalancesResult(
           .sort()
           .join(":")}:net-liabilities`,
         symbol: "USD",
-        name: "Checking",
+        name: "Checking Net",
         chainId: "depository",
         amount: netCash,
         priceUsd: 1,
