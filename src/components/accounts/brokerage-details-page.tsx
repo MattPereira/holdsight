@@ -32,6 +32,15 @@ function toBalancesResults(
   }));
 }
 
+function accountSyncError(accounts: CurrentBrokerageAccount[]): string | null {
+  return (
+    accounts
+      .filter((account) => account.syncStatus === "error")
+      .map((account) => account.syncErrorMessage?.trim())
+      .find((message): message is string => Boolean(message)) ?? null
+  );
+}
+
 export function BrokerageDetailsPage({
   initialAccounts,
 }: {
@@ -39,17 +48,35 @@ export function BrokerageDetailsPage({
 }) {
   const [accounts, setAccounts] =
     useState<CurrentBrokerageAccount[]>(initialAccounts);
+  const [syncedInitialAccounts, setSyncedInitialAccounts] =
+    useState(initialAccounts);
   const { groups } = useAssetGroups();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  if (syncedInitialAccounts !== initialAccounts) {
+    setSyncedInitialAccounts(initialAccounts);
+    setAccounts(initialAccounts);
+    setError(null);
+  }
 
   const summary = useMemo(
     () => portfolioAssetSummary(toBalancesResults(accounts)),
     [accounts],
   );
 
+  const syncError = useMemo(() => accountSyncError(accounts), [accounts]);
+  const displayedError = error ?? syncError;
   const accountsWithHoldings = useMemo(
     () => accounts.filter((account) => account.balances.length > 0),
+    [accounts],
+  );
+  const visibleAccounts = useMemo(
+    () =>
+      accounts.filter(
+        (account) =>
+          account.balances.length > 0 || account.syncStatus === "error",
+      ),
     [accounts],
   );
   const hasHoldings = accountsWithHoldings.length > 0;
@@ -82,14 +109,21 @@ export function BrokerageDetailsPage({
         </Button>
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {displayedError && (
+        <p
+          role="alert"
+          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+        >
+          {displayedError}
+        </p>
+      )}
 
       {accounts.length === 0 ? (
         <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
           No brokerage linked yet. Connect an account to load balances.
         </p>
       ) : (
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-6 md:gap-0">
           {hasHoldings && (
             <PortfolioAllocations
               grandTotalValue={summary.grandTotalValue}
@@ -99,7 +133,7 @@ export function BrokerageDetailsPage({
           )}
 
           <div className="flex flex-col gap-6">
-            {accountsWithHoldings.map((account) => (
+            {visibleAccounts.map((account) => (
               <BrokerageDetailsTable key={account.id} account={account} />
             ))}
           </div>

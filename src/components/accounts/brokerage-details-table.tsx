@@ -2,6 +2,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -42,6 +43,8 @@ function accountTotal(balances: BrokerageBalance[]): number {
 }
 
 function DesktopTable({ balances }: { balances: BrokerageBalance[] }) {
+  const total = accountTotal(balances);
+
   return (
     <div className="hidden overflow-hidden rounded-lg border sm:block">
       <Table className="table-fixed">
@@ -80,12 +83,22 @@ function DesktopTable({ balances }: { balances: BrokerageBalance[] }) {
             </TableRow>
           ))}
         </TableBody>
+        <TableFooter>
+          <TableRow className="hover:bg-muted/50">
+            <TableCell colSpan={4}>Total</TableCell>
+            <TableCell className="text-right font-semibold tabular-nums">
+              {formatUsd(total)}
+            </TableCell>
+          </TableRow>
+        </TableFooter>
       </Table>
     </div>
   );
 }
 
 function MobileList({ balances }: { balances: BrokerageBalance[] }) {
+  const total = accountTotal(balances);
+
   return (
     <ul className="divide-y rounded-lg border sm:hidden">
       {balances.map((balance, i) => (
@@ -108,6 +121,10 @@ function MobileList({ balances }: { balances: BrokerageBalance[] }) {
           </div>
         </li>
       ))}
+      <li className="flex items-baseline justify-between gap-4 bg-muted/50 px-4 py-3 font-medium">
+        <span>Total</span>
+        <span className="font-semibold tabular-nums">{formatUsd(total)}</span>
+      </li>
     </ul>
   );
 }
@@ -123,22 +140,19 @@ export function BrokerageDetailsTable({
   account: CurrentBrokerageAccount;
 }) {
   const { balances } = account;
-  const heading = account.label ?? account.institutionName ?? account.brokerage;
+  const institution = account.institutionName ?? account.brokerage;
+  const label = account.label ?? institution;
+  const secondaryInstitution = institution !== label ? institution : null;
 
   return (
     <section className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-4 px-2">
-        <span className="text-sm font-medium">
-          {heading}
-          {account.institutionName && account.label ? (
-            <span className="ml-2 text-muted-foreground">
-              {account.institutionName}
-            </span>
-          ) : null}
-        </span>
-        <span className="text-sm font-medium tabular-nums">
-          {formatUsd(accountTotal(balances))}
-        </span>
+        <span className="text-sm font-medium">{label}</span>
+        {secondaryInstitution ? (
+          <span className="text-right text-sm font-medium text-muted-foreground">
+            {secondaryInstitution}
+          </span>
+        ) : null}
       </div>
       {balances.length > 0 ? (
         <>

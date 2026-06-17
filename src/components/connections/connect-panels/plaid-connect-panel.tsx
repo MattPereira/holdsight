@@ -230,10 +230,9 @@ export function PlaidConnectPanel({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 max-w-xl">
       <FieldGroup>
         <FieldSet>
-          <FieldLegend>Account types</FieldLegend>
           <div data-slot="checkbox-group" className="flex flex-col gap-2">
             {accountOptions.map((option) => {
               const Icon = option.icon;
@@ -263,7 +262,12 @@ export function PlaidConnectPanel({
         </FieldSet>
       </FieldGroup>
 
-      <Button type="button" onClick={handleConnect} disabled={!canConnect}>
+      <Button
+        type="button"
+        size="lg"
+        onClick={handleConnect}
+        disabled={!canConnect}
+      >
         {isConnecting ? "Connecting..." : "Continue to Plaid"}
       </Button>
     </div>

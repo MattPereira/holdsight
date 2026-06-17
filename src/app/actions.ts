@@ -373,6 +373,15 @@ function plaidResultError(
   return null;
 }
 
+function brokerageSyncError(accounts: CurrentBrokerageAccount[]): string | null {
+  const messages = accounts
+    .filter((account) => account.syncStatus === "error")
+    .map((account) => account.syncErrorMessage?.trim())
+    .filter((message): message is string => Boolean(message));
+
+  return messages[0] ?? null;
+}
+
 async function createPlaidLinkTokenForFamilies(
   familiesInput: readonly string[],
 ): Promise<PlaidLinkTokenActionResult> {
@@ -493,7 +502,7 @@ async function linkPlaidAccountsForFamilies({
     }
 
     revalidatePath("/");
-    revalidatePath("/brokerage");
+    revalidatePath("/brokerages");
     return currentPlaidAccounts(userId, errors[0] ?? null);
   } catch (error) {
     return currentPlaidAccounts(
@@ -525,10 +534,20 @@ export async function loadBrokerageBalances(): Promise<BrokerageActionResult> {
     return { accounts: [], error: "You must be signed in to view balances." };
   }
 
-  await syncUserBrokerageBalances(userId);
+  try {
+    await syncUserBrokerageBalances(userId);
+  } catch (error) {
+    const accounts = await getCurrentBrokerageBalances(userId);
+    return {
+      accounts,
+      error: plaidActionErrorMessage(error, "Failed to refresh brokerage."),
+    };
+  }
+
+  const accounts = await getCurrentBrokerageBalances(userId);
   revalidatePath("/");
-  revalidatePath("/brokerage");
-  return { accounts: await getCurrentBrokerageBalances(userId), error: null };
+  revalidatePath("/brokerages");
+  return { accounts, error: brokerageSyncError(accounts) };
 }
 
 /**
@@ -805,7 +824,7 @@ export async function createGroup(input: {
   revalidatePath("/");
   revalidatePath("/wallets");
   revalidatePath("/exchange");
-  revalidatePath("/brokerage");
+  revalidatePath("/brokerages");
   return { groups, error: null };
 }
 
@@ -823,7 +842,7 @@ export async function updateGroup(
   revalidatePath("/");
   revalidatePath("/wallets");
   revalidatePath("/exchange");
-  revalidatePath("/brokerage");
+  revalidatePath("/brokerages");
   return { groups, error: null };
 }
 
@@ -839,7 +858,7 @@ export async function deleteGroup(
   revalidatePath("/");
   revalidatePath("/wallets");
   revalidatePath("/exchange");
-  revalidatePath("/brokerage");
+  revalidatePath("/brokerages");
   return { groups, error: null };
 }
 

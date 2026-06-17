@@ -5,7 +5,7 @@ export default async function ConnectPage() {
   const connections = await getAccountConnections();
 
   return (
-    <div className="w-full max-w-4xl">
+    <div className="">
       <AccountConnectView connections={connections} />
     </div>
   );
