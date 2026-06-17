@@ -1,9 +1,8 @@
 "use client";
 
 import { RiSettings3Line } from "@remixicon/react";
-import { useState } from "react";
+import Link from "next/link";
 
-import { AccountConnectSheet } from "@/components/connections/account-connect-sheet";
 import { Button } from "@/components/ui/button";
 import {
   CollapsibleLineItem,
@@ -58,8 +57,6 @@ export function PortfolioAccountsList({
   manualItems: ManualBalanceItemRow[];
   investmentAccountSections: InvestmentAccountSection[];
 }) {
-  const [manageOpen, setManageOpen] = useState(false);
-
   const manualAssets = manualItems.filter((item) => item.kind === "asset");
   const manualLiabilities = manualItems.filter(
     (item) => item.kind === "liability",
@@ -99,17 +96,16 @@ export function PortfolioAccountsList({
       <div className="flex items-center gap-2">
         <h2 className="text-xl font-medium">Accounts</h2>
         <Button
-          type="button"
+          asChild
           variant="outline"
           size="icon-sm"
           aria-label="Manage accounts"
-          onClick={() => setManageOpen(true)}
         >
-          <RiSettings3Line />
+          <Link href="/connect">
+            <RiSettings3Line />
+          </Link>
         </Button>
       </div>
-
-      <AccountConnectSheet open={manageOpen} onOpenChange={setManageOpen} />
 
       {!hasAnything ? (
         <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">

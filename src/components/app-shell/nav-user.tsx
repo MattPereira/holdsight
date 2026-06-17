@@ -28,7 +28,6 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { AccountConnectSheet } from "@/components/connections/account-connect-sheet";
 import { AssetGroupSettings } from "@/components/portfolio/asset-group-settings";
 
 function initials(name: string) {
@@ -54,7 +53,6 @@ export function NavUser({
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const [isPending, setIsPending] = useState(false);
-  const [connectSheetOpen, setConnectSheetOpen] = useState(false);
   const [groupsSheetOpen, setGroupsSheetOpen] = useState(false);
 
   async function handleSignOut() {
@@ -108,7 +106,7 @@ export function NavUser({
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => setConnectSheetOpen(true)}>
+            <DropdownMenuItem onSelect={() => router.push("/connect")}>
               <RiLinksLine />
               Manage accounts
             </DropdownMenuItem>
@@ -133,10 +131,6 @@ export function NavUser({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <AccountConnectSheet
-          open={connectSheetOpen}
-          onOpenChange={setConnectSheetOpen}
-        />
         <AssetGroupSettings
           open={groupsSheetOpen}
           onOpenChange={setGroupsSheetOpen}
