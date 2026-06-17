@@ -67,14 +67,14 @@ function DesktopTable({ balances }: { balances: BrokerageBalance[] }) {
         <TableBody>
           {balances.map((balance, i) => (
             <TableRow key={balanceKey(balance, i)}>
-              <TableCell className="font-medium">{balance.symbol}</TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground">
+              <TableCell className="font-normal">{balance.symbol}</TableCell>
+              <TableCell className="text-right font-normal tabular-nums">
                 {formatCostBasis(balance.costBasisUsd)}
               </TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground">
+              <TableCell className="text-right font-normal tabular-nums">
                 {amountFormat.format(balance.amount)}
               </TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground">
+              <TableCell className="text-right font-normal tabular-nums">
                 {priceFormat.format(balance.priceUsd)}
               </TableCell>
               <TableCell className="text-right font-medium tabular-nums">
@@ -149,7 +149,7 @@ export function BrokerageDetailsTable({
       <div className="flex items-baseline justify-between gap-4 px-2">
         <span className="text-sm font-medium">{label}</span>
         {secondaryInstitution ? (
-          <span className="text-right text-sm font-medium text-muted-foreground">
+          <span className="text-right text-sm font-normal text-muted-foreground">
             {secondaryInstitution}
           </span>
         ) : null}

@@ -150,7 +150,7 @@ export function PortfolioAccountsList({
                   />
                 ))}
                 <div className="flex items-center justify-between gap-3 bg-muted/50 px-4 py-3 font-medium">
-                  <span className="">Total</span>
+                  <span className="">Total Funds</span>
                   <span className="tabular-nums">
                     {usdFormat.format(investmentTotal + manualAssetsTotal)}
                   </span>

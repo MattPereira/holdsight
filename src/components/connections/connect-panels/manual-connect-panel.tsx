@@ -115,12 +115,13 @@ export function ManualConnectPanel({
       <FieldGroup>
         <Field>
           <FieldLabel>Type</FieldLabel>
-          <div className="flex gap-2">
+
+          <div className="flex gap-5">
             {(["asset", "liability"] as const).map((kind) => (
               <Button
                 key={kind}
                 type="button"
-                size="sm"
+                size="lg"
                 variant={form.kind === kind ? "default" : "outline"}
                 onClick={() => setForm((prev) => ({ ...prev, kind }))}
                 disabled={isPending}
@@ -175,8 +176,8 @@ export function ManualConnectPanel({
         {formError ? (
           <p className="text-sm text-destructive">{formError}</p>
         ) : null}
-        <div className="flex items-center gap-2">
-          <Button type="submit" size="sm" disabled={isPending}>
+        <div className="flex justify-end items-center gap-2">
+          <Button size="lg" type="submit" disabled={isPending}>
             <RiAddLine data-icon="inline-start" />
             {editingId ? "Save" : "Add item"}
           </Button>

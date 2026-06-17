@@ -309,7 +309,7 @@ export function PortfolioAllocations({
   );
 
   if (visibleTotals.length === 0) {
-    return <p className="text-sm text-muted-foreground">No balances.</p>;
+    return null;
   }
 
   return (

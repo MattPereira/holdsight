@@ -147,8 +147,7 @@ function MobileList({ balances }: { balances: InvestmentBalance[] }) {
  * rewrite of the aggregate summary display can never take it down with it.
  */
 export function AccountDetailsTable({ result }: { result: BalancesResult }) {
-  const hasBalances =
-    result.status === "ready" && result.balances.length > 0;
+  const hasBalances = result.status === "ready" && result.balances.length > 0;
   const total = walletTotal(result);
 
   // A ready-but-empty address has nothing worth showing.
