@@ -11,7 +11,6 @@ import {
   FieldDescription,
   FieldError,
   FieldGroup,
-  FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import type { SavedEvmAccount } from "@/lib/evm/accounts";

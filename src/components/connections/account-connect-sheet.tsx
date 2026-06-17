@@ -13,10 +13,10 @@ import {
   getAccountConnections,
   type AccountConnectionsResult,
 } from "@/app/actions";
-import { KrakenConnectPanel } from "@/components/connect-panels/kraken-connect-panel";
-import { ManualConnectPanel } from "@/components/connect-panels/manual-connect-panel";
-import { PlaidConnectPanel } from "@/components/connect-panels/plaid-connect-panel";
-import { WalletConnectPanel } from "@/components/connect-panels/wallet-connect-panel";
+import { KrakenConnectPanel } from "@/components/connections/connect-panels/kraken-connect-panel";
+import { ManualConnectPanel } from "@/components/connections/connect-panels/manual-connect-panel";
+import { PlaidConnectPanel } from "@/components/connections/connect-panels/plaid-connect-panel";
+import { WalletConnectPanel } from "@/components/connections/connect-panels/wallet-connect-panel";
 import {
   Field,
   FieldContent,

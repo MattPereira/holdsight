@@ -5,9 +5,9 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { loadPortfolioPageData } from "@/app/actions";
-import { PortfolioAccountsList } from "@/components/portfolio-accounts-list";
-import { useAssetGroups } from "@/components/asset-groups-context";
-import { PortfolioAllocations } from "@/components/portfolio-allocations";
+import { PortfolioAccountsList } from "@/components/portfolio/portfolio-accounts-list";
+import { useAssetGroups } from "@/components/portfolio/asset-groups-context";
+import { PortfolioAllocations } from "@/components/portfolio/portfolio-allocations";
 import { Button } from "@/components/ui/button";
 import type { CreditCardAccountRow } from "@/lib/credit-card/accounts";
 import type { DepositoryAccountRow } from "@/lib/depository/accounts";

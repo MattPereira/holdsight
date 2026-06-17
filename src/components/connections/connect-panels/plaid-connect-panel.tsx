@@ -37,7 +37,7 @@ import {
   FieldSet,
   FieldTitle,
 } from "@/components/ui/field";
-import { usePlaidConnect } from "@/components/use-plaid-connect";
+import { usePlaidConnect } from "@/components/connections/use-plaid-connect";
 import type { SavedPlaidItem } from "@/lib/plaid/items";
 
 type AccountFamily = "checking" | "savings" | "credit_card" | "brokerage";

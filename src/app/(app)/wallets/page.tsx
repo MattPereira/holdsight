@@ -1,4 +1,4 @@
-import { AccountDetailsPage } from "@/components/account-details-page";
+import { AccountDetailsPage } from "@/components/accounts/account-details-page";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getUserEvmAccounts } from "@/lib/evm/accounts";
 import { getCurrentWalletBalances } from "@/lib/wallets/balances";

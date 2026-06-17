@@ -1,4 +1,4 @@
-import { PortfolioPage } from "@/components/portfolio-page";
+import { PortfolioPage } from "@/components/portfolio/portfolio-page";
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
   emptyPortfolioHomeData,

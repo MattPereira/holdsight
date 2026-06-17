@@ -1,4 +1,4 @@
-import { BrokerageDetailsPage } from "@/components/brokerage-details-page";
+import { BrokerageDetailsPage } from "@/components/accounts/brokerage-details-page";
 import { getCurrentBrokerageBalances } from "@/lib/brokerage/balances";
 import { getCurrentUserId } from "@/lib/auth/session";
 

@@ -8,9 +8,9 @@ import {
   loadWalletBalances,
   loadKrakenBalances,
 } from "@/app/actions";
-import { AccountDetailsTable } from "@/components/account-details-table";
-import { PortfolioAllocations } from "@/components/portfolio-allocations";
-import { useAssetGroups } from "@/components/asset-groups-context";
+import { AccountDetailsTable } from "@/components/accounts/account-details-table";
+import { PortfolioAllocations } from "@/components/portfolio/portfolio-allocations";
+import { useAssetGroups } from "@/components/portfolio/asset-groups-context";
 import { Button } from "@/components/ui/button";
 import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 import type { BalancesResult } from "@/lib/portfolio/types";

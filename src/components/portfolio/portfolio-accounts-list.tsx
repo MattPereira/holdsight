@@ -3,7 +3,7 @@
 import { RiSettings3Line } from "@remixicon/react";
 import { useState } from "react";
 
-import { AccountConnectSheet } from "@/components/account-connect-sheet";
+import { AccountConnectSheet } from "@/components/connections/account-connect-sheet";
 import { Button } from "@/components/ui/button";
 import {
   CollapsibleLineItem,

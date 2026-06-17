@@ -10,7 +10,7 @@ import {
   readPlaidLinkSession,
   savePlaidLinkError,
   type PlaidLinkSession,
-} from "@/components/use-plaid-connect";
+} from "@/components/connections/use-plaid-connect";
 
 function linkAccount(
   session: PlaidLinkSession,

@@ -28,8 +28,8 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { AccountConnectSheet } from "@/components/account-connect-sheet";
-import { AssetGroupSettings } from "@/components/asset-group-settings";
+import { AccountConnectSheet } from "@/components/connections/account-connect-sheet";
+import { AssetGroupSettings } from "@/components/portfolio/asset-group-settings";
 
 function initials(name: string) {
   return name

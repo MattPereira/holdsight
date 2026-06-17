@@ -1,9 +1,9 @@
 import Link from "next/link";
 
-import { AppSidebar } from "@/components/app-sidebar";
-import { LoginForm } from "@/components/login-form";
-import { AssetGroupsProvider } from "@/components/asset-groups-context";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { AppSidebar } from "@/components/app-shell/app-sidebar";
+import { LoginForm } from "@/components/auth/login-form";
+import { AssetGroupsProvider } from "@/components/portfolio/asset-groups-context";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import {
   SidebarInset,
   SidebarProvider,

@@ -4,9 +4,9 @@ import { RiRefreshLine } from "@remixicon/react";
 import { useMemo, useState, useTransition } from "react";
 
 import { loadBrokerageBalances } from "@/app/actions";
-import { BrokerageDetailsTable } from "@/components/brokerage-details-table";
-import { PortfolioAllocations } from "@/components/portfolio-allocations";
-import { useAssetGroups } from "@/components/asset-groups-context";
+import { BrokerageDetailsTable } from "@/components/accounts/brokerage-details-table";
+import { PortfolioAllocations } from "@/components/portfolio/portfolio-allocations";
+import { useAssetGroups } from "@/components/portfolio/asset-groups-context";
 import { Button } from "@/components/ui/button";
 import type { CurrentBrokerageAccount } from "@/lib/brokerage/balances";
 import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";

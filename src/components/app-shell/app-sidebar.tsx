@@ -7,7 +7,7 @@ import {
   RiWalletLine,
 } from "@remixicon/react";
 
-import { NavUser } from "@/components/nav-user";
+import { NavUser } from "@/components/app-shell/nav-user";
 import {
   Sidebar,
   SidebarContent,
