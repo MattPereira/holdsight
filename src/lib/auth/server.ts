@@ -1,10 +1,19 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { jwt } from "better-auth/plugins";
+import { oauthProvider } from "@better-auth/oauth-provider";
 
 import { db } from "@/db/index";
 import * as schema from "@/db/schema";
 
+const baseURL = process.env.BETTER_AUTH_URL;
+
+if (!baseURL) {
+  throw new Error("BETTER_AUTH_URL must be configured.");
+}
+
 export const auth = betterAuth({
+  baseURL,
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
@@ -20,6 +29,19 @@ export const auth = betterAuth({
       generateId: "uuid",
     },
   },
+  plugins: [
+    jwt({
+      jwt: { issuer: baseURL },
+      disableSettingJwtHeader: true,
+    }),
+    oauthProvider({
+      loginPage: "/",
+      consentPage: "/oauth/consent",
+      validAudiences: [new URL("/api/mcp", baseURL).toString()],
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
+    }),
+  ],
 });
 
 export type Session = typeof auth.$Infer.Session;

@@ -3,7 +3,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 
 const AUTH_API_PREFIX = "/api/auth";
-const AGENT_ALLOCATIONS_PATH = "/api/portfolio/allocations";
+const MCP_API_PATH = "/api/mcp";
+const MCP_AUTHORIZATION_SERVER_METADATA_PATH =
+  "/.well-known/oauth-authorization-server";
+const MCP_PROTECTED_RESOURCE_METADATA_PREFIX =
+  "/.well-known/oauth-protected-resource";
 const SIGN_IN_PATH = "/";
 
 function isAuthApiRoute(pathname: string): boolean {
@@ -14,16 +18,6 @@ function isApiRoute(pathname: string): boolean {
   return pathname === "/api" || pathname.startsWith("/api/");
 }
 
-function isAgentAllocationsBearerRequest(request: NextRequest): boolean {
-  if (request.nextUrl.pathname !== AGENT_ALLOCATIONS_PATH) return false;
-
-  const authorization = request.headers.get("authorization");
-  if (!authorization) return false;
-
-  const [scheme, token] = authorization.split(/\s+/, 2);
-  return scheme.toLowerCase() === "bearer" && Boolean(token);
-}
-
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -31,7 +25,11 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (isAgentAllocationsBearerRequest(request)) {
+  if (
+    pathname === MCP_API_PATH ||
+    pathname === MCP_AUTHORIZATION_SERVER_METADATA_PATH ||
+    pathname.startsWith(MCP_PROTECTED_RESOURCE_METADATA_PREFIX)
+  ) {
     return NextResponse.next();
   }
 

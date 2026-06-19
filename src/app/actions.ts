@@ -23,6 +23,7 @@ import {
 import {
   getCurrentUserKrakenBalances,
   syncKrakenAccounts,
+  syncUserKrakenAccounts,
 } from "@/lib/exchange/kraken/balances";
 import {
   addUserEvmAccounts,
@@ -78,15 +79,9 @@ import {
 } from "@/lib/manual-balance/items";
 import {
   emptyPortfolioHomeData,
+  getCurrentPortfolioHomeData,
   type PortfolioHomeData,
 } from "@/lib/portfolio/page-data";
-import { refreshPortfolioForUser } from "@/lib/portfolio/refresh";
-import {
-  createUserAgentApiKey,
-  getUserAgentApiKeys,
-  revokeUserAgentApiKey,
-  type AgentApiKey,
-} from "@/lib/agents/api-keys";
 import type { AssetGroup } from "@/lib/portfolio/asset-totals";
 import {
   createAssetGroup,
@@ -871,82 +866,26 @@ export async function loadPortfolioPageData(): Promise<PortfolioHomeData> {
   const userId = await getCurrentUserId();
   if (!userId) return emptyPortfolioHomeData();
 
-  return refreshPortfolioForUser(userId);
-}
+  const syncWallets = async () => {
+    const wallets = await getUserEvmAccounts(userId);
+    if (wallets.length === 0) return;
 
-/* ----------------------------- agent keys ----------------------------- */
+    await syncEvmWalletBalances(wallets);
 
-export type AgentApiKeyView = {
-  id: string;
-  name: string;
-  keyPrefix: string;
-  scopes: string[];
-  lastUsedAt: string | null;
-  createdAt: string;
-};
-
-export type AgentApiKeysActionResult = {
-  keys: AgentApiKeyView[];
-  secret?: string;
-  error: string | null;
-};
-
-function agentApiKeyView(key: AgentApiKey): AgentApiKeyView {
-  return {
-    id: key.id,
-    name: key.name,
-    keyPrefix: key.keyPrefix,
-    scopes: key.scopes,
-    lastUsedAt: key.lastUsedAt?.toISOString() ?? null,
-    createdAt: key.createdAt.toISOString(),
+    const hyperCoreAccounts = await ensureUserHyperCoreAccounts(
+      userId,
+      wallets,
+    );
+    await syncHyperCoreAccounts(hyperCoreAccounts);
   };
-}
 
-async function currentAgentKeys(
-  userId: string,
-  error: string | null = null,
-): Promise<AgentApiKeysActionResult> {
-  const keys = await getUserAgentApiKeys(userId);
-  return { keys: keys.map(agentApiKeyView), error };
-}
+  await Promise.all([
+    syncWallets(),
+    syncUserKrakenAccounts(userId),
+    syncUserBrokerageBalances(userId),
+    syncUserDepositoryBalances(userId),
+    syncUserCreditCardAccounts(userId),
+  ]);
 
-export async function getAgentApiKeys(): Promise<AgentApiKeysActionResult> {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return { keys: [], error: "You must be signed in to manage agents." };
-  }
-
-  return currentAgentKeys(userId);
-}
-
-export async function createAgentApiKey(
-  name: string,
-): Promise<AgentApiKeysActionResult> {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return { keys: [], error: "You must be signed in to manage agents." };
-  }
-
-  const result = await createUserAgentApiKey(userId, { name });
-  if (result.error || !result.result) {
-    return currentAgentKeys(userId, result.error ?? "Failed to create key.");
-  }
-
-  return {
-    keys: (await getUserAgentApiKeys(userId)).map(agentApiKeyView),
-    secret: result.result.secret,
-    error: null,
-  };
-}
-
-export async function revokeAgentApiKey(
-  keyId: string,
-): Promise<AgentApiKeysActionResult> {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return { keys: [], error: "You must be signed in to manage agents." };
-  }
-
-  await revokeUserAgentApiKey(userId, keyId);
-  return currentAgentKeys(userId);
+  return getCurrentPortfolioHomeData(userId);
 }

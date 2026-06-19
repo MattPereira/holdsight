@@ -7,13 +7,11 @@ import {
   RiExpandUpDownLine,
   RiLogoutBoxRLine,
   RiMoonLine,
-  RiRobot2Line,
   RiSunLine,
 } from "@remixicon/react";
 import { useTheme } from "next-themes";
 
 import { authClient } from "@/lib/auth/client";
-import { AgentApiKeySheet } from "@/components/agents/agent-api-key-sheet";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -45,7 +43,6 @@ export function NavUser({ name, email }: { name: string; email: string }) {
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
   const [isPending, setIsPending] = useState(false);
-  const [agentsOpen, setAgentsOpen] = useState(false);
 
   async function handleSignOut() {
     setIsPending(true);
@@ -102,10 +99,6 @@ export function NavUser({ name, email }: { name: string; email: string }) {
               <RiLinksLine />
               Manage accounts
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setAgentsOpen(true)}>
-              <RiRobot2Line />
-              Manage agents
-            </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={(event) => {
                 // Keep the menu open so toggling theme feels immediate.
@@ -123,7 +116,6 @@ export function NavUser({ name, email }: { name: string; email: string }) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <AgentApiKeySheet open={agentsOpen} onOpenChange={setAgentsOpen} />
       </SidebarMenuItem>
     </SidebarMenu>
   );
