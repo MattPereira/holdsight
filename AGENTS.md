@@ -5,3 +5,5 @@ This version has breaking changes — APIs, conventions, and file structure may 
 <!-- END:nextjs-agent-rules -->
 
 After code changes, run `pnpm run check` for validation. Do not run `pnpm run build` unless explicitly requested.
+
+Do not start the local development server. The user starts and manages dev server processes.

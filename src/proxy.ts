@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 
 const AUTH_API_PREFIX = "/api/auth";
+const AGENT_ALLOCATIONS_PATH = "/api/portfolio/allocations";
 const SIGN_IN_PATH = "/";
 
 function isAuthApiRoute(pathname: string): boolean {
@@ -13,10 +14,24 @@ function isApiRoute(pathname: string): boolean {
   return pathname === "/api" || pathname.startsWith("/api/");
 }
 
+function isAgentAllocationsBearerRequest(request: NextRequest): boolean {
+  if (request.nextUrl.pathname !== AGENT_ALLOCATIONS_PATH) return false;
+
+  const authorization = request.headers.get("authorization");
+  if (!authorization) return false;
+
+  const [scheme, token] = authorization.split(/\s+/, 2);
+  return scheme.toLowerCase() === "bearer" && Boolean(token);
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isAuthApiRoute(pathname)) {
+    return NextResponse.next();
+  }
+
+  if (isAgentAllocationsBearerRequest(request)) {
     return NextResponse.next();
   }
 
