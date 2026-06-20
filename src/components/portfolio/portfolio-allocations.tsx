@@ -20,6 +20,7 @@ import {
   NestedLineItems,
 } from "@/components/ui/line-item";
 import { cn } from "@/lib/utils";
+import { buildPortfolioAllocations } from "@/lib/portfolio/allocations";
 import {
   applyAssetGroups,
   ASSET_CHART_COLORS,
@@ -46,12 +47,6 @@ const compactUsdFormat = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 1,
 });
 
-const MIN_VISIBLE_ASSET_VALUE_USD = 100;
-
-function weightOf(valueUsd: number, grandTotalValue: number) {
-  return grandTotalValue === 0 ? 0 : valueUsd / grandTotalValue;
-}
-
 function formatUsd(value: number) {
   return usdFormat.format(value);
 }
@@ -72,6 +67,7 @@ type HoldingsDisplayRow = {
   name?: string;
   amount: number;
   valueUsd: number;
+  weight: number;
   isGroup?: boolean;
   members?: HoldingsDisplayRow[];
 };
@@ -195,12 +191,10 @@ function AllocationDonutChart({
 
 function HoldingsRows({
   rows,
-  totalValue,
   colorByKey,
   onOpenSettings,
 }: {
   rows: HoldingsDisplayRow[];
-  totalValue: number;
   colorByKey?: Map<string, string>;
   onOpenSettings?: () => void;
 }) {
@@ -232,7 +226,7 @@ function HoldingsRows({
           labelTitle: row.symbol,
           sublabel: row.name,
           sublabelTitle: row.name,
-          value: percentFormat.format(weightOf(row.valueUsd, totalValue)),
+          value: percentFormat.format(row.weight),
           secondaryValue: formatUsd(row.valueUsd),
         };
 
@@ -250,9 +244,7 @@ function HoldingsRows({
                   labelTitle={member.symbol}
                   sublabel={member.name}
                   sublabelTitle={member.name}
-                  value={percentFormat.format(
-                    weightOf(member.valueUsd, totalValue),
-                  )}
+                  value={percentFormat.format(member.weight)}
                   secondaryValue={formatUsd(member.valueUsd)}
                 />
               ))}
@@ -278,23 +270,29 @@ export function PortfolioAllocations({
   allSymbols?: string[];
 }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const visibleTotals = useMemo(
+  const allocations = useMemo(
     () =>
-      totals.filter((total) => total.valueUsd >= MIN_VISIBLE_ASSET_VALUE_USD),
-    [totals],
+      buildPortfolioAllocations({
+        grandTotalValueUsd: grandTotalValue,
+        totals,
+        groups,
+      }),
+    [grandTotalValue, totals, groups],
   );
+  const { visibleTotals } = allocations;
   const colorByKey = useMemo(
     () => assetColorByKey(visibleTotals, groups),
     [visibleTotals, groups],
   );
   const rows: HoldingsDisplayRow[] = useMemo(
     () =>
-      applyAssetGroups(visibleTotals, groups).map((row) => ({
+      allocations.rows.map((row) => ({
         key: row.key,
         symbol: row.label,
         name: row.name,
         amount: row.amount,
         valueUsd: row.valueUsd,
+        weight: row.weight,
         isGroup: row.isGroup,
         color: row.color,
         members: row.members.map((member) => ({
@@ -303,9 +301,10 @@ export function PortfolioAllocations({
           name: member.name,
           amount: member.amount,
           valueUsd: member.valueUsd,
+          weight: member.weight,
         })),
       })),
-    [visibleTotals, groups],
+    [allocations.rows],
   );
 
   if (visibleTotals.length === 0) {
@@ -322,7 +321,6 @@ export function PortfolioAllocations({
       <div className="min-w-0">
         <HoldingsRows
           rows={rows}
-          totalValue={grandTotalValue}
           colorByKey={colorByKey}
           onOpenSettings={allSymbols ? () => setSettingsOpen(true) : undefined}
         />

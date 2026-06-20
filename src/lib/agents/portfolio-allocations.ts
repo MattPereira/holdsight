@@ -1,13 +1,11 @@
 import "server-only";
 
-import { applyAssetGroups } from "@/lib/portfolio/asset-totals";
+import { buildPortfolioAllocations } from "@/lib/portfolio/allocations";
 import { getCurrentPortfolioHomeData } from "@/lib/portfolio/page-data";
 import { refreshPortfolioForUser } from "@/lib/portfolio/refresh";
 import { getUserAssetGroups } from "@/lib/portfolio/groups";
 
-const MIN_AGENT_ASSET_VALUE_USD = 10;
-
-export type AgentPortfolioAllocation =
+export type PortfolioAllocationForAgent =
   | {
       type: "asset";
       symbol: string;
@@ -32,45 +30,39 @@ export type AgentPortfolioAllocation =
       }[];
     };
 
-export type AgentPortfolioAllocations = {
+export type PortfolioAllocationsForAgent = {
   retrievedAt: string;
   refreshed: boolean;
   portfolio: {
     grandTotalValueUsd: number;
     minimumAssetValueUsd: number;
     otherValueUsd: number;
-    allocations: AgentPortfolioAllocation[];
+    allocations: PortfolioAllocationForAgent[];
   };
 };
 
-export async function getAgentPortfolioAllocations(
+export async function getPortfolioAllocationsForAgent(
   userId: string,
   { refresh = false }: { refresh?: boolean } = {},
-): Promise<AgentPortfolioAllocations> {
+): Promise<PortfolioAllocationsForAgent> {
   const data = refresh
     ? await refreshPortfolioForUser(userId)
     : await getCurrentPortfolioHomeData(userId);
-  const grandTotalValueUsd = data.portfolioSummary.grandTotalValue;
   const groups = await getUserAssetGroups(userId);
-  const visibleAssets = data.portfolioSummary.totals.filter(
-    (asset) => asset.valueUsd >= MIN_AGENT_ASSET_VALUE_USD,
-  );
-  const visibleValueUsd = visibleAssets.reduce(
-    (sum, asset) => sum + asset.valueUsd,
-    0,
-  );
+  const allocations = buildPortfolioAllocations({
+    grandTotalValueUsd: data.portfolioSummary.grandTotalValue,
+    totals: data.portfolioSummary.totals,
+    groups,
+  });
 
   return {
     retrievedAt: new Date().toISOString(),
     refreshed: refresh,
     portfolio: {
-      grandTotalValueUsd,
-      minimumAssetValueUsd: MIN_AGENT_ASSET_VALUE_USD,
-      otherValueUsd: Math.max(0, grandTotalValueUsd - visibleValueUsd),
-      allocations: applyAssetGroups(visibleAssets, groups).map((row) => {
-        const weight =
-          grandTotalValueUsd === 0 ? 0 : row.valueUsd / grandTotalValueUsd;
-
+      grandTotalValueUsd: allocations.grandTotalValueUsd,
+      minimumAssetValueUsd: allocations.minimumAssetValueUsd,
+      otherValueUsd: allocations.otherValueUsd,
+      allocations: allocations.rows.map((row) => {
         if (!row.isGroup) {
           return {
             type: "asset",
@@ -78,31 +70,23 @@ export async function getAgentPortfolioAllocations(
             name: row.name ?? null,
             amount: row.amount,
             valueUsd: row.valueUsd,
-            weight,
+            weight: row.weight,
           };
         }
 
-        const groupId = row.key.startsWith("group:")
-          ? row.key.slice("group:".length)
-          : row.key;
-        const group = groups.find((candidate) => candidate.id === groupId);
-
         return {
           type: "group",
-          id: groupId,
+          id: row.groupId ?? row.key,
           name: row.label,
-          userDefinedName: group?.name ?? null,
+          userDefinedName: row.userDefinedName ?? null,
           valueUsd: row.valueUsd,
-          weight,
+          weight: row.weight,
           members: row.members.map((member) => ({
             symbol: member.symbol,
             name: member.name ?? null,
             amount: member.amount,
             valueUsd: member.valueUsd,
-            weight:
-              grandTotalValueUsd === 0
-                ? 0
-                : member.valueUsd / grandTotalValueUsd,
+            weight: member.weight,
           })),
         };
       }),

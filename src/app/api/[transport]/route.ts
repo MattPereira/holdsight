@@ -2,7 +2,7 @@ import { mcpHandler } from "@better-auth/oauth-provider";
 import { createMcpHandler } from "mcp-handler";
 import { z } from "zod";
 
-import { getAgentPortfolioAllocations } from "@/lib/portfolio/agent-allocations";
+import { getPortfolioAllocationsForAgent } from "@/lib/agents/portfolio-allocations";
 
 const baseURL = process.env.BETTER_AUTH_URL;
 
@@ -39,7 +39,7 @@ const authenticatedHandler = mcpHandler(
             inputSchema: {},
           },
           async () => {
-            const allocations = await getAgentPortfolioAllocations(userId);
+            const allocations = await getPortfolioAllocationsForAgent(userId);
 
             return {
               content: [
@@ -78,7 +78,7 @@ const authenticatedHandler = mcpHandler(
               };
             }
 
-            const allocations = await getAgentPortfolioAllocations(userId, {
+            const allocations = await getPortfolioAllocationsForAgent(userId, {
               refresh: true,
             });
 
