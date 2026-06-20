@@ -121,7 +121,7 @@ function AllocationDonutChart({
   return (
     <ChartContainer
       config={chartConfig}
-      className="mx-auto aspect-square h-auto w-full max-w-[380px] sm:max-w-[300px] lg:max-w-[440px]"
+      className="mx-auto aspect-square h-auto w-full max-w-95 sm:max-w-75 lg:max-w-110"
     >
       <PieChart>
         <ChartTooltip

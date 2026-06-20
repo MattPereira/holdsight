@@ -2,7 +2,7 @@
 
 import { RiRefreshLine, RiRobot2Line, RiShieldCheckLine } from "@remixicon/react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,14 @@ type PublicOAuthClient = {
 };
 
 export default function OAuthConsentPage() {
+  return (
+    <Suspense fallback={<OAuthConsentFallback />}>
+      <OAuthConsentContent />
+    </Suspense>
+  );
+}
+
+function OAuthConsentContent() {
   const searchParams = useSearchParams();
   const clientId = searchParams.get("client_id") ?? "";
   const scopes = searchParams.get("scope")?.split(" ").filter(Boolean) ?? [];
@@ -153,6 +161,25 @@ export default function OAuthConsentPage() {
             {isPending ? "Connecting…" : "Allow connection"}
           </Button>
         </CardFooter>
+      </Card>
+    </main>
+  );
+}
+
+function OAuthConsentFallback() {
+  return (
+    <main className="flex min-h-svh items-center justify-center bg-muted p-6">
+      <Card className="w-full max-w-lg">
+        <CardHeader>
+          <Badge variant="secondary">
+            <RiRobot2Line data-icon="inline-start" />
+            MCP connection request
+          </Badge>
+          <CardTitle className="mt-2">Connect to Holdsight</CardTitle>
+          <CardDescription>
+            Loading authorization details.
+          </CardDescription>
+        </CardHeader>
       </Card>
     </main>
   );
