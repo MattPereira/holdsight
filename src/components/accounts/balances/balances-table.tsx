@@ -1,0 +1,206 @@
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import type {
+  BalanceGroup,
+  BalanceRow,
+  SecondaryColumn,
+} from "@/components/accounts/types";
+
+const usdFormat = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
+const priceFormat = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+// Sub-dollar prices keep enough significant digits that cheap tokens
+// don't collapse to $0.00.
+const subDollarPriceFormat = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumSignificantDigits: 4,
+});
+
+const amountFormat = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 4,
+});
+
+function formatUsd(value: number) {
+  return usdFormat.format(value);
+}
+
+function formatPrice(price: number) {
+  return price !== 0 && Math.abs(price) < 1
+    ? subDollarPriceFormat.format(price)
+    : priceFormat.format(price);
+}
+
+function DesktopTable({
+  rows,
+  total,
+  secondaryColumn,
+}: {
+  rows: BalanceRow[];
+  total: number;
+  secondaryColumn: SecondaryColumn;
+}) {
+  const secondaryRight = secondaryColumn.align === "right";
+
+  return (
+    <div className="hidden overflow-hidden rounded-lg border sm:block">
+      <Table className="table-fixed">
+        <colgroup>
+          <col className="w-[28%]" />
+          <col className="w-[16%]" />
+          <col className="w-[20%]" />
+          <col className="w-[18%]" />
+          <col className="w-[18%]" />
+        </colgroup>
+        <TableHeader>
+          <TableRow className="bg-muted/30 hover:bg-muted/30">
+            <TableHead>Asset</TableHead>
+            <TableHead className={secondaryRight ? "text-right" : undefined}>
+              {secondaryColumn.header}
+            </TableHead>
+            <TableHead className="text-right">Amount</TableHead>
+            <TableHead className="text-right">Price</TableHead>
+            <TableHead className="text-right">Value</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={row.key}>
+              <TableCell className="font-medium">{row.symbol}</TableCell>
+              <TableCell
+                className={
+                  secondaryRight
+                    ? "text-right tabular-nums text-muted-foreground"
+                    : "text-muted-foreground"
+                }
+              >
+                {row.secondary}
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-muted-foreground">
+                {amountFormat.format(row.amount)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-muted-foreground">
+                {formatPrice(row.priceUsd)}
+              </TableCell>
+              <TableCell className="text-right font-medium tabular-nums">
+                {formatUsd(row.valueUsd)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+        <TableFooter>
+          <TableRow className="hover:bg-muted/50">
+            <TableCell colSpan={4}>Total</TableCell>
+            <TableCell className="text-right font-semibold tabular-nums">
+              {formatUsd(total)}
+            </TableCell>
+          </TableRow>
+        </TableFooter>
+      </Table>
+    </div>
+  );
+}
+
+function MobileList({
+  rows,
+  total,
+  secondaryColumn,
+}: {
+  rows: BalanceRow[];
+  total: number;
+  secondaryColumn: SecondaryColumn;
+}) {
+  return (
+    <ul className="divide-y rounded-lg border sm:hidden">
+      {rows.map((row) => (
+        <li key={row.key} className="flex flex-col gap-2 px-4 py-3">
+          <div className="flex items-baseline justify-between gap-4">
+            <span className="font-medium">{row.symbol}</span>
+            <span className="font-medium tabular-nums">
+              {formatUsd(row.valueUsd)}
+            </span>
+          </div>
+          <div className="flex items-baseline justify-between gap-4 text-xs text-muted-foreground">
+            <span>
+              {secondaryColumn.mobileLabel
+                ? `${secondaryColumn.mobileLabel} ${row.secondary}`
+                : row.secondary}
+            </span>
+            <span className="tabular-nums">
+              {amountFormat.format(row.amount)} @ {formatPrice(row.priceUsd)}
+            </span>
+          </div>
+        </li>
+      ))}
+      <li className="flex items-baseline justify-between gap-4 bg-muted/50 px-4 py-3 font-medium">
+        <span>Total</span>
+        <span className="font-semibold tabular-nums">{formatUsd(total)}</span>
+      </li>
+    </ul>
+  );
+}
+
+/**
+ * Per-group holdings for an account details page: a header (address or account
+ * label, with an optional secondary identifier) followed by its assets — a
+ * columnar table on desktop and a stacked list on mobile, each capped with a
+ * Total row.
+ *
+ * Source-agnostic: callers normalize their balances into {@link BalanceGroup}s
+ * and supply the {@link SecondaryColumn} descriptor for the source-specific
+ * second column (chain, cost basis, etc.).
+ */
+export function BalancesTable({
+  group,
+  secondaryColumn,
+}: {
+  group: BalanceGroup;
+  secondaryColumn: SecondaryColumn;
+}) {
+  const hasRows = group.rows.length > 0;
+
+  return (
+    <section className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-4 px-2">
+        <span className="text-sm font-medium">{group.title}</span>
+        {group.subtitle ? (
+          <span className="text-right text-sm font-normal text-muted-foreground">
+            {group.subtitle}
+          </span>
+        ) : null}
+      </div>
+      {hasRows ? (
+        <>
+          <DesktopTable
+            rows={group.rows}
+            total={group.total}
+            secondaryColumn={secondaryColumn}
+          />
+          <MobileList
+            rows={group.rows}
+            total={group.total}
+            secondaryColumn={secondaryColumn}
+          />
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">{group.emptyMessage}</p>
+      )}
+    </section>
+  );
+}

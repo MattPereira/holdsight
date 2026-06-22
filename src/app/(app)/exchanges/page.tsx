@@ -1,4 +1,4 @@
-import { AccountDetailsPage } from "@/components/accounts/account-details-page";
+import { ExchangesDetailsPage } from "@/components/accounts/exchanges-details-page";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getUserKrakenAccounts } from "@/lib/exchange/kraken/accounts";
 import { getCurrentKrakenBalances } from "@/lib/exchange/kraken/balances";
@@ -20,11 +20,9 @@ export default async function ExchangePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <AccountDetailsPage
+      <ExchangesDetailsPage
         key={balanceResultsKey}
         initialResults={balanceResults}
-        source="kraken"
-        title="Exchanges"
       />
     </div>
   );

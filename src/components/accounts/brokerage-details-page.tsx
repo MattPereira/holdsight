@@ -1,18 +1,14 @@
 "use client";
 
-import { RiRefreshLine } from "@remixicon/react";
-import { useMemo, useState, useTransition } from "react";
-
 import {
   loadBrokerageBalances,
   loadBrokerageTransactions,
 } from "@/app/actions";
-import { BrokerageDetailsTable } from "@/components/accounts/brokerage-details-table";
-import { TransactionsTable } from "@/components/accounts/transactions/transactions-table";
-import { PortfolioAllocations } from "@/components/portfolio/portfolio-allocations";
-import { useAssetGroups } from "@/components/portfolio/asset-groups-context";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AccountDetailsClient } from "@/components/accounts/account-details-client";
+import {
+  BROKERAGE_SECONDARY_COLUMN,
+  brokerageAccountsToGroups,
+} from "@/components/accounts/balances/groups";
 import type { CurrentBrokerageAccount } from "@/lib/brokerage/balances";
 import type { CurrentBrokerageTransaction } from "@/lib/brokerage/transactions";
 import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
@@ -47,6 +43,18 @@ function accountSyncError(accounts: CurrentBrokerageAccount[]): string | null {
   );
 }
 
+function brokerageAccountsToSummary(accounts: CurrentBrokerageAccount[]) {
+  return portfolioAssetSummary(toBalancesResults(accounts));
+}
+
+function brokerageEmptyMessage(
+  accounts: CurrentBrokerageAccount[],
+): string | undefined {
+  return accounts.length === 0
+    ? "No brokerage linked yet. Connect an account to load balances."
+    : undefined;
+}
+
 export function BrokerageDetailsPage({
   initialAccounts,
   initialTransactions,
@@ -54,176 +62,25 @@ export function BrokerageDetailsPage({
   initialAccounts: CurrentBrokerageAccount[];
   initialTransactions: CurrentBrokerageTransaction[];
 }) {
-  const [accounts, setAccounts] =
-    useState<CurrentBrokerageAccount[]>(initialAccounts);
-  const [transactions, setTransactions] =
-    useState<CurrentBrokerageTransaction[]>(initialTransactions);
-  const [syncedInitialAccounts, setSyncedInitialAccounts] =
-    useState(initialAccounts);
-  const [syncedInitialTransactions, setSyncedInitialTransactions] =
-    useState(initialTransactions);
-  const { groups } = useAssetGroups();
-  const [error, setError] = useState<string | null>(null);
-  const [transactionError, setTransactionError] = useState<string | null>(null);
-  const [transactionMessage, setTransactionMessage] = useState<string | null>(
-    null,
-  );
-  const [isBalancePending, startBalanceTransition] = useTransition();
-  const [isTransactionPending, startTransactionTransition] = useTransition();
-  const [activeTab, setActiveTab] = useState("balances");
-
-  if (syncedInitialAccounts !== initialAccounts) {
-    setSyncedInitialAccounts(initialAccounts);
-    setAccounts(initialAccounts);
-    setError(null);
-    setTransactionError(null);
-    setTransactionMessage(null);
-  }
-
-  if (syncedInitialTransactions !== initialTransactions) {
-    setSyncedInitialTransactions(initialTransactions);
-    setTransactions(initialTransactions);
-    setTransactionError(null);
-    setTransactionMessage(null);
-  }
-
-  const summary = useMemo(
-    () => portfolioAssetSummary(toBalancesResults(accounts)),
-    [accounts],
-  );
-
-  const syncError = useMemo(() => accountSyncError(accounts), [accounts]);
-  const displayedError = error ?? syncError;
-  const accountsWithHoldings = useMemo(
-    () => accounts.filter((account) => account.balances.length > 0),
-    [accounts],
-  );
-  const visibleAccounts = useMemo(
-    () =>
-      accounts.filter(
-        (account) =>
-          account.balances.length > 0 || account.syncStatus === "error",
-      ),
-    [accounts],
-  );
-  const hasHoldings = accountsWithHoldings.length > 0;
-  const balanceBusy = isBalancePending;
-  const transactionBusy = isTransactionPending;
-
-  function handleRefresh() {
-    setError(null);
-    startBalanceTransition(async () => {
-      const result = await loadBrokerageBalances();
-      setAccounts(result.accounts);
-      setError(result.error);
-    });
-  }
-
-  function handleTransactionRefresh() {
-    setTransactionError(null);
-    setTransactionMessage(null);
-    startTransactionTransition(async () => {
-      const result = await loadBrokerageTransactions();
-      setTransactions(result.transactions);
-      setTransactionMessage(result.message || null);
-      setTransactionError(result.error);
-    });
-  }
-
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">Brokerages</h1>
-
-      {displayedError && (
-        <p
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          {displayedError}
-        </p>
-      )}
-
-      {accounts.length === 0 ? (
-        <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-          No brokerage linked yet. Connect an account to load balances.
-        </p>
-      ) : (
-        <Tabs
-          value={activeTab}
-          onValueChange={setActiveTab}
-          className="flex flex-col gap-4"
-        >
-          <div className="flex items-center justify-between gap-2">
-            <TabsList>
-              <TabsTrigger value="balances">Balances</TabsTrigger>
-              <TabsTrigger value="transactions">Transactions</TabsTrigger>
-            </TabsList>
-
-            {activeTab === "balances" ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={balanceBusy}
-              >
-                <RiRefreshLine />
-                {balanceBusy ? "Refreshing" : "Refresh"}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={handleTransactionRefresh}
-                disabled={transactionBusy}
-              >
-                <RiRefreshLine />
-                {transactionBusy ? "Refreshing" : "Refresh"}
-              </Button>
-            )}
-          </div>
-
-          <TabsContent value="balances">
-            <div className="flex flex-col gap-6 md:gap-0">
-              {hasHoldings && (
-                <PortfolioAllocations
-                  grandTotalValue={summary.grandTotalValue}
-                  totals={summary.totals}
-                  groups={groups}
-                />
-              )}
-
-              <div className="flex flex-col gap-6">
-                {visibleAccounts.map((account) => (
-                  <BrokerageDetailsTable key={account.id} account={account} />
-                ))}
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="transactions">
-            <div className="flex flex-col gap-4">
-              {transactionError ? (
-                <p
-                  role="alert"
-                  className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-                >
-                  {transactionError}
-                </p>
-              ) : null}
-
-              {transactionMessage ? (
-                <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                  {transactionMessage}
-                </p>
-              ) : null}
-
-              <TransactionsTable transactions={transactions} />
-            </div>
-          </TabsContent>
-        </Tabs>
-      )}
-    </div>
+    <AccountDetailsClient
+      title="Brokerages"
+      initialBalances={initialAccounts}
+      loadBalances={loadBrokerageBalances}
+      getBalances={(result) => result.accounts}
+      getBalancesError={(result) => result.error}
+      balancesToGroups={brokerageAccountsToGroups}
+      balancesToSummary={brokerageAccountsToSummary}
+      deriveBalancesError={accountSyncError}
+      emptyMessage={brokerageEmptyMessage}
+      secondaryColumn={BROKERAGE_SECONDARY_COLUMN}
+      transactions={{
+        initialTransactions,
+        loadTransactions: loadBrokerageTransactions,
+        getTransactions: (result) => result.transactions,
+        getError: (result) => result.error,
+        getMessage: (result) => result.message || null,
+      }}
+    />
   );
 }
