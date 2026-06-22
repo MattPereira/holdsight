@@ -116,21 +116,7 @@ export function BrokerageDetailsPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
-        <h1 className="text-xl font-semibold">Brokerages</h1>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-sm"
-          onClick={handleRefresh}
-          disabled={balanceBusy}
-          aria-label={
-            accounts.length > 0 ? "Refresh Brokerage" : "Load Brokerage"
-          }
-        >
-          <RiRefreshLine />
-        </Button>
-      </div>
+      <h1 className="text-xl font-semibold">Brokerages</h1>
 
       {displayedError && (
         <p
@@ -151,10 +137,36 @@ export function BrokerageDetailsPage({
           onValueChange={setActiveTab}
           className="flex flex-col gap-4"
         >
-          <TabsList>
-            <TabsTrigger value="balances">Balances</TabsTrigger>
-            <TabsTrigger value="transactions">Transactions</TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between gap-2">
+            <TabsList>
+              <TabsTrigger value="balances">Balances</TabsTrigger>
+              <TabsTrigger value="transactions">Transactions</TabsTrigger>
+            </TabsList>
+
+            {activeTab === "balances" ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={balanceBusy}
+              >
+                <RiRefreshLine />
+                {balanceBusy ? "Refreshing" : "Refresh"}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleTransactionRefresh}
+                disabled={transactionBusy}
+              >
+                <RiRefreshLine />
+                {transactionBusy ? "Refreshing" : "Refresh"}
+              </Button>
+            )}
+          </div>
 
           <TabsContent value="balances">
             <div className="flex flex-col gap-6 md:gap-0">
@@ -176,22 +188,6 @@ export function BrokerageDetailsPage({
 
           <TabsContent value="transactions">
             <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex flex-col gap-1">
-                  <h2 className="text-sm font-medium">Transactions</h2>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleTransactionRefresh}
-                  disabled={transactionBusy}
-                >
-                  <RiRefreshLine />
-                  {transactionBusy ? "Refreshing" : "Refresh transactions"}
-                </Button>
-              </div>
-
               {transactionError ? (
                 <p
                   role="alert"
