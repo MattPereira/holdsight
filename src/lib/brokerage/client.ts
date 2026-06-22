@@ -4,6 +4,7 @@ import {
   AccountType,
   type Holding,
   type InvestmentAccount,
+  type InvestmentTransaction,
   type Security,
 } from "plaid";
 
@@ -13,6 +14,7 @@ import type {
   BrokerageAccountTypeValue,
   BrokerageAssetClass,
   BrokerageBalance,
+  BrokerageTransactionsResult,
   HoldingsResult,
 } from "@/lib/brokerage/types";
 
@@ -178,6 +180,66 @@ export async function getHoldings(accessToken: string): Promise<HoldingsResult> 
     const { code, message, httpStatus } = readPlaidError(error);
     // The user's login expired/changed — they must re-link via Plaid Link.
     if (code === "ITEM_LOGIN_REQUIRED") return { status: "login_required" };
+    return { status: "error", message, httpStatus };
+  }
+}
+
+const INVESTMENT_TRANSACTIONS_PAGE_SIZE = 500;
+
+/**
+ * Fetch investment transactions for a Plaid Item across every investment
+ * account in the requested date window, following Plaid's offset pagination.
+ */
+export async function getInvestmentTransactions(
+  accessToken: string,
+  input: {
+    startDate: string;
+    endDate: string;
+    accountIds?: string[];
+  },
+): Promise<BrokerageTransactionsResult> {
+  const transactions: InvestmentTransaction[] = [];
+  const securitiesById = new Map<string, Security>();
+  let totalInvestmentTransactions = 0;
+  let offset = 0;
+
+  try {
+    do {
+      const res = await getClient().investmentsTransactionsGet({
+        access_token: accessToken,
+        start_date: input.startDate,
+        end_date: input.endDate,
+        options: {
+          count: INVESTMENT_TRANSACTIONS_PAGE_SIZE,
+          offset,
+          ...(input.accountIds && input.accountIds.length > 0
+            ? { account_ids: input.accountIds }
+            : {}),
+        },
+      });
+
+      transactions.push(...res.data.investment_transactions);
+      for (const security of res.data.securities) {
+        securitiesById.set(security.security_id, security);
+      }
+
+      totalInvestmentTransactions = res.data.total_investment_transactions;
+      offset += res.data.investment_transactions.length;
+    } while (
+      transactions.length < totalInvestmentTransactions &&
+      offset > 0
+    );
+
+    return {
+      status: "ready",
+      transactions,
+      securities: Array.from(securitiesById.values()),
+      totalInvestmentTransactions,
+    };
+  } catch (error) {
+    const { code, message, httpStatus } = readPlaidError(error);
+    if (code === "ITEM_LOGIN_REQUIRED") return { status: "login_required" };
+    if (code === "PRODUCT_NOT_READY") return { status: "not_ready" };
     return { status: "error", message, httpStatus };
   }
 }

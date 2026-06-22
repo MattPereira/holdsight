@@ -113,6 +113,13 @@
       "when": 1781910684220,
       "tag": "0015_big_iron_lad",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1782159312799,
+      "tag": "0016_wooden_mimic",
+      "breakpoints": true
     }
   ]
 }

@@ -57,6 +57,10 @@ import {
   type CurrentBrokerageAccount,
 } from "@/lib/brokerage/balances";
 import {
+  syncUserBrokerageInvestmentTransactions,
+  type SyncUserBrokerageInvestmentTransactionsResult,
+} from "@/lib/brokerage/transactions";
+import {
   getUserDepositoryAccounts,
   saveDepositoryAccounts,
   type DepositoryAccountRow,
@@ -308,6 +312,12 @@ export type BrokerageActionResult = {
   error: string | null;
 };
 
+export type BrokerageTransactionsActionResult = {
+  summary: SyncUserBrokerageInvestmentTransactionsResult | null;
+  message: string;
+  error: string | null;
+};
+
 export type DepositoryActionResult = {
   accounts: DepositoryAccountRow[];
   error: string | null;
@@ -548,6 +558,69 @@ export async function loadBrokerageBalances(): Promise<BrokerageActionResult> {
   revalidatePath("/");
   revalidatePath("/brokerages");
   return { accounts, error: brokerageSyncError(accounts) };
+}
+
+function dateOnly(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function brokerageTransactionsMessage(
+  summary: SyncUserBrokerageInvestmentTransactionsResult,
+): string {
+  const transactionLabel =
+    summary.transactionCount === 1 ? "transaction" : "transactions";
+  const skipped =
+    summary.skippedTransactionCount > 0
+      ? ` ${summary.skippedTransactionCount} unmatched Plaid ${summary.skippedTransactionCount === 1 ? "transaction was" : "transactions were"} skipped.`
+      : "";
+  const failures =
+    summary.failures.length > 0
+      ? ` ${summary.failures.length} ${summary.failures.length === 1 ? "institution needs" : "institutions need"} attention.`
+      : "";
+
+  return `Synced ${summary.transactionCount} brokerage ${transactionLabel}.${skipped}${failures}`;
+}
+
+/**
+ * Refresh brokerage investment transactions separately from brokerage balances.
+ * Uses a one-month lookback until transaction sync cursors/backfill are wired.
+ */
+export async function loadBrokerageTransactions(): Promise<BrokerageTransactionsActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      summary: null,
+      message: "",
+      error: "You must be signed in to refresh transactions.",
+    };
+  }
+
+  const end = new Date();
+  const start = new Date(end);
+  start.setMonth(start.getMonth() - 1);
+
+  try {
+    const summary = await syncUserBrokerageInvestmentTransactions(userId, {
+      startDate: dateOnly(start),
+      endDate: dateOnly(end),
+    });
+
+    revalidatePath("/brokerages");
+    return {
+      summary,
+      message: brokerageTransactionsMessage(summary),
+      error: summary.failures[0]?.message ?? null,
+    };
+  } catch (error) {
+    return {
+      summary: null,
+      message: "",
+      error: plaidActionErrorMessage(
+        error,
+        "Failed to refresh brokerage transactions.",
+      ),
+    };
+  }
 }
 
 /**

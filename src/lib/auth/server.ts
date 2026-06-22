@@ -38,6 +38,7 @@ export const auth = betterAuth({
       loginPage: "/",
       consentPage: "/oauth/consent",
       validAudiences: [new URL("/api/mcp", baseURL).toString()],
+      accessTokenExpiresIn: 60 * 60 * 24,
       allowDynamicClientRegistration: true,
       allowUnauthenticatedClientRegistration: true,
     }),
