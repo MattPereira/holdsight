@@ -8,11 +8,13 @@ import {
   loadBrokerageTransactions,
 } from "@/app/actions";
 import { BrokerageDetailsTable } from "@/components/accounts/brokerage-details-table";
+import { TransactionsTable } from "@/components/accounts/transactions/transactions-table";
 import { PortfolioAllocations } from "@/components/portfolio/portfolio-allocations";
 import { useAssetGroups } from "@/components/portfolio/asset-groups-context";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CurrentBrokerageAccount } from "@/lib/brokerage/balances";
+import type { CurrentBrokerageTransaction } from "@/lib/brokerage/transactions";
 import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 import type { BalancesResult } from "@/lib/portfolio/types";
 
@@ -47,13 +49,19 @@ function accountSyncError(accounts: CurrentBrokerageAccount[]): string | null {
 
 export function BrokerageDetailsPage({
   initialAccounts,
+  initialTransactions,
 }: {
   initialAccounts: CurrentBrokerageAccount[];
+  initialTransactions: CurrentBrokerageTransaction[];
 }) {
   const [accounts, setAccounts] =
     useState<CurrentBrokerageAccount[]>(initialAccounts);
+  const [transactions, setTransactions] =
+    useState<CurrentBrokerageTransaction[]>(initialTransactions);
   const [syncedInitialAccounts, setSyncedInitialAccounts] =
     useState(initialAccounts);
+  const [syncedInitialTransactions, setSyncedInitialTransactions] =
+    useState(initialTransactions);
   const { groups } = useAssetGroups();
   const [error, setError] = useState<string | null>(null);
   const [transactionError, setTransactionError] = useState<string | null>(null);
@@ -62,11 +70,19 @@ export function BrokerageDetailsPage({
   );
   const [isBalancePending, startBalanceTransition] = useTransition();
   const [isTransactionPending, startTransactionTransition] = useTransition();
+  const [activeTab, setActiveTab] = useState("balances");
 
   if (syncedInitialAccounts !== initialAccounts) {
     setSyncedInitialAccounts(initialAccounts);
     setAccounts(initialAccounts);
     setError(null);
+    setTransactionError(null);
+    setTransactionMessage(null);
+  }
+
+  if (syncedInitialTransactions !== initialTransactions) {
+    setSyncedInitialTransactions(initialTransactions);
+    setTransactions(initialTransactions);
     setTransactionError(null);
     setTransactionMessage(null);
   }
@@ -93,7 +109,6 @@ export function BrokerageDetailsPage({
   const hasHoldings = accountsWithHoldings.length > 0;
   const balanceBusy = isBalancePending;
   const transactionBusy = isTransactionPending;
-  const [activeTab, setActiveTab] = useState("balances");
 
   function handleRefresh() {
     setError(null);
@@ -109,6 +124,7 @@ export function BrokerageDetailsPage({
     setTransactionMessage(null);
     startTransactionTransition(async () => {
       const result = await loadBrokerageTransactions();
+      setTransactions(result.transactions);
       setTransactionMessage(result.message || null);
       setTransactionError(result.error);
     });
@@ -202,6 +218,8 @@ export function BrokerageDetailsPage({
                   {transactionMessage}
                 </p>
               ) : null}
+
+              <TransactionsTable transactions={transactions} />
             </div>
           </TabsContent>
         </Tabs>

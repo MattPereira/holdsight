@@ -57,7 +57,9 @@ import {
   type CurrentBrokerageAccount,
 } from "@/lib/brokerage/balances";
 import {
+  getCurrentBrokerageTransactions,
   syncUserBrokerageInvestmentTransactions,
+  type CurrentBrokerageTransaction,
   type SyncUserBrokerageInvestmentTransactionsResult,
 } from "@/lib/brokerage/transactions";
 import {
@@ -314,6 +316,7 @@ export type BrokerageActionResult = {
 
 export type BrokerageTransactionsActionResult = {
   summary: SyncUserBrokerageInvestmentTransactionsResult | null;
+  transactions: CurrentBrokerageTransaction[];
   message: string;
   error: string | null;
 };
@@ -583,37 +586,36 @@ function brokerageTransactionsMessage(
 
 /**
  * Refresh brokerage investment transactions separately from brokerage balances.
- * Uses a one-month lookback until transaction sync cursors/backfill are wired.
  */
 export async function loadBrokerageTransactions(): Promise<BrokerageTransactionsActionResult> {
   const userId = await getCurrentUserId();
   if (!userId) {
     return {
       summary: null,
+      transactions: [],
       message: "",
       error: "You must be signed in to refresh transactions.",
     };
   }
 
   const end = new Date();
-  const start = new Date(end);
-  start.setMonth(start.getMonth() - 1);
 
   try {
     const summary = await syncUserBrokerageInvestmentTransactions(userId, {
-      startDate: dateOnly(start),
       endDate: dateOnly(end),
     });
 
     revalidatePath("/brokerages");
     return {
       summary,
+      transactions: await getCurrentBrokerageTransactions(userId),
       message: brokerageTransactionsMessage(summary),
       error: summary.failures[0]?.message ?? null,
     };
   } catch (error) {
     return {
       summary: null,
+      transactions: await getCurrentBrokerageTransactions(userId),
       message: "",
       error: plaidActionErrorMessage(
         error,
