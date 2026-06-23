@@ -57,8 +57,6 @@ export function AccountDetailsShell({
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-xl font-semibold">{title}</h1>
-
       {balancesError ? (
         <p
           role="alert"
@@ -69,45 +67,48 @@ export function AccountDetailsShell({
       ) : null}
 
       {groups.length === 0 && emptyMessage ? (
-        <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-          {emptyMessage}
-        </p>
+        <>
+          <h1 className="text-xl font-semibold">{title}</h1>
+          <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
+            {emptyMessage}
+          </p>
+        </>
       ) : (
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
           className="flex flex-col gap-4"
         >
-          <div
-            className={
-              hasTransactions
-                ? "flex items-center justify-between gap-2"
-                : "flex items-center justify-end gap-2"
-            }
-          >
-            {hasTransactions ? (
-              <TabsList>
-                <TabsTrigger value="balances">Balances</TabsTrigger>
-                <TabsTrigger value="transactions">Transactions</TabsTrigger>
-              </TabsList>
-            ) : null}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-semibold">{title}</h1>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={refresh}
-              disabled={refreshBusy}
-            >
-              <RiRefreshLine />
-              {onTransactionsTab
-                ? refreshBusy
-                  ? "Syncing"
-                  : "Sync"
-                : refreshBusy
-                  ? "Refreshing"
-                  : "Refresh"}
-            </Button>
+              {hasTransactions ? (
+                <TabsList>
+                  <TabsTrigger value="balances">Balances</TabsTrigger>
+                  <TabsTrigger value="transactions">Transactions</TabsTrigger>
+                </TabsList>
+              ) : null}
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                onClick={refresh}
+                disabled={refreshBusy}
+                aria-label={
+                  onTransactionsTab
+                    ? refreshBusy
+                      ? "Syncing"
+                      : "Sync"
+                    : refreshBusy
+                      ? "Refreshing"
+                      : "Refresh"
+                }
+              >
+                <RiRefreshLine />
+              </Button>
+            </div>
           </div>
 
           <TabsContent value="balances">

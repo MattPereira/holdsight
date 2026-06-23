@@ -92,70 +92,64 @@ export function TransactionsTabContent({
 
       {total > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <div className="flex items-center gap-3">
-            {pageCount > 1 ? (
-              <Pagination className="mx-0 w-auto">
-                <PaginationContent className="gap-1">
-                  <PaginationItem>
-                    <PaginationPrevious
-                      text=""
-                      aria-disabled={currentPage <= 1}
-                      className={cn(
-                        "cursor-pointer",
-                        currentPage <= 1 && "pointer-events-none opacity-50",
-                      )}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    />
-                  </PaginationItem>
-                  <PaginationItem>
-                    <span className="px-1 text-sm tabular-nums text-muted-foreground">
-                      {currentPage} / {pageCount}
-                    </span>
-                  </PaginationItem>
-                  <PaginationItem>
-                    <PaginationNext
-                      text=""
-                      aria-disabled={currentPage >= pageCount}
-                      className={cn(
-                        "cursor-pointer",
-                        currentPage >= pageCount &&
-                          "pointer-events-none opacity-50",
-                      )}
-                      onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-                    />
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
-            ) : null}
-
-            <Select
-              value={String(pageSize)}
-              onValueChange={handlePageSizeChange}
-            >
-              <SelectTrigger
-                size="sm"
-                aria-label="Transactions per page"
-                className="w-[64px]"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAGE_SIZE_OPTIONS.map((option) => (
-                  <SelectItem key={option} value={String(option)}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           <span className="text-sm font-normal text-muted-foreground">
             {status}
           </span>
+
+          <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
+            <SelectTrigger
+              size="sm"
+              aria-label="Transactions per page"
+              className="w-[64px]"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_SIZE_OPTIONS.map((option) => (
+                <SelectItem key={option} value={String(option)}>
+                  {option}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       ) : null}
 
       <TransactionsTable transactions={pageTransactions} />
+
+      {pageCount > 1 ? (
+        <Pagination className="mx-0 w-auto justify-end">
+          <PaginationContent className="gap-1">
+            <PaginationItem>
+              <PaginationPrevious
+                text=""
+                aria-disabled={currentPage <= 1}
+                className={cn(
+                  "cursor-pointer",
+                  currentPage <= 1 && "pointer-events-none opacity-50",
+                )}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              />
+            </PaginationItem>
+            <PaginationItem>
+              <span className="px-1 text-sm tabular-nums text-muted-foreground">
+                {currentPage} / {pageCount}
+              </span>
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                text=""
+                aria-disabled={currentPage >= pageCount}
+                className={cn(
+                  "cursor-pointer",
+                  currentPage >= pageCount && "pointer-events-none opacity-50",
+                )}
+                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      ) : null}
     </div>
   );
 }

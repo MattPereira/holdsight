@@ -413,7 +413,6 @@ export async function processBrokerageTransactionSyncPage(input: {
 
 export async function getCurrentBrokerageTransactions(
   userId: string,
-  limit = 200,
 ): Promise<CurrentBrokerageTransaction[]> {
   const rows = await db
     .select({
@@ -446,8 +445,7 @@ export async function getCurrentBrokerageTransactions(
     .innerJoin(brokerageTransactionDetails, eq(brokerageTransactionDetails.transactionId, investmentTransactions.id))
     .innerJoin(investmentAccounts, eq(investmentAccounts.id, investmentTransactions.investmentAccountId))
     .where(and(eq(investmentTransactions.userId, userId), eq(investmentTransactions.sourceProvider, PLAID_PROVIDER)))
-    .orderBy(desc(investmentTransactions.executedAt))
-    .limit(limit);
+    .orderBy(desc(investmentTransactions.executedAt));
 
   return rows.map((row) => ({
     ...row,
