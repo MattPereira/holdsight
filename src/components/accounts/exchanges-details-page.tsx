@@ -3,7 +3,6 @@
 import {
   loadKrakenBalances,
   loadKrakenTransactions,
-  loadOlderKrakenTransactions,
 } from "@/app/actions";
 import { AccountDetailsClient } from "@/components/accounts/account-details-client";
 import {
@@ -47,7 +46,6 @@ export function ExchangesDetailsPage({
         getMessage: (result) => result.message || null,
         initialHistoryStatus,
         getHistoryStatus: (result) => result.historyStatus,
-        loadOlderTransactions: loadOlderKrakenTransactions,
       }}
     />
   );

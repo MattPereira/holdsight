@@ -443,7 +443,7 @@ async function markSyncSuccess(input: {
       investmentAccountId: link.investmentAccountId,
       provider: PLAID_PROVIDER,
       status: "success",
-      cursor: state?.cursor ?? null,
+      checkpoint: state?.checkpoint ?? null,
       earliestBackfilledAt: stateEarliestBackfilledAt({
         state,
         startDate: input.startDate,
@@ -478,7 +478,7 @@ async function markSyncFailure(input: {
       investmentAccountId: link.investmentAccountId,
       provider: PLAID_PROVIDER,
       status,
-      cursor: state?.cursor ?? null,
+      checkpoint: state?.checkpoint ?? null,
       earliestBackfilledAt: state?.earliestBackfilledAt ?? null,
       latestSyncedExecutedAt: state?.latestSyncedExecutedAt ?? null,
       backfillStartedAt: state?.backfillStartedAt ?? null,

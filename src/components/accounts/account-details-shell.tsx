@@ -6,7 +6,10 @@ import { useState } from "react";
 import { BalancesTabContent } from "@/components/accounts/balances/balances-tab-content";
 import type { TransactionsPanel } from "@/components/accounts/transactions/types";
 import { TransactionsTabContent } from "@/components/accounts/transactions/transactions-tab-content";
-import type { BalanceGroup, SecondaryColumn } from "@/components/accounts/types";
+import type {
+  BalanceGroup,
+  SecondaryColumn,
+} from "@/components/accounts/types";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { PortfolioAssetSummary } from "@/lib/portfolio/asset-totals";
@@ -47,7 +50,9 @@ export function AccountDetailsShell({
   const hasTransactions = transactions !== undefined;
   const onTransactionsTab = activeTab === "transactions" && hasTransactions;
 
-  const refresh = onTransactionsTab ? transactions.onRefresh : onRefreshBalances;
+  const refresh = onTransactionsTab
+    ? transactions.onRefresh
+    : onRefreshBalances;
   const refreshBusy = onTransactionsTab ? transactions.busy : balancesBusy;
 
   return (
@@ -95,7 +100,13 @@ export function AccountDetailsShell({
               disabled={refreshBusy}
             >
               <RiRefreshLine />
-              {refreshBusy ? "Refreshing" : "Refresh"}
+              {onTransactionsTab
+                ? refreshBusy
+                  ? "Syncing"
+                  : "Sync"
+                : refreshBusy
+                  ? "Refreshing"
+                  : "Refresh"}
             </Button>
           </div>
 

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { start } from "workflow/api";
 
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
@@ -26,14 +27,12 @@ import {
   syncUserKrakenAccounts,
 } from "@/lib/exchange/kraken/balances";
 import {
-  backfillUserKrakenTrades,
   getCurrentKrakenTransactions,
   getKrakenTransactionHistoryStatus,
-  syncUserKrakenTransactions,
   type CurrentKrakenTransaction,
   type KrakenTransactionHistoryStatus,
-  type SyncUserKrakenTransactionsResult,
 } from "@/lib/exchange/kraken/transactions";
+import { syncKrakenTransactionHistory } from "@/workflows/kraken-transaction-sync";
 import {
   addUserEvmAccounts,
   getUserEvmAccounts,
@@ -263,7 +262,6 @@ export async function loadKrakenBalances(): Promise<BalancesResult[]> {
 }
 
 export type KrakenTransactionsActionResult = {
-  summary: SyncUserKrakenTransactionsResult | null;
   transactions: CurrentKrakenTransaction[];
   message: string;
   error: string | null;
@@ -274,7 +272,6 @@ export async function loadKrakenTransactions(): Promise<KrakenTransactionsAction
   const userId = await getCurrentUserId();
   if (!userId) {
     return {
-      summary: null,
       transactions: [],
       message: "",
       error: "You must be signed in to refresh transactions.",
@@ -283,17 +280,34 @@ export async function loadKrakenTransactions(): Promise<KrakenTransactionsAction
   }
 
   try {
-    const summary = await syncUserKrakenTransactions(userId);
+    const accounts = await getUserKrakenAccounts(userId);
+    if (accounts.length === 0) {
+      return {
+        transactions: [],
+        message: "",
+        error: "Add Kraken API credentials before syncing transactions.",
+        historyStatus: {
+          earliestTransactionAt: null,
+          latestTransactionAt: null,
+          hasMore: false,
+        },
+      };
+    }
+
+    await Promise.all(
+      accounts.map((account) =>
+        start(syncKrakenTransactionHistory, [userId, account.id]),
+      ),
+    );
     revalidatePath("/exchanges");
     const [transactions, historyStatus] = await Promise.all([
       getCurrentKrakenTransactions(userId),
       getKrakenTransactionHistoryStatus(userId),
     ]);
     return {
-      summary,
       transactions,
-      message: `Synced ${summary.transactionCount} Kraken ${summary.transactionCount === 1 ? "transaction" : "transactions"}.`,
-      error: summary.failures[0]?.message ?? null,
+      message: `Queued full transaction history sync for ${accounts.length} Kraken ${accounts.length === 1 ? "account" : "accounts"}.`,
+      error: null,
       historyStatus,
     };
   } catch (error) {
@@ -302,51 +316,9 @@ export async function loadKrakenTransactions(): Promise<KrakenTransactionsAction
       getKrakenTransactionHistoryStatus(userId),
     ]);
     return {
-      summary: null,
       transactions,
       message: "",
       error: error instanceof Error ? error.message : "Failed to refresh Kraken transactions.",
-      historyStatus,
-    };
-  }
-}
-
-export async function loadOlderKrakenTransactions(): Promise<KrakenTransactionsActionResult> {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return {
-      summary: null,
-      transactions: [],
-      message: "",
-      error: "You must be signed in to load older transactions.",
-      historyStatus: { earliestTransactionAt: null, latestTransactionAt: null, hasMore: false },
-    };
-  }
-
-  try {
-    const summary = await backfillUserKrakenTrades(userId);
-    revalidatePath("/exchanges");
-    const [transactions, historyStatus] = await Promise.all([
-      getCurrentKrakenTransactions(userId),
-      getKrakenTransactionHistoryStatus(userId),
-    ]);
-    return {
-      summary,
-      transactions,
-      message: `Loaded ${summary.transactionCount} older Kraken ${summary.transactionCount === 1 ? "trade" : "trades"}.`,
-      error: summary.failures[0]?.message ?? null,
-      historyStatus,
-    };
-  } catch (error) {
-    const [transactions, historyStatus] = await Promise.all([
-      getCurrentKrakenTransactions(userId),
-      getKrakenTransactionHistoryStatus(userId),
-    ]);
-    return {
-      summary: null,
-      transactions,
-      message: "",
-      error: error instanceof Error ? error.message : "Failed to load older Kraken transactions.",
       historyStatus,
     };
   }

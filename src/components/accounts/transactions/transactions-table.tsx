@@ -36,13 +36,17 @@ const OUTBOUND_SIDES = new Set<InvestmentTransactionListItem["side"]>([
   "close",
 ]);
 
-function sideDirection(side: InvestmentTransactionListItem["side"]): LegDirection {
+function sideDirection(
+  side: InvestmentTransactionListItem["side"],
+): LegDirection {
   if (INBOUND_SIDES.has(side)) return "in";
   if (OUTBOUND_SIDES.has(side)) return "out";
   return "neutral";
 }
 
-function formatAsset(transaction: InvestmentTransactionListItem): string | null {
+function formatAsset(
+  transaction: InvestmentTransactionListItem,
+): string | null {
   if (transaction.baseAmount === null || !transaction.baseAssetSymbol) {
     return null;
   }
@@ -121,6 +125,8 @@ export function TransactionsTable({
       </p>
     );
   }
+
+  console.log(transactions.length);
 
   return (
     <ul className="divide-y">

@@ -48,6 +48,15 @@ export type InvestmentTransactionSyncStatus =
   | "rate_limited"
   | "error";
 
+/**
+ * Provider-owned, durable progress for a transaction history import.
+ *
+ * The ingestion layer deliberately does not interpret this object. For
+ * example, Kraken will store its backfill offset and forward scan boundary
+ * here, while other providers can use their own cursor formats.
+ */
+export type InvestmentTransactionSyncCheckpoint = Record<string, unknown>;
+
 export type NormalizedInvestmentTransaction = {
   sourceProvider: string;
   sourceTransactionId: string;
@@ -127,7 +136,9 @@ export type InvestmentTransactionSyncState = {
   investmentAccountId: string;
   provider: string;
   status: InvestmentTransactionSyncStatus;
-  cursor: string | null;
+  checkpoint: InvestmentTransactionSyncCheckpoint | null;
+  leaseToken: string | null;
+  leaseExpiresAt: Date | null;
   earliestBackfilledAt: Date | null;
   latestSyncedExecutedAt: Date | null;
   backfillStartedAt: Date | null;
@@ -142,7 +153,9 @@ export type UpsertInvestmentTransactionSyncStateInput = {
   investmentAccountId: string;
   provider: string;
   status: InvestmentTransactionSyncStatus;
-  cursor?: string | null;
+  checkpoint?: InvestmentTransactionSyncCheckpoint | null;
+  leaseToken?: string | null;
+  leaseExpiresAt?: Date | null;
   earliestBackfilledAt?: Date | null;
   latestSyncedExecutedAt?: Date | null;
   backfillStartedAt?: Date | null;
@@ -153,6 +166,7 @@ export type UpsertInvestmentTransactionSyncStateInput = {
 };
 
 type TransactionIdLookup = Map<string, string>;
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 function decimalValue(value: string | number | null | undefined): string | null {
   if (value === null || value === undefined) return null;
@@ -185,7 +199,9 @@ export async function getInvestmentTransactionSyncState(input: {
       investmentAccountId: investmentTransactionSyncs.investmentAccountId,
       provider: investmentTransactionSyncs.provider,
       status: investmentTransactionSyncs.status,
-      cursor: investmentTransactionSyncs.cursor,
+      checkpoint: investmentTransactionSyncs.checkpoint,
+      leaseToken: investmentTransactionSyncs.leaseToken,
+      leaseExpiresAt: investmentTransactionSyncs.leaseExpiresAt,
       earliestBackfilledAt: investmentTransactionSyncs.earliestBackfilledAt,
       latestSyncedExecutedAt:
         investmentTransactionSyncs.latestSyncedExecutedAt,
@@ -214,15 +230,26 @@ export async function getInvestmentTransactionSyncState(input: {
 export async function upsertInvestmentTransactionSyncState(
   input: UpsertInvestmentTransactionSyncStateInput,
 ): Promise<InvestmentTransactionSyncState> {
+  return db.transaction((tx) =>
+    upsertInvestmentTransactionSyncStateInTransaction(tx, input),
+  );
+}
+
+async function upsertInvestmentTransactionSyncStateInTransaction(
+  tx: DbTransaction,
+  input: UpsertInvestmentTransactionSyncStateInput,
+): Promise<InvestmentTransactionSyncState> {
   const now = new Date();
-  const [state] = await db
+  const [state] = await tx
     .insert(investmentTransactionSyncs)
     .values({
       userId: input.userId,
       investmentAccountId: input.investmentAccountId,
       provider: input.provider,
       status: input.status,
-      cursor: input.cursor ?? null,
+      checkpoint: input.checkpoint ?? null,
+      leaseToken: input.leaseToken ?? null,
+      leaseExpiresAt: input.leaseExpiresAt ?? null,
       earliestBackfilledAt: input.earliestBackfilledAt ?? null,
       latestSyncedExecutedAt: input.latestSyncedExecutedAt ?? null,
       backfillStartedAt: input.backfillStartedAt ?? null,
@@ -238,7 +265,9 @@ export async function upsertInvestmentTransactionSyncState(
       ],
       set: {
         status: input.status,
-        cursor: input.cursor ?? null,
+        checkpoint: input.checkpoint ?? null,
+        leaseToken: input.leaseToken ?? null,
+        leaseExpiresAt: input.leaseExpiresAt ?? null,
         earliestBackfilledAt: input.earliestBackfilledAt ?? null,
         latestSyncedExecutedAt: input.latestSyncedExecutedAt ?? null,
         backfillStartedAt: input.backfillStartedAt ?? null,
@@ -255,7 +284,9 @@ export async function upsertInvestmentTransactionSyncState(
       investmentAccountId: investmentTransactionSyncs.investmentAccountId,
       provider: investmentTransactionSyncs.provider,
       status: investmentTransactionSyncs.status,
-      cursor: investmentTransactionSyncs.cursor,
+      checkpoint: investmentTransactionSyncs.checkpoint,
+      leaseToken: investmentTransactionSyncs.leaseToken,
+      leaseExpiresAt: investmentTransactionSyncs.leaseExpiresAt,
       earliestBackfilledAt: investmentTransactionSyncs.earliestBackfilledAt,
       latestSyncedExecutedAt:
         investmentTransactionSyncs.latestSyncedExecutedAt,
@@ -272,6 +303,13 @@ export async function upsertInvestmentTransactionSyncState(
 export async function upsertInvestmentTransactions(
   input: UpsertInvestmentTransactionsInput,
 ): Promise<UpsertInvestmentTransactionsResult> {
+  return db.transaction((tx) => upsertInvestmentTransactionsInTransaction(tx, input));
+}
+
+async function upsertInvestmentTransactionsInTransaction(
+  tx: DbTransaction,
+  input: UpsertInvestmentTransactionsInput,
+): Promise<UpsertInvestmentTransactionsResult> {
   if (input.transactions.length === 0) {
     return {
       transactionCount: 0,
@@ -281,9 +319,8 @@ export async function upsertInvestmentTransactions(
     };
   }
 
-  return db.transaction(async (tx) => {
-    const now = new Date();
-    const upsertedTransactions = await tx
+  const now = new Date();
+  const upsertedTransactions = await tx
       .insert(investmentTransactions)
       .values(
         input.transactions.map((transaction) => ({
@@ -348,40 +385,58 @@ export async function upsertInvestmentTransactions(
         sourceTransactionId: investmentTransactions.sourceTransactionId,
       });
 
-    const idsBySourceTransactionId = new Map(
+  const idsBySourceTransactionId = new Map(
       upsertedTransactions.map((transaction) => [
         transaction.sourceTransactionId,
         transaction.id,
       ]),
     );
 
-    const evmDetailCount = await upsertEvmDetails(
+  const evmDetailCount = await upsertEvmDetails(
       tx,
       idsBySourceTransactionId,
       input.evmDetails ?? [],
     );
-    const hyperCoreDetailCount = await upsertHyperCoreDetails(
+  const hyperCoreDetailCount = await upsertHyperCoreDetails(
       tx,
       idsBySourceTransactionId,
       input.hyperCoreDetails ?? [],
     );
-    const brokerageDetailCount = await upsertBrokerageDetails(
+  const brokerageDetailCount = await upsertBrokerageDetails(
       tx,
       idsBySourceTransactionId,
       input.brokerageDetails ?? [],
     );
 
-    return {
-      transactionCount: upsertedTransactions.length,
-      evmDetailCount,
-      hyperCoreDetailCount,
-      brokerageDetailCount,
-    };
-  });
+  return {
+    transactionCount: upsertedTransactions.length,
+    evmDetailCount,
+    hyperCoreDetailCount,
+    brokerageDetailCount,
+  };
+}
+
+export async function saveInvestmentTransactionPage(input: {
+  transactions: UpsertInvestmentTransactionsInput;
+  syncState: UpsertInvestmentTransactionSyncStateInput;
+}): Promise<{
+  transactions: UpsertInvestmentTransactionsResult;
+  syncState: InvestmentTransactionSyncState;
+}> {
+  return db.transaction(async (tx) => ({
+    transactions: await upsertInvestmentTransactionsInTransaction(
+      tx,
+      input.transactions,
+    ),
+    syncState: await upsertInvestmentTransactionSyncStateInTransaction(
+      tx,
+      input.syncState,
+    ),
+  }));
 }
 
 async function upsertEvmDetails(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  tx: DbTransaction,
   idsBySourceTransactionId: TransactionIdLookup,
   details: NormalizedEvmTransactionDetails[],
 ): Promise<number> {
@@ -425,7 +480,7 @@ async function upsertEvmDetails(
 }
 
 async function upsertHyperCoreDetails(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  tx: DbTransaction,
   idsBySourceTransactionId: TransactionIdLookup,
   details: NormalizedHyperCoreTransactionDetails[],
 ): Promise<number> {
@@ -463,7 +518,7 @@ async function upsertHyperCoreDetails(
 }
 
 async function upsertBrokerageDetails(
-  tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  tx: DbTransaction,
   idsBySourceTransactionId: TransactionIdLookup,
   details: NormalizedBrokerageTransactionDetails[],
 ): Promise<number> {

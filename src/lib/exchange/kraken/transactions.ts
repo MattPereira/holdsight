@@ -7,8 +7,10 @@ import { investmentAccounts } from "@/db/schema/investment-accounts";
 import { investmentTransactions } from "@/db/schema/investment-transactions";
 import {
   getInvestmentTransactionSyncState,
+  saveInvestmentTransactionPage,
   upsertInvestmentTransactions,
   upsertInvestmentTransactionSyncState,
+  type InvestmentTransactionSyncCheckpoint,
   type InvestmentTransactionSyncState,
   type NormalizedInvestmentTransaction,
 } from "@/lib/investment-transactions/ingestion";
@@ -52,6 +54,35 @@ type KrakenBackfillCursor = {
 
 type KrakenBackfillCompleteCursor = {
   complete: true;
+};
+
+type KrakenBackfillCheckpoint = {
+  version: 1;
+  phase: "backfilling";
+  backfill: KrakenBackfillCursor;
+};
+
+type KrakenForwardCheckpoint = {
+  version: 1;
+  phase: "catching_up" | "forward_sync";
+  forward: { startUnix: number; endUnix: number; offset: number };
+};
+
+type KrakenUpToDateCheckpoint = {
+  version: 1;
+  phase: "up_to_date";
+  forward: { scannedThroughUnix: number };
+};
+
+type KrakenTransactionCheckpoint =
+  | KrakenBackfillCheckpoint
+  | KrakenForwardCheckpoint
+  | KrakenUpToDateCheckpoint;
+
+export type KrakenTransactionSyncPageResult = {
+  transactionCount: number;
+  phase: KrakenTransactionCheckpoint["phase"];
+  shouldContinue: boolean;
 };
 
 function numberOrNull(value: string | null): number | null {
@@ -123,27 +154,49 @@ function earliestTradeDate(trades: NormalizedInvestmentTransaction[]): Date | nu
   );
 }
 
-function parseBackfillCursor(value: string | null): KrakenBackfillCursor | null {
+function parseBackfillCursor(
+  value: InvestmentTransactionSyncState["checkpoint"],
+): KrakenBackfillCursor | null {
   if (!value) return null;
-  try {
-    const parsed = JSON.parse(value) as Partial<KrakenBackfillCursor>;
-    if (
-      typeof parsed.endUnix !== "number" || !Number.isFinite(parsed.endUnix) ||
-      typeof parsed.offset !== "number" || !Number.isInteger(parsed.offset) || parsed.offset < 0
-    ) return null;
-    return { endUnix: parsed.endUnix, offset: parsed.offset };
-  } catch {
+  const parsed = value as Partial<KrakenBackfillCursor>;
+  if (
+    typeof parsed.endUnix !== "number" || !Number.isFinite(parsed.endUnix) ||
+    typeof parsed.offset !== "number" || !Number.isInteger(parsed.offset) || parsed.offset < 0
+  ) {
     return null;
   }
+  return { endUnix: parsed.endUnix, offset: parsed.offset };
 }
 
-function isBackfillCompleteCursor(value: string | null): boolean {
+function isBackfillCompleteCursor(
+  value: InvestmentTransactionSyncState["checkpoint"],
+): boolean {
   if (!value) return false;
-  try {
-    return (JSON.parse(value) as Partial<KrakenBackfillCompleteCursor>).complete === true;
-  } catch {
-    return false;
+  return (value as Partial<KrakenBackfillCompleteCursor>).complete === true;
+}
+
+function isKrakenTransactionCheckpoint(
+  value: InvestmentTransactionSyncCheckpoint | null,
+): value is KrakenTransactionCheckpoint {
+  if (!value || value.version !== 1 || typeof value.phase !== "string") return false;
+  if (value.phase === "backfilling") {
+    return parseBackfillCursor(value.backfill as InvestmentTransactionSyncCheckpoint) !== null;
   }
+  if (value.phase === "catching_up" || value.phase === "forward_sync") {
+    const forward = value.forward as Partial<KrakenForwardCheckpoint["forward"]>;
+    return typeof forward?.startUnix === "number" && typeof forward.endUnix === "number" && typeof forward.offset === "number";
+  }
+  return value.phase === "up_to_date" && typeof (value.forward as Partial<KrakenUpToDateCheckpoint["forward"]>)?.scannedThroughUnix === "number";
+}
+
+function isKrakenTransactionSyncComplete(
+  value: InvestmentTransactionSyncCheckpoint | null,
+): boolean {
+  return isKrakenTransactionCheckpoint(value) && value.phase === "up_to_date";
+}
+
+function initialKrakenCheckpoint(nowUnix: number): KrakenBackfillCheckpoint {
+  return { version: 1, phase: "backfilling", backfill: { endUnix: nowUnix, offset: 0 } };
 }
 
 async function updateSyncState(input: {
@@ -151,7 +204,7 @@ async function updateSyncState(input: {
   accountId: string;
   state: InvestmentTransactionSyncState | null;
   status: "success" | "rate_limited" | "error";
-  cursor?: string | null;
+  checkpoint?: InvestmentTransactionSyncState["checkpoint"];
   backfillCompleted?: boolean;
   earliestBackfilledAt?: Date | null;
   latestSyncedExecutedAt?: Date | null;
@@ -163,7 +216,7 @@ async function updateSyncState(input: {
     investmentAccountId: input.accountId,
     provider: KRAKEN_PROVIDER,
     status: input.status,
-    cursor: input.cursor ?? input.state?.cursor ?? null,
+    checkpoint: input.checkpoint ?? input.state?.checkpoint ?? null,
     earliestBackfilledAt: input.earliestBackfilledAt ?? input.state?.earliestBackfilledAt ?? null,
     latestSyncedExecutedAt: input.latestSyncedExecutedAt ?? input.state?.latestSyncedExecutedAt ?? null,
     backfillStartedAt: input.state?.backfillStartedAt ?? now,
@@ -174,6 +227,140 @@ async function updateSyncState(input: {
     lastHttpStatus: input.error?.httpStatus ?? null,
     lastErrorMessage: input.error?.message ?? null,
   });
+}
+
+/**
+ * Advances one durable Kraken history page. The caller decides when to invoke
+ * the next page; this function never loops or sleeps.
+ */
+export async function processKrakenTransactionSyncPage(input: {
+  userId: string;
+  account: SavedKrakenAccount;
+}): Promise<KrakenTransactionSyncPageResult> {
+  const state = await getInvestmentTransactionSyncState({
+    userId: input.userId,
+    investmentAccountId: input.account.id,
+    provider: KRAKEN_PROVIDER,
+  });
+  const now = new Date();
+  const nowUnix = Math.floor(now.getTime() / 1000);
+  const storedCheckpoint = state?.checkpoint ?? null;
+  const legacyBackfill = parseBackfillCursor(storedCheckpoint);
+  const checkpoint: KrakenTransactionCheckpoint = isKrakenTransactionCheckpoint(storedCheckpoint)
+    ? storedCheckpoint
+    : legacyBackfill
+      ? { version: 1, phase: "backfilling", backfill: legacyBackfill }
+      : isBackfillCompleteCursor(storedCheckpoint)
+        ? {
+            version: 1,
+            phase: "up_to_date",
+            forward: {
+              scannedThroughUnix: Math.floor(
+                (state?.latestSyncedExecutedAt ?? now).getTime() / 1000,
+              ),
+            },
+          }
+        : initialKrakenCheckpoint(nowUnix);
+  const credentials = await getUserKrakenCredentials(input.userId, input.account.id);
+  if (!credentials) throw new Error("Add Kraken API credentials before syncing transactions.");
+
+  const pairs = await fetchKrakenAssetPairs();
+  const request = checkpoint.phase === "backfilling"
+    ? checkpoint.backfill
+    : checkpoint.phase === "up_to_date"
+      ? {
+          startUnix: checkpoint.forward.scannedThroughUnix - INCREMENTAL_SYNC_OVERLAP_DAYS * 86_400,
+          endUnix: nowUnix,
+          offset: 0,
+        }
+      : checkpoint.forward;
+  const page = await fetchKrakenTradesHistoryPage(credentials, request);
+  const trades = Object.entries(page.trades).flatMap(([id, trade]) => {
+    const normalized = normalizeTrade(id, trade, pairs);
+    return normalized ? [normalized] : [];
+  });
+  const nextOffset = page.offset + Object.keys(page.trades).length;
+  const hasMoreInWindow = nextOffset < page.count;
+
+  let nextCheckpoint: KrakenTransactionCheckpoint;
+  let backfillCompletedAt = state?.backfillCompletedAt ?? null;
+  let latestSyncedExecutedAt = state?.latestSyncedExecutedAt ?? null;
+
+  if (checkpoint.phase === "backfilling") {
+    if (hasMoreInWindow) {
+      nextCheckpoint = {
+        ...checkpoint,
+        backfill: { ...checkpoint.backfill, offset: nextOffset },
+      };
+    } else {
+      nextCheckpoint = {
+        version: 1,
+        phase: "catching_up",
+        forward: {
+          startUnix: checkpoint.backfill.endUnix - INCREMENTAL_SYNC_OVERLAP_DAYS * 86_400,
+          endUnix: nowUnix,
+          offset: 0,
+        },
+      };
+      backfillCompletedAt = now;
+    }
+  } else if (hasMoreInWindow) {
+    nextCheckpoint = checkpoint.phase === "up_to_date"
+      ? {
+          version: 1,
+          phase: "forward_sync",
+          forward: {
+            startUnix: checkpoint.forward.scannedThroughUnix - INCREMENTAL_SYNC_OVERLAP_DAYS * 86_400,
+            endUnix: request.endUnix,
+            offset: nextOffset,
+          },
+        }
+      : {
+          ...checkpoint,
+          forward: {
+            startUnix: checkpoint.forward.startUnix,
+            endUnix: request.endUnix,
+            offset: nextOffset,
+          },
+        };
+  } else {
+    nextCheckpoint = {
+      version: 1,
+      phase: "up_to_date",
+      forward: { scannedThroughUnix: request.endUnix },
+    };
+    latestSyncedExecutedAt = new Date(request.endUnix * 1000);
+  }
+
+  const saved = await saveInvestmentTransactionPage({
+    transactions: {
+      userId: input.userId,
+      investmentAccountId: input.account.id,
+      transactions: trades,
+    },
+    syncState: {
+      userId: input.userId,
+      investmentAccountId: input.account.id,
+      provider: KRAKEN_PROVIDER,
+      status: nextCheckpoint.phase === "up_to_date" ? "success" : "syncing",
+      checkpoint: nextCheckpoint,
+      leaseToken: state?.leaseToken ?? null,
+      leaseExpiresAt: state?.leaseExpiresAt ?? null,
+      earliestBackfilledAt: earliestTradeDate(trades) ?? state?.earliestBackfilledAt ?? null,
+      latestSyncedExecutedAt,
+      backfillStartedAt: state?.backfillStartedAt ?? now,
+      backfillCompletedAt,
+      lastSyncedAt: now,
+      lastHttpStatus: null,
+      lastErrorMessage: null,
+    },
+  });
+
+  return {
+    transactionCount: saved.transactions.transactionCount,
+    phase: nextCheckpoint.phase,
+    shouldContinue: nextCheckpoint.phase !== "up_to_date",
+  };
 }
 
 export async function getCurrentKrakenTransactions(
@@ -243,7 +430,9 @@ export async function getKrakenTransactionHistoryStatus(
   return {
     earliestTransactionAt: earliest[0]?.executedAt.toISOString() ?? null,
     latestTransactionAt: latest[0]?.executedAt.toISOString() ?? null,
-    hasMore: states.some((state) => !isBackfillCompleteCursor(state?.cursor ?? null)),
+    hasMore: states.some(
+      (state) => !isKrakenTransactionSyncComplete(state?.checkpoint ?? null),
+    ),
   };
 }
 
@@ -298,7 +487,7 @@ async function backfillKrakenAccountTrades(
   pairs: Record<string, KrakenAssetPair>,
 ): Promise<{ transactionCount: number; failure?: { accountId: string; message: string; httpStatus: number } }> {
   const state = await getInvestmentTransactionSyncState({ userId, investmentAccountId: account.id, provider: KRAKEN_PROVIDER });
-  const cursor = parseBackfillCursor(state?.cursor ?? null) ?? {
+  const cursor = parseBackfillCursor(state?.checkpoint ?? null) ?? {
     endUnix: Math.floor(Date.now() / 1000),
     offset: 0,
   };
@@ -324,9 +513,9 @@ async function backfillKrakenAccountTrades(
       accountId: account.id,
       state,
       status: "success",
-      cursor: hasMore
-        ? JSON.stringify({ ...cursor, offset: nextOffset })
-        : JSON.stringify({ complete: true }),
+      checkpoint: hasMore
+        ? { ...cursor, offset: nextOffset }
+        : { complete: true },
       backfillCompleted: !hasMore,
       earliestBackfilledAt: earliestTradeDate(trades) ?? state?.earliestBackfilledAt ?? null,
       latestSyncedExecutedAt: state?.latestSyncedExecutedAt ?? latestTradeDate(trades) ?? null,

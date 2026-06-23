@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
+import { withWorkflow } from "workflow/next";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
   serverExternalPackages: ["@better-auth/kysely-adapter"],
 };
 
-export default nextConfig;
+export default withWorkflow(nextConfig);

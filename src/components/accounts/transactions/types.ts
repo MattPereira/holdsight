@@ -13,6 +13,4 @@ export type TransactionsPanel = {
   error: string | null;
   message: string | null;
   historyStatus?: TransactionHistoryStatus;
-  onLoadOlder?: () => void;
-  loadingOlder?: boolean;
 };

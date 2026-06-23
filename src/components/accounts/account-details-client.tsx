@@ -16,7 +16,6 @@ type TransactionsConfig<TTransactionResult> = {
   getMessage?: (result: TTransactionResult) => string | null;
   initialHistoryStatus?: TransactionHistoryStatus;
   getHistoryStatus?: (result: TTransactionResult) => TransactionHistoryStatus;
-  loadOlderTransactions?: () => Promise<TTransactionResult>;
 };
 
 export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResult>({
@@ -62,8 +61,6 @@ export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResu
     useState<TransactionHistoryStatus | undefined>(transactions?.initialHistoryStatus);
   const [isBalancePending, startBalanceTransition] = useTransition();
   const [isTransactionPending, startTransactionTransition] = useTransition();
-  const [isOlderTransactionsPending, startOlderTransactionsTransition] =
-    useTransition();
 
   if (syncedInitialBalances !== initialBalances) {
     setSyncedInitialBalances(initialBalances);
@@ -123,20 +120,6 @@ export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResu
     });
   }
 
-  function handleLoadOlderTransactions() {
-    if (!transactions?.loadOlderTransactions) return;
-
-    setTransactionError(null);
-    setTransactionMessage(null);
-    startOlderTransactionsTransition(async () => {
-      const result = await transactions.loadOlderTransactions!();
-      setCurrentTransactions(transactions.getTransactions(result));
-      setTransactionError(transactions.getError?.(result) ?? null);
-      setTransactionMessage(transactions.getMessage?.(result) ?? null);
-      setTransactionHistoryStatus(transactions.getHistoryStatus?.(result));
-    });
-  }
-
   return (
     <AccountDetailsShell
       title={title}
@@ -156,10 +139,6 @@ export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResu
               error: transactionError,
               message: transactionMessage,
               historyStatus: transactionHistoryStatus,
-              onLoadOlder: transactions.loadOlderTransactions
-                ? handleLoadOlderTransactions
-                : undefined,
-              loadingOlder: isOlderTransactionsPending,
             }
           : undefined
       }

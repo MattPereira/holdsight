@@ -1,6 +1,5 @@
 import { TransactionsTable } from "@/components/accounts/transactions/transactions-table";
 import type { TransactionsPanel } from "@/components/accounts/transactions/types";
-import { Button } from "@/components/ui/button";
 
 const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
 
@@ -33,10 +32,8 @@ export function TransactionsTabContent({
               ? `Loaded ${dateFormat.format(new Date(panel.historyStatus.earliestTransactionAt))} to ${dateFormat.format(new Date(panel.historyStatus.latestTransactionAt))}`
               : "No Kraken trades loaded yet."}
           </span>
-          {panel.historyStatus.hasMore && panel.onLoadOlder ? (
-            <Button type="button" size="sm" variant="outline" onClick={panel.onLoadOlder} disabled={panel.loadingOlder}>
-              {panel.loadingOlder ? "Loading older trades" : "Load 50 older trades"}
-            </Button>
+          {panel.historyStatus.hasMore ? (
+            <span>Full transaction history sync is in progress.</span>
           ) : panel.historyStatus.earliestTransactionAt ? (
             <span>Full available trade history loaded.</span>
           ) : null}
