@@ -8,8 +8,6 @@ import { investmentTransactions } from "@/db/schema/investment-transactions";
 import {
   getInvestmentTransactionSyncState,
   saveInvestmentTransactionPage,
-  upsertInvestmentTransactions,
-  upsertInvestmentTransactionSyncState,
   type InvestmentTransactionSyncCheckpoint,
   type InvestmentTransactionSyncState,
   type NormalizedInvestmentTransaction,
@@ -30,16 +28,9 @@ import {
 } from "./client";
 
 const KRAKEN_PROVIDER = "kraken";
-const INITIAL_SYNC_LOOKBACK_DAYS = 30;
 const INCREMENTAL_SYNC_OVERLAP_DAYS = 7;
 
 export type CurrentKrakenTransaction = InvestmentTransactionListItem;
-
-export type SyncUserKrakenTransactionsResult = {
-  accountCount: number;
-  transactionCount: number;
-  failures: Array<{ accountId: string; message: string; httpStatus: number }>;
-};
 
 export type KrakenTransactionHistoryStatus = {
   earliestTransactionAt: string | null;
@@ -89,12 +80,6 @@ function numberOrNull(value: string | null): number | null {
   return value === null ? null : Number(value);
 }
 
-function dateMinusDays(date: Date, days: number): Date {
-  const result = new Date(date);
-  result.setUTCDate(result.getUTCDate() - days);
-  return result;
-}
-
 function assetPairForTrade(
   pairName: string | undefined,
   pairs: Record<string, KrakenAssetPair>,
@@ -136,14 +121,6 @@ function normalizeTrade(
     status: "confirmed",
     raw: trade,
   };
-}
-
-function latestTradeDate(trades: NormalizedInvestmentTransaction[]): Date | null {
-  if (trades.length === 0) return null;
-  return trades.reduce(
-    (latest, trade) => (trade.executedAt > latest ? trade.executedAt : latest),
-    trades[0].executedAt,
-  );
 }
 
 function earliestTradeDate(trades: NormalizedInvestmentTransaction[]): Date | null {
@@ -197,36 +174,6 @@ function isKrakenTransactionSyncComplete(
 
 function initialKrakenCheckpoint(nowUnix: number): KrakenBackfillCheckpoint {
   return { version: 1, phase: "backfilling", backfill: { endUnix: nowUnix, offset: 0 } };
-}
-
-async function updateSyncState(input: {
-  userId: string;
-  accountId: string;
-  state: InvestmentTransactionSyncState | null;
-  status: "success" | "rate_limited" | "error";
-  checkpoint?: InvestmentTransactionSyncState["checkpoint"];
-  backfillCompleted?: boolean;
-  earliestBackfilledAt?: Date | null;
-  latestSyncedExecutedAt?: Date | null;
-  error?: { message: string; httpStatus: number };
-}): Promise<void> {
-  const now = new Date();
-  await upsertInvestmentTransactionSyncState({
-    userId: input.userId,
-    investmentAccountId: input.accountId,
-    provider: KRAKEN_PROVIDER,
-    status: input.status,
-    checkpoint: input.checkpoint ?? input.state?.checkpoint ?? null,
-    earliestBackfilledAt: input.earliestBackfilledAt ?? input.state?.earliestBackfilledAt ?? null,
-    latestSyncedExecutedAt: input.latestSyncedExecutedAt ?? input.state?.latestSyncedExecutedAt ?? null,
-    backfillStartedAt: input.state?.backfillStartedAt ?? now,
-    backfillCompletedAt: input.backfillCompleted && input.status === "success"
-      ? now
-      : input.state?.backfillCompletedAt ?? null,
-    lastSyncedAt: now,
-    lastHttpStatus: input.error?.httpStatus ?? null,
-    lastErrorMessage: input.error?.message ?? null,
-  });
 }
 
 /**
@@ -344,8 +291,6 @@ export async function processKrakenTransactionSyncPage(input: {
       provider: KRAKEN_PROVIDER,
       status: nextCheckpoint.phase === "up_to_date" ? "success" : "syncing",
       checkpoint: nextCheckpoint,
-      leaseToken: state?.leaseToken ?? null,
-      leaseExpiresAt: state?.leaseExpiresAt ?? null,
       earliestBackfilledAt: earliestTradeDate(trades) ?? state?.earliestBackfilledAt ?? null,
       latestSyncedExecutedAt,
       backfillStartedAt: state?.backfillStartedAt ?? now,
@@ -431,121 +376,5 @@ export async function getKrakenTransactionHistoryStatus(
     hasMore: states.some(
       (state) => !isKrakenTransactionSyncComplete(state?.checkpoint ?? null),
     ),
-  };
-}
-
-async function syncKrakenAccountTransactions(
-  userId: string,
-  account: SavedKrakenAccount,
-  pairs: Record<string, KrakenAssetPair>,
-): Promise<{ transactionCount: number; failure?: { accountId: string; message: string; httpStatus: number } }> {
-  const state = await getInvestmentTransactionSyncState({ userId, investmentAccountId: account.id, provider: KRAKEN_PROVIDER });
-  const now = new Date();
-  const start = state?.latestSyncedExecutedAt
-    ? dateMinusDays(state.latestSyncedExecutedAt, INCREMENTAL_SYNC_OVERLAP_DAYS)
-    : dateMinusDays(now, INITIAL_SYNC_LOOKBACK_DAYS);
-  const credentials = await getUserKrakenCredentials(userId, account.id);
-
-  if (!credentials) {
-    const error = { message: "Add Kraken API credentials before syncing transactions.", httpStatus: 400 };
-    await updateSyncState({ userId, accountId: account.id, state, status: "error", error });
-    return { transactionCount: 0, failure: { accountId: account.id, ...error } };
-  }
-
-  try {
-    const result = await fetchKrakenTradesHistoryPage(credentials, {
-      startUnix: Math.floor(start.getTime() / 1000),
-      endUnix: Math.floor(now.getTime() / 1000),
-    });
-    const trades = Object.entries(result.trades).flatMap(([id, trade]) => {
-      const normalized = normalizeTrade(id, trade, pairs);
-      return normalized ? [normalized] : [];
-    });
-    const written = await upsertInvestmentTransactions({ userId, investmentAccountId: account.id, transactions: trades });
-    await updateSyncState({
-      userId,
-      accountId: account.id,
-      state,
-      status: "success",
-      earliestBackfilledAt: state?.earliestBackfilledAt ?? start,
-      latestSyncedExecutedAt: latestTradeDate(trades) ?? state?.latestSyncedExecutedAt ?? now,
-    });
-    return { transactionCount: written.transactionCount };
-  } catch (caught) {
-    const httpStatus = caught instanceof Error && "httpStatus" in caught ? Number(caught.httpStatus) : 502;
-    const error = { message: caught instanceof Error ? caught.message : "Kraken transaction sync failed.", httpStatus: Number.isFinite(httpStatus) ? httpStatus : 502 };
-    await updateSyncState({ userId, accountId: account.id, state, status: error.httpStatus === 429 ? "rate_limited" : "error", error });
-    return { transactionCount: 0, failure: { accountId: account.id, ...error } };
-  }
-}
-
-async function backfillKrakenAccountTrades(
-  userId: string,
-  account: SavedKrakenAccount,
-  pairs: Record<string, KrakenAssetPair>,
-): Promise<{ transactionCount: number; failure?: { accountId: string; message: string; httpStatus: number } }> {
-  const state = await getInvestmentTransactionSyncState({ userId, investmentAccountId: account.id, provider: KRAKEN_PROVIDER });
-  const cursor = parseBackfillCursor(state?.checkpoint ?? null) ?? {
-    endUnix: Math.floor(Date.now() / 1000),
-    offset: 0,
-  };
-  const credentials = await getUserKrakenCredentials(userId, account.id);
-
-  if (!credentials) {
-    const error = { message: "Add Kraken API credentials before loading older trades.", httpStatus: 400 };
-    await updateSyncState({ userId, accountId: account.id, state, status: "error", error });
-    return { transactionCount: 0, failure: { accountId: account.id, ...error } };
-  }
-
-  try {
-    const page = await fetchKrakenTradesHistoryPage(credentials, cursor);
-    const trades = Object.entries(page.trades).flatMap(([id, trade]) => {
-      const normalized = normalizeTrade(id, trade, pairs);
-      return normalized ? [normalized] : [];
-    });
-    const written = await upsertInvestmentTransactions({ userId, investmentAccountId: account.id, transactions: trades });
-    const nextOffset = page.offset + Object.keys(page.trades).length;
-    const hasMore = nextOffset < page.count;
-    await updateSyncState({
-      userId,
-      accountId: account.id,
-      state,
-      status: "success",
-      checkpoint: hasMore
-        ? { ...cursor, offset: nextOffset }
-        : { complete: true },
-      backfillCompleted: !hasMore,
-      earliestBackfilledAt: earliestTradeDate(trades) ?? state?.earliestBackfilledAt ?? null,
-      latestSyncedExecutedAt: state?.latestSyncedExecutedAt ?? latestTradeDate(trades) ?? null,
-    });
-    return { transactionCount: written.transactionCount };
-  } catch (caught) {
-    const httpStatus = caught instanceof Error && "httpStatus" in caught ? Number(caught.httpStatus) : 502;
-    const error = { message: caught instanceof Error ? caught.message : "Kraken trade backfill failed.", httpStatus: Number.isFinite(httpStatus) ? httpStatus : 502 };
-    await updateSyncState({ userId, accountId: account.id, state, status: error.httpStatus === 429 ? "rate_limited" : "error", error });
-    return { transactionCount: 0, failure: { accountId: account.id, ...error } };
-  }
-}
-
-export async function syncUserKrakenTransactions(userId: string): Promise<SyncUserKrakenTransactionsResult> {
-  const accounts = await getUserKrakenAccounts(userId);
-  const pairs = await fetchKrakenAssetPairs();
-  const results = await Promise.all(accounts.map((account) => syncKrakenAccountTransactions(userId, account, pairs)));
-  return {
-    accountCount: accounts.length,
-    transactionCount: results.reduce((total, result) => total + result.transactionCount, 0),
-    failures: results.flatMap((result) => result.failure ? [result.failure] : []),
-  };
-}
-
-/** Load one persisted, rate-limit-safe page of older Kraken trades per account. */
-export async function backfillUserKrakenTrades(userId: string): Promise<SyncUserKrakenTransactionsResult> {
-  const accounts = await getUserKrakenAccounts(userId);
-  const pairs = await fetchKrakenAssetPairs();
-  const results = await Promise.all(accounts.map((account) => backfillKrakenAccountTrades(userId, account, pairs)));
-  return {
-    accountCount: accounts.length,
-    transactionCount: results.reduce((total, result) => total + result.transactionCount, 0),
-    failures: results.flatMap((result) => result.failure ? [result.failure] : []),
   };
 }

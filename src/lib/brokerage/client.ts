@@ -4,7 +4,6 @@ import {
   AccountType,
   type Holding,
   type InvestmentAccount,
-  type InvestmentTransaction,
   type Security,
 } from "plaid";
 
@@ -14,7 +13,7 @@ import type {
   BrokerageAccountTypeValue,
   BrokerageAssetClass,
   BrokerageBalance,
-  BrokerageTransactionsResult,
+  BrokerageTransactionsPageResult,
   HoldingsResult,
 } from "@/lib/brokerage/types";
 
@@ -186,55 +185,33 @@ export async function getHoldings(accessToken: string): Promise<HoldingsResult> 
 
 const INVESTMENT_TRANSACTIONS_PAGE_SIZE = 500;
 
-/**
- * Fetch investment transactions for a Plaid Item across every investment
- * account in the requested date window, following Plaid's offset pagination.
- */
-export async function getInvestmentTransactions(
+/** Fetch one offset-paginated page of investment transactions for one account. */
+export async function getInvestmentTransactionsPage(
   accessToken: string,
   input: {
     startDate: string;
     endDate: string;
-    accountIds?: string[];
+    accountId: string;
+    offset: number;
   },
-): Promise<BrokerageTransactionsResult> {
-  const transactions: InvestmentTransaction[] = [];
-  const securitiesById = new Map<string, Security>();
-  let totalInvestmentTransactions = 0;
-  let offset = 0;
-
+): Promise<BrokerageTransactionsPageResult> {
   try {
-    do {
-      const res = await getClient().investmentsTransactionsGet({
-        access_token: accessToken,
-        start_date: input.startDate,
-        end_date: input.endDate,
-        options: {
-          count: INVESTMENT_TRANSACTIONS_PAGE_SIZE,
-          offset,
-          ...(input.accountIds && input.accountIds.length > 0
-            ? { account_ids: input.accountIds }
-            : {}),
-        },
-      });
-
-      transactions.push(...res.data.investment_transactions);
-      for (const security of res.data.securities) {
-        securitiesById.set(security.security_id, security);
-      }
-
-      totalInvestmentTransactions = res.data.total_investment_transactions;
-      offset += res.data.investment_transactions.length;
-    } while (
-      transactions.length < totalInvestmentTransactions &&
-      offset > 0
-    );
+    const res = await getClient().investmentsTransactionsGet({
+      access_token: accessToken,
+      start_date: input.startDate,
+      end_date: input.endDate,
+      options: {
+        count: INVESTMENT_TRANSACTIONS_PAGE_SIZE,
+        offset: input.offset,
+        account_ids: [input.accountId],
+      },
+    });
 
     return {
       status: "ready",
-      transactions,
-      securities: Array.from(securitiesById.values()),
-      totalInvestmentTransactions,
+      transactions: res.data.investment_transactions,
+      securities: res.data.securities,
+      totalInvestmentTransactions: res.data.total_investment_transactions,
     };
   } catch (error) {
     const { code, message, httpStatus } = readPlaidError(error);

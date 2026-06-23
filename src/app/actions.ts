@@ -51,13 +51,17 @@ import {
 } from "@/lib/plaid/client";
 import {
   getUserPlaidItems,
+  getUserBrokeragePlaidItems,
   PlaidRevokeError,
   removeUserPlaidItem,
   upsertPlaidItem,
   type SavedPlaidItem,
 } from "@/lib/plaid/items";
 import { getHoldings } from "@/lib/brokerage/client";
-import { saveBrokerageAccounts } from "@/lib/brokerage/accounts";
+import {
+  getUserBrokerageAccounts,
+  saveBrokerageAccounts,
+} from "@/lib/brokerage/accounts";
 import {
   applyItemHoldings,
   getCurrentBrokerageBalances,
@@ -65,11 +69,14 @@ import {
   type CurrentBrokerageAccount,
 } from "@/lib/brokerage/balances";
 import {
+  claimBrokerageTransactionImport,
+  completeBrokerageTransactionImport,
   getCurrentBrokerageTransactions,
-  syncUserBrokerageInvestmentTransactions,
+  getBrokerageTransactionImportStatus,
+  setBrokerageTransactionImportRun,
   type CurrentBrokerageTransaction,
-  type SyncUserBrokerageInvestmentTransactionsResult,
 } from "@/lib/brokerage/transactions";
+import { syncBrokerageTransactionHistory } from "@/workflows/brokerage-transaction-sync";
 import {
   getUserDepositoryAccounts,
   saveDepositoryAccounts,
@@ -386,10 +393,10 @@ export type BrokerageActionResult = {
 };
 
 export type BrokerageTransactionsActionResult = {
-  summary: SyncUserBrokerageInvestmentTransactionsResult | null;
   transactions: CurrentBrokerageTransaction[];
   message: string;
   error: string | null;
+  isSyncing: boolean;
 };
 
 export type DepositoryActionResult = {
@@ -634,27 +641,6 @@ export async function loadBrokerageBalances(): Promise<BrokerageActionResult> {
   return { accounts, error: brokerageSyncError(accounts) };
 }
 
-function dateOnly(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function brokerageTransactionsMessage(
-  summary: SyncUserBrokerageInvestmentTransactionsResult,
-): string {
-  const transactionLabel =
-    summary.transactionCount === 1 ? "transaction" : "transactions";
-  const skipped =
-    summary.skippedTransactionCount > 0
-      ? ` ${summary.skippedTransactionCount} unmatched Plaid ${summary.skippedTransactionCount === 1 ? "transaction was" : "transactions were"} skipped.`
-      : "";
-  const failures =
-    summary.failures.length > 0
-      ? ` ${summary.failures.length} ${summary.failures.length === 1 ? "institution needs" : "institutions need"} attention.`
-      : "";
-
-  return `Synced ${summary.transactionCount} brokerage ${transactionLabel}.${skipped}${failures}`;
-}
-
 /**
  * Refresh brokerage investment transactions separately from brokerage balances.
  */
@@ -662,36 +648,72 @@ export async function loadBrokerageTransactions(): Promise<BrokerageTransactions
   const userId = await getCurrentUserId();
   if (!userId) {
     return {
-      summary: null,
       transactions: [],
       message: "",
       error: "You must be signed in to refresh transactions.",
+      isSyncing: false,
     };
   }
 
-  const end = new Date();
-
   try {
-    const summary = await syncUserBrokerageInvestmentTransactions(userId, {
-      endDate: dateOnly(end),
-    });
+    const [items, accounts] = await Promise.all([
+      getUserBrokeragePlaidItems(userId),
+      getUserBrokerageAccounts(userId),
+    ]);
+    let queuedItemCount = 0;
+
+    for (const item of items) {
+      const accountIds = accounts
+        .filter((account) => account.plaidItemId === item.id)
+        .map((account) => account.id);
+      if (accountIds.length === 0 || !await claimBrokerageTransactionImport(userId, item.id)) {
+        continue;
+      }
+
+      try {
+        const run = await start(syncBrokerageTransactionHistory, [
+          userId,
+          item.id,
+          accountIds,
+        ]);
+        await setBrokerageTransactionImportRun(userId, item.id, run.runId);
+        queuedItemCount += 1;
+      } catch (error) {
+        await completeBrokerageTransactionImport({
+          userId,
+          plaidItemId: item.id,
+          status: "error",
+          error: {
+            message: error instanceof Error ? error.message : "Failed to queue brokerage transaction sync.",
+            httpStatus: null,
+          },
+        });
+        throw error;
+      }
+    }
 
     revalidatePath("/brokerages");
     return {
-      summary,
       transactions: await getCurrentBrokerageTransactions(userId),
-      message: brokerageTransactionsMessage(summary),
-      error: summary.failures[0]?.message ?? null,
+      message: queuedItemCount > 0
+        ? `Queued transaction history sync for ${queuedItemCount} Plaid ${queuedItemCount === 1 ? "connection" : "connections"}.`
+        : "Transaction history sync is already running.",
+      error: null,
+      isSyncing: queuedItemCount > 0 || items.some((item) => item.transactionSyncStatus === "syncing"),
     };
   } catch (error) {
+    const [transactions, status] = await Promise.all([
+      getCurrentBrokerageTransactions(userId),
+      getBrokerageTransactionImportStatus(userId),
+    ]);
     return {
-      summary: null,
-      transactions: await getCurrentBrokerageTransactions(userId),
+      transactions,
       message: "",
       error: plaidActionErrorMessage(
         error,
         "Failed to refresh brokerage transactions.",
       ),
+      isSyncing: status.isSyncing,
     };
   }
 }

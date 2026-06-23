@@ -41,6 +41,11 @@ export const plaidItemStatus = pgEnum("plaid_item_status", [
   "disabled",
 ]);
 
+export const plaidItemTransactionSyncStatus = pgEnum(
+  "plaid_item_transaction_sync_status",
+  ["idle", "syncing", "success", "rate_limited", "error"],
+);
+
 export const brokerageAccountType = pgEnum("brokerage_account_type", [
   "taxable",
   "traditional_ira",
@@ -199,6 +204,14 @@ export const plaidItems = pgTable(
     institutionName: text("institution_name"),
     status: plaidItemStatus("status").default("active").notNull(),
     lastSyncedAt: timestamp("last_synced_at"),
+    transactionSyncStatus: plaidItemTransactionSyncStatus("transaction_sync_status")
+      .default("idle")
+      .notNull(),
+    transactionSyncRunId: text("transaction_sync_run_id"),
+    transactionSyncStartedAt: timestamp("transaction_sync_started_at"),
+    transactionSyncCompletedAt: timestamp("transaction_sync_completed_at"),
+    transactionSyncHttpStatus: integer("transaction_sync_http_status"),
+    transactionSyncErrorMessage: text("transaction_sync_error_message"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()

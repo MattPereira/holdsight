@@ -137,8 +137,6 @@ export type InvestmentTransactionSyncState = {
   provider: string;
   status: InvestmentTransactionSyncStatus;
   checkpoint: InvestmentTransactionSyncCheckpoint | null;
-  leaseToken: string | null;
-  leaseExpiresAt: Date | null;
   earliestBackfilledAt: Date | null;
   latestSyncedExecutedAt: Date | null;
   backfillStartedAt: Date | null;
@@ -154,8 +152,6 @@ export type UpsertInvestmentTransactionSyncStateInput = {
   provider: string;
   status: InvestmentTransactionSyncStatus;
   checkpoint?: InvestmentTransactionSyncCheckpoint | null;
-  leaseToken?: string | null;
-  leaseExpiresAt?: Date | null;
   earliestBackfilledAt?: Date | null;
   latestSyncedExecutedAt?: Date | null;
   backfillStartedAt?: Date | null;
@@ -200,8 +196,6 @@ export async function getInvestmentTransactionSyncState(input: {
       provider: investmentTransactionSyncs.provider,
       status: investmentTransactionSyncs.status,
       checkpoint: investmentTransactionSyncs.checkpoint,
-      leaseToken: investmentTransactionSyncs.leaseToken,
-      leaseExpiresAt: investmentTransactionSyncs.leaseExpiresAt,
       earliestBackfilledAt: investmentTransactionSyncs.earliestBackfilledAt,
       latestSyncedExecutedAt:
         investmentTransactionSyncs.latestSyncedExecutedAt,
@@ -248,8 +242,6 @@ async function upsertInvestmentTransactionSyncStateInTransaction(
       provider: input.provider,
       status: input.status,
       checkpoint: input.checkpoint ?? null,
-      leaseToken: input.leaseToken ?? null,
-      leaseExpiresAt: input.leaseExpiresAt ?? null,
       earliestBackfilledAt: input.earliestBackfilledAt ?? null,
       latestSyncedExecutedAt: input.latestSyncedExecutedAt ?? null,
       backfillStartedAt: input.backfillStartedAt ?? null,
@@ -266,8 +258,6 @@ async function upsertInvestmentTransactionSyncStateInTransaction(
       set: {
         status: input.status,
         checkpoint: input.checkpoint ?? null,
-        leaseToken: input.leaseToken ?? null,
-        leaseExpiresAt: input.leaseExpiresAt ?? null,
         earliestBackfilledAt: input.earliestBackfilledAt ?? null,
         latestSyncedExecutedAt: input.latestSyncedExecutedAt ?? null,
         backfillStartedAt: input.backfillStartedAt ?? null,
@@ -285,8 +275,6 @@ async function upsertInvestmentTransactionSyncStateInTransaction(
       provider: investmentTransactionSyncs.provider,
       status: investmentTransactionSyncs.status,
       checkpoint: investmentTransactionSyncs.checkpoint,
-      leaseToken: investmentTransactionSyncs.leaseToken,
-      leaseExpiresAt: investmentTransactionSyncs.leaseExpiresAt,
       earliestBackfilledAt: investmentTransactionSyncs.earliestBackfilledAt,
       latestSyncedExecutedAt:
         investmentTransactionSyncs.latestSyncedExecutedAt,

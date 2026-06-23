@@ -202,8 +202,6 @@ export const investmentTransactionSyncs = pgTable(
       .default("idle")
       .notNull(),
     checkpoint: jsonb("checkpoint").$type<Record<string, unknown>>(),
-    leaseToken: text("lease_token"),
-    leaseExpiresAt: timestamp("lease_expires_at"),
     earliestBackfilledAt: timestamp("earliest_backfilled_at"),
     latestSyncedExecutedAt: timestamp("latest_synced_executed_at"),
     backfillStartedAt: timestamp("backfill_started_at"),

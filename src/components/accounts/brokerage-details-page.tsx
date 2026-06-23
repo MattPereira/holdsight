@@ -58,9 +58,11 @@ function brokerageEmptyMessage(
 export function BrokerageDetailsPage({
   initialAccounts,
   initialTransactions,
+  initialTransactionsSyncing,
 }: {
   initialAccounts: CurrentBrokerageAccount[];
   initialTransactions: CurrentBrokerageTransaction[];
+  initialTransactionsSyncing: boolean;
 }) {
   return (
     <AccountDetailsClient
@@ -80,6 +82,8 @@ export function BrokerageDetailsPage({
         getTransactions: (result) => result.transactions,
         getError: (result) => result.error,
         getMessage: (result) => result.message || null,
+        initialIsSyncing: initialTransactionsSyncing,
+        getIsSyncing: (result) => result.isSyncing,
       }}
     />
   );

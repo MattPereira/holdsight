@@ -42,7 +42,7 @@ export type HoldingsResult =
   | { status: "login_required" }
   | { status: "error"; message: string; httpStatus: number };
 
-export type BrokerageTransactionsResult =
+export type BrokerageTransactionsPageResult =
   | {
       status: "ready";
       transactions: InvestmentTransaction[];

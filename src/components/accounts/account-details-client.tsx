@@ -14,6 +14,8 @@ type TransactionsConfig<TTransactionResult> = {
   ) => InvestmentTransactionListItem[];
   getError?: (result: TTransactionResult) => string | null;
   getMessage?: (result: TTransactionResult) => string | null;
+  initialIsSyncing?: boolean;
+  getIsSyncing?: (result: TTransactionResult) => boolean;
   initialHistoryStatus?: TransactionHistoryStatus;
   getHistoryStatus?: (result: TTransactionResult) => TransactionHistoryStatus;
 };
@@ -59,6 +61,9 @@ export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResu
   );
   const [transactionHistoryStatus, setTransactionHistoryStatus] =
     useState<TransactionHistoryStatus | undefined>(transactions?.initialHistoryStatus);
+  const [isTransactionSyncing, setTransactionSyncing] = useState(
+    transactions?.initialIsSyncing ?? false,
+  );
   const [isBalancePending, startBalanceTransition] = useTransition();
   const [isTransactionPending, startTransactionTransition] = useTransition();
 
@@ -77,6 +82,7 @@ export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResu
     setSyncedInitialTransactions(transactions.initialTransactions);
     setCurrentTransactions(transactions.initialTransactions);
     setTransactionHistoryStatus(transactions.initialHistoryStatus);
+    setTransactionSyncing(transactions.initialIsSyncing ?? false);
     setTransactionError(null);
     setTransactionMessage(null);
   }
@@ -117,6 +123,7 @@ export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResu
       setTransactionError(transactions.getError?.(result) ?? null);
       setTransactionMessage(transactions.getMessage?.(result) ?? null);
       setTransactionHistoryStatus(transactions.getHistoryStatus?.(result));
+      setTransactionSyncing(transactions.getIsSyncing?.(result) ?? false);
     });
   }
 
@@ -135,7 +142,7 @@ export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResu
           ? {
               transactions: currentTransactions,
               onRefresh: handleRefreshTransactions,
-              busy: isTransactionPending,
+              busy: isTransactionPending || isTransactionSyncing,
               error: transactionError,
               message: transactionMessage,
               historyStatus: transactionHistoryStatus,
