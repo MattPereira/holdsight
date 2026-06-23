@@ -4,7 +4,20 @@ import {
   type AssetTotal,
 } from "@/lib/portfolio/asset-totals";
 
-export const MIN_PORTFOLIO_ALLOCATION_VALUE_USD = 10;
+// UI-only declutter threshold. An asset is collapsed into the "Other" bucket
+// when its value falls below 0.1% of the portfolio, but holdings above the
+// absolute cap are never hidden (so large portfolios don't hide still-material
+// positions). Pass `minimumAssetValueUsd` explicitly to override — e.g. agents
+// pass `Number.NEGATIVE_INFINITY` to receive every holding with no cutoff.
+export const ALLOCATION_MIN_WEIGHT = 0.001;
+export const ALLOCATION_MAX_HIDDEN_VALUE_USD = 100;
+
+export function effectiveMinimumAssetValueUsd(grandTotalValueUsd: number) {
+  return Math.min(
+    ALLOCATION_MAX_HIDDEN_VALUE_USD,
+    grandTotalValueUsd * ALLOCATION_MIN_WEIGHT,
+  );
+}
 
 export type PortfolioAllocationMember = {
   key: string;
@@ -49,13 +62,15 @@ export function buildPortfolioAllocations({
   grandTotalValueUsd,
   totals,
   groups,
+  minimumAssetValueUsd = effectiveMinimumAssetValueUsd(grandTotalValueUsd),
 }: {
   grandTotalValueUsd: number;
   totals: AssetTotal[];
   groups: AssetGroup[];
+  minimumAssetValueUsd?: number;
 }): PortfolioAllocations {
   const visibleTotals = totals.filter(
-    (total) => total.valueUsd >= MIN_PORTFOLIO_ALLOCATION_VALUE_USD,
+    (total) => total.valueUsd >= minimumAssetValueUsd,
   );
   const visibleValueUsd = visibleTotals.reduce(
     (sum, total) => sum + total.valueUsd,
@@ -64,7 +79,7 @@ export function buildPortfolioAllocations({
 
   return {
     grandTotalValueUsd,
-    minimumAssetValueUsd: MIN_PORTFOLIO_ALLOCATION_VALUE_USD,
+    minimumAssetValueUsd,
     otherValueUsd: Math.max(0, grandTotalValueUsd - visibleValueUsd),
     visibleTotals,
     rows: applyAssetGroups(visibleTotals, groups).map((row) => {

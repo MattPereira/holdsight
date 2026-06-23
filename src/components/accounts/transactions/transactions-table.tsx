@@ -12,7 +12,6 @@ const amountFormat = new Intl.NumberFormat("en-US", {
 
 const dateFormat = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
-  timeStyle: "short",
 });
 
 type LegDirection = "in" | "out" | "neutral";
@@ -134,11 +133,9 @@ export function TransactionsTable({
           className="flex items-start justify-between gap-4 py-3"
         >
           <div className="flex flex-col">
+            <span className="text-sm">{transaction.accountLabel ?? "—"}</span>
             <span className="text-xs text-muted-foreground">
               {dateFormat.format(new Date(transaction.executedAt))}
-            </span>
-            <span className="text-sm font-medium">
-              {transaction.accountLabel ?? "—"}
             </span>
           </div>
           <div className="flex flex-col items-end">

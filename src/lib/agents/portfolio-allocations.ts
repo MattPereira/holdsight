@@ -35,8 +35,6 @@ export type PortfolioAllocationsForAgent = {
   refreshed: boolean;
   portfolio: {
     grandTotalValueUsd: number;
-    minimumAssetValueUsd: number;
-    otherValueUsd: number;
     allocations: PortfolioAllocationForAgent[];
   };
 };
@@ -49,10 +47,14 @@ export async function getPortfolioAllocationsForAgent(
     ? await refreshPortfolioForUser(userId)
     : await getCurrentPortfolioHomeData(userId);
   const groups = await getUserAssetGroups(userId);
+  // Agents receive every holding with no declutter cutoff — hiding small
+  // positions is a UI concern, and a full dataset lets weights reconcile to the
+  // grand total without an "Other" remainder.
   const allocations = buildPortfolioAllocations({
     grandTotalValueUsd: data.portfolioSummary.grandTotalValue,
     totals: data.portfolioSummary.totals,
     groups,
+    minimumAssetValueUsd: Number.NEGATIVE_INFINITY,
   });
 
   return {
@@ -60,8 +62,6 @@ export async function getPortfolioAllocationsForAgent(
     refreshed: refresh,
     portfolio: {
       grandTotalValueUsd: allocations.grandTotalValueUsd,
-      minimumAssetValueUsd: allocations.minimumAssetValueUsd,
-      otherValueUsd: allocations.otherValueUsd,
       allocations: allocations.rows.map((row) => {
         if (!row.isGroup) {
           return {
