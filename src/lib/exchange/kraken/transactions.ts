@@ -365,7 +365,6 @@ export async function processKrakenTransactionSyncPage(input: {
 
 export async function getCurrentKrakenTransactions(
   userId: string,
-  limit = 200,
 ): Promise<CurrentKrakenTransaction[]> {
   const rows = await db
     .select({
@@ -392,8 +391,7 @@ export async function getCurrentKrakenTransactions(
     .from(investmentTransactions)
     .innerJoin(investmentAccounts, eq(investmentAccounts.id, investmentTransactions.investmentAccountId))
     .where(and(eq(investmentTransactions.userId, userId), eq(investmentTransactions.sourceProvider, KRAKEN_PROVIDER)))
-    .orderBy(desc(investmentTransactions.executedAt))
-    .limit(limit);
+    .orderBy(desc(investmentTransactions.executedAt));
 
   return rows.map((row) => ({
     ...row,

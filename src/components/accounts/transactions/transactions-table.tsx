@@ -126,8 +126,6 @@ export function TransactionsTable({
     );
   }
 
-  console.log(transactions.length);
-
   return (
     <ul className="divide-y">
       {transactions.map((transaction) => (
