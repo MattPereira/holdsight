@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { CurrentBrokerageTransaction } from "@/lib/brokerage/transactions";
+import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 
 const usdFormat = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -22,34 +22,34 @@ type TransactionLeg = {
   label: string;
 };
 
-const INBOUND_SIDES = new Set<CurrentBrokerageTransaction["side"]>([
+const INBOUND_SIDES = new Set<InvestmentTransactionListItem["side"]>([
   "buy",
   "receive",
   "increase",
   "open",
 ]);
 
-const OUTBOUND_SIDES = new Set<CurrentBrokerageTransaction["side"]>([
+const OUTBOUND_SIDES = new Set<InvestmentTransactionListItem["side"]>([
   "sell",
   "send",
   "decrease",
   "close",
 ]);
 
-function sideDirection(side: CurrentBrokerageTransaction["side"]): LegDirection {
+function sideDirection(side: InvestmentTransactionListItem["side"]): LegDirection {
   if (INBOUND_SIDES.has(side)) return "in";
   if (OUTBOUND_SIDES.has(side)) return "out";
   return "neutral";
 }
 
-function formatAsset(transaction: CurrentBrokerageTransaction): string | null {
+function formatAsset(transaction: InvestmentTransactionListItem): string | null {
   if (transaction.baseAmount === null || !transaction.baseAssetSymbol) {
     return null;
   }
   return `${amountFormat.format(Math.abs(transaction.baseAmount))} ${transaction.baseAssetSymbol}`;
 }
 
-function formatCash(transaction: CurrentBrokerageTransaction): string | null {
+function formatCash(transaction: InvestmentTransactionListItem): string | null {
   return transaction.valueUsd === null
     ? null
     : usdFormat.format(Math.abs(transaction.valueUsd));
@@ -58,7 +58,7 @@ function formatCash(transaction: CurrentBrokerageTransaction): string | null {
 // Trades have two legs (asset in/out and the opposing cash leg); everything
 // else is a single movement whose direction comes from the transaction side.
 function transactionLegs(
-  transaction: CurrentBrokerageTransaction,
+  transaction: InvestmentTransactionListItem,
 ): TransactionLeg[] {
   const asset = formatAsset(transaction);
   const cash = formatCash(transaction);
@@ -112,7 +112,7 @@ function Leg({ leg }: { leg: TransactionLeg }) {
 export function TransactionsTable({
   transactions,
 }: {
-  transactions: CurrentBrokerageTransaction[];
+  transactions: InvestmentTransactionListItem[];
 }) {
   if (transactions.length === 0) {
     return (

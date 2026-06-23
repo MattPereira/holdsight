@@ -154,7 +154,8 @@ export function KrakenConnectPanel({
             aria-invalid={Boolean(error)}
           />
           <FieldDescription>
-            API key must allow query permissions
+            API key needs Funds: Query for balances and Orders &amp; trades:
+            Query closed orders &amp; trades for transaction history.
           </FieldDescription>
           <FieldError>{error}</FieldError>
         </Field>

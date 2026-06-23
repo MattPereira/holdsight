@@ -1,13 +1,8 @@
 import { TransactionsTable } from "@/components/accounts/transactions/transactions-table";
-import type { CurrentBrokerageTransaction } from "@/lib/brokerage/transactions";
+import type { TransactionsPanel } from "@/components/accounts/transactions/types";
+import { Button } from "@/components/ui/button";
 
-export type TransactionsPanel = {
-  transactions: CurrentBrokerageTransaction[];
-  onRefresh: () => void;
-  busy: boolean;
-  error: string | null;
-  message: string | null;
-};
+const dateFormat = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
 
 export function TransactionsTabContent({
   panel,
@@ -29,6 +24,23 @@ export function TransactionsTabContent({
         <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
           {panel.message}
         </p>
+      ) : null}
+
+      {panel.historyStatus ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+          <span>
+            {panel.historyStatus.earliestTransactionAt && panel.historyStatus.latestTransactionAt
+              ? `Loaded ${dateFormat.format(new Date(panel.historyStatus.earliestTransactionAt))} to ${dateFormat.format(new Date(panel.historyStatus.latestTransactionAt))}`
+              : "No Kraken trades loaded yet."}
+          </span>
+          {panel.historyStatus.hasMore && panel.onLoadOlder ? (
+            <Button type="button" size="sm" variant="outline" onClick={panel.onLoadOlder} disabled={panel.loadingOlder}>
+              {panel.loadingOlder ? "Loading older trades" : "Load 50 older trades"}
+            </Button>
+          ) : panel.historyStatus.earliestTransactionAt ? (
+            <span>Full available trade history loaded.</span>
+          ) : null}
+        </div>
       ) : null}
 
       <TransactionsTable transactions={panel.transactions} />

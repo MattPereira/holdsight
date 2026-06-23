@@ -1,18 +1,22 @@
 import { useMemo, useState, useTransition } from "react";
 
 import { AccountDetailsShell } from "@/components/accounts/account-details-shell";
+import type { TransactionHistoryStatus } from "@/components/accounts/transactions/types";
 import type { BalanceGroup, SecondaryColumn } from "@/components/accounts/types";
-import type { CurrentBrokerageTransaction } from "@/lib/brokerage/transactions";
+import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import type { PortfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 
 type TransactionsConfig<TTransactionResult> = {
-  initialTransactions: CurrentBrokerageTransaction[];
+  initialTransactions: InvestmentTransactionListItem[];
   loadTransactions: () => Promise<TTransactionResult>;
   getTransactions: (
     result: TTransactionResult,
-  ) => CurrentBrokerageTransaction[];
+  ) => InvestmentTransactionListItem[];
   getError?: (result: TTransactionResult) => string | null;
   getMessage?: (result: TTransactionResult) => string | null;
+  initialHistoryStatus?: TransactionHistoryStatus;
+  getHistoryStatus?: (result: TTransactionResult) => TransactionHistoryStatus;
+  loadOlderTransactions?: () => Promise<TTransactionResult>;
 };
 
 export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResult>({
@@ -42,7 +46,7 @@ export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResu
 }) {
   const [balances, setBalances] = useState<TBalances>(initialBalances);
   const [currentTransactions, setCurrentTransactions] = useState<
-    CurrentBrokerageTransaction[] | undefined
+    InvestmentTransactionListItem[] | undefined
   >(transactions?.initialTransactions);
   const [syncedInitialBalances, setSyncedInitialBalances] =
     useState(initialBalances);
@@ -54,8 +58,12 @@ export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResu
   const [transactionMessage, setTransactionMessage] = useState<string | null>(
     null,
   );
+  const [transactionHistoryStatus, setTransactionHistoryStatus] =
+    useState<TransactionHistoryStatus | undefined>(transactions?.initialHistoryStatus);
   const [isBalancePending, startBalanceTransition] = useTransition();
   const [isTransactionPending, startTransactionTransition] = useTransition();
+  const [isOlderTransactionsPending, startOlderTransactionsTransition] =
+    useTransition();
 
   if (syncedInitialBalances !== initialBalances) {
     setSyncedInitialBalances(initialBalances);
@@ -71,6 +79,7 @@ export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResu
   ) {
     setSyncedInitialTransactions(transactions.initialTransactions);
     setCurrentTransactions(transactions.initialTransactions);
+    setTransactionHistoryStatus(transactions.initialHistoryStatus);
     setTransactionError(null);
     setTransactionMessage(null);
   }
@@ -110,6 +119,21 @@ export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResu
       setCurrentTransactions(transactions.getTransactions(result));
       setTransactionError(transactions.getError?.(result) ?? null);
       setTransactionMessage(transactions.getMessage?.(result) ?? null);
+      setTransactionHistoryStatus(transactions.getHistoryStatus?.(result));
+    });
+  }
+
+  function handleLoadOlderTransactions() {
+    if (!transactions?.loadOlderTransactions) return;
+
+    setTransactionError(null);
+    setTransactionMessage(null);
+    startOlderTransactionsTransition(async () => {
+      const result = await transactions.loadOlderTransactions!();
+      setCurrentTransactions(transactions.getTransactions(result));
+      setTransactionError(transactions.getError?.(result) ?? null);
+      setTransactionMessage(transactions.getMessage?.(result) ?? null);
+      setTransactionHistoryStatus(transactions.getHistoryStatus?.(result));
     });
   }
 
@@ -131,6 +155,11 @@ export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResu
               busy: isTransactionPending,
               error: transactionError,
               message: transactionMessage,
+              historyStatus: transactionHistoryStatus,
+              onLoadOlder: transactions.loadOlderTransactions
+                ? handleLoadOlderTransactions
+                : undefined,
+              loadingOlder: isOlderTransactionsPending,
             }
           : undefined
       }

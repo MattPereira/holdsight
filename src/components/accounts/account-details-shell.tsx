@@ -4,7 +4,7 @@ import { RiRefreshLine } from "@remixicon/react";
 import { useState } from "react";
 
 import { BalancesTabContent } from "@/components/accounts/balances/balances-tab-content";
-import type { TransactionsPanel } from "@/components/accounts/transactions/transactions-tab-content";
+import type { TransactionsPanel } from "@/components/accounts/transactions/types";
 import { TransactionsTabContent } from "@/components/accounts/transactions/transactions-tab-content";
 import type { BalanceGroup, SecondaryColumn } from "@/components/accounts/types";
 import { Button } from "@/components/ui/button";

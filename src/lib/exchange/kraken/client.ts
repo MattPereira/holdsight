@@ -7,6 +7,7 @@ const KRAKEN_API_BASE_URL =
   process.env.KRAKEN_API_BASE_URL ?? "https://api.kraken.com";
 
 const KRAKEN_PRIVATE_BALANCE_PATH = "/0/private/BalanceEx";
+const KRAKEN_PRIVATE_TRADES_HISTORY_PATH = "/0/private/TradesHistory";
 const KRAKEN_PUBLIC_ASSET_PAIRS_PATH = "/0/public/AssetPairs";
 const KRAKEN_PUBLIC_TICKER_PATH = "/0/public/Ticker";
 
@@ -29,7 +30,7 @@ type KrakenExtendedBalanceEntry = {
   hold_trade?: string;
 };
 
-type KrakenAssetPair = {
+export type KrakenAssetPair = {
   altname?: string;
   wsname?: string;
   base?: string;
@@ -45,6 +46,27 @@ type KrakenTicker = {
 
 export type KrakenBalance = InvestmentBalance & {
   assetClass: "crypto" | "cash";
+};
+
+export type KrakenTrade = {
+  ordertxid?: string;
+  pair?: string;
+  time?: number;
+  type?: "buy" | "sell";
+  ordertype?: string;
+  price?: string;
+  cost?: string;
+  fee?: string;
+  vol?: string;
+  margin?: string;
+  misc?: string;
+  trade_id?: number;
+  maker?: boolean;
+};
+
+type KrakenTradesHistory = {
+  trades: Record<string, KrakenTrade>;
+  count?: number;
 };
 
 export type KrakenBalancesResult =
@@ -114,9 +136,11 @@ async function readKrakenJson<T>(
 async function krakenPrivatePost<T>(
   path: string,
   credentials: KrakenCredentials,
+  params: Record<string, string> = {},
 ): Promise<T> {
   const body = new URLSearchParams({
     nonce: Date.now().toString(),
+    ...params,
   });
 
   const response = await fetch(`${KRAKEN_API_BASE_URL}${path}`, {
@@ -150,7 +174,7 @@ async function krakenPublicGet<T>(
   return readKrakenJson<T>(response, "Kraken public API error");
 }
 
-function normalizeAssetSymbol(asset: string): string {
+export function normalizeKrakenAssetSymbol(asset: string): string {
   const base = asset
     .trim()
     .replace(/^X(?=[A-Z0-9]{3,}$)/, "")
@@ -206,8 +230,8 @@ export async function fetchKrakenUsdMarkets(): Promise<UsdMarket[]> {
   );
 
   return Object.entries(result).flatMap(([pairKey, pair]) => {
-    const base = normalizeAssetSymbol(pair.base ?? "");
-    const quote = normalizeAssetSymbol(pair.quote ?? "");
+    const base = normalizeKrakenAssetSymbol(pair.base ?? "");
+    const quote = normalizeKrakenAssetSymbol(pair.quote ?? "");
     if (!base || quote !== "USD") return [];
     if (pair.status && pair.status !== "online") return [];
 
@@ -257,7 +281,7 @@ export async function fetchKrakenBalances(
     const balancesWithAmount = Object.entries(rawBalances)
       .map(([asset, balance]) => ({
         asset,
-        symbol: normalizeAssetSymbol(asset),
+        symbol: normalizeKrakenAssetSymbol(asset),
         amount: toNumber(balance.balance),
       }))
       .filter((balance) => balance.amount > 0);
@@ -324,4 +348,39 @@ export async function fetchKrakenBalances(
       httpStatus: Number.isFinite(httpStatus) ? httpStatus : 502,
     };
   }
+}
+
+export async function fetchKrakenAssetPairs(): Promise<
+  Record<string, KrakenAssetPair>
+> {
+  return krakenPublicGet<Record<string, KrakenAssetPair>>(
+    KRAKEN_PUBLIC_ASSET_PAIRS_PATH,
+    new URLSearchParams({ assetVersion: "1" }),
+  );
+}
+
+/** Fetch every trade in the requested time range (Kraken returns 50 per page). */
+export type KrakenTradesHistoryPage = {
+  trades: Record<string, KrakenTrade>;
+  count: number;
+  offset: number;
+};
+
+export async function fetchKrakenTradesHistoryPage(
+  credentials: KrakenCredentials,
+  input: { startUnix?: number; endUnix: number; offset?: number },
+): Promise<KrakenTradesHistoryPage> {
+  const offset = input.offset ?? 0;
+  const result = await krakenPrivatePost<KrakenTradesHistory>(
+    KRAKEN_PRIVATE_TRADES_HISTORY_PATH,
+    credentials,
+    {
+      type: "all",
+      ...(input.startUnix ? { start: String(input.startUnix) } : {}),
+      end: String(input.endUnix),
+      ofs: String(offset),
+    },
+  );
+
+  return { trades: result.trades, count: result.count ?? 0, offset };
 }

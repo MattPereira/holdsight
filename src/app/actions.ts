@@ -26,6 +26,15 @@ import {
   syncUserKrakenAccounts,
 } from "@/lib/exchange/kraken/balances";
 import {
+  backfillUserKrakenTrades,
+  getCurrentKrakenTransactions,
+  getKrakenTransactionHistoryStatus,
+  syncUserKrakenTransactions,
+  type CurrentKrakenTransaction,
+  type KrakenTransactionHistoryStatus,
+  type SyncUserKrakenTransactionsResult,
+} from "@/lib/exchange/kraken/transactions";
+import {
   addUserEvmAccounts,
   getUserEvmAccounts,
   removeUserEvmAccount,
@@ -251,6 +260,96 @@ export async function loadKrakenBalances(): Promise<BalancesResult[]> {
   await syncKrakenAccounts(userId, krakenAccounts);
 
   return getCurrentUserKrakenBalances(userId);
+}
+
+export type KrakenTransactionsActionResult = {
+  summary: SyncUserKrakenTransactionsResult | null;
+  transactions: CurrentKrakenTransaction[];
+  message: string;
+  error: string | null;
+  historyStatus: KrakenTransactionHistoryStatus;
+};
+
+export async function loadKrakenTransactions(): Promise<KrakenTransactionsActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      summary: null,
+      transactions: [],
+      message: "",
+      error: "You must be signed in to refresh transactions.",
+      historyStatus: { earliestTransactionAt: null, latestTransactionAt: null, hasMore: false },
+    };
+  }
+
+  try {
+    const summary = await syncUserKrakenTransactions(userId);
+    revalidatePath("/exchanges");
+    const [transactions, historyStatus] = await Promise.all([
+      getCurrentKrakenTransactions(userId),
+      getKrakenTransactionHistoryStatus(userId),
+    ]);
+    return {
+      summary,
+      transactions,
+      message: `Synced ${summary.transactionCount} Kraken ${summary.transactionCount === 1 ? "transaction" : "transactions"}.`,
+      error: summary.failures[0]?.message ?? null,
+      historyStatus,
+    };
+  } catch (error) {
+    const [transactions, historyStatus] = await Promise.all([
+      getCurrentKrakenTransactions(userId),
+      getKrakenTransactionHistoryStatus(userId),
+    ]);
+    return {
+      summary: null,
+      transactions,
+      message: "",
+      error: error instanceof Error ? error.message : "Failed to refresh Kraken transactions.",
+      historyStatus,
+    };
+  }
+}
+
+export async function loadOlderKrakenTransactions(): Promise<KrakenTransactionsActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      summary: null,
+      transactions: [],
+      message: "",
+      error: "You must be signed in to load older transactions.",
+      historyStatus: { earliestTransactionAt: null, latestTransactionAt: null, hasMore: false },
+    };
+  }
+
+  try {
+    const summary = await backfillUserKrakenTrades(userId);
+    revalidatePath("/exchanges");
+    const [transactions, historyStatus] = await Promise.all([
+      getCurrentKrakenTransactions(userId),
+      getKrakenTransactionHistoryStatus(userId),
+    ]);
+    return {
+      summary,
+      transactions,
+      message: `Loaded ${summary.transactionCount} older Kraken ${summary.transactionCount === 1 ? "trade" : "trades"}.`,
+      error: summary.failures[0]?.message ?? null,
+      historyStatus,
+    };
+  } catch (error) {
+    const [transactions, historyStatus] = await Promise.all([
+      getCurrentKrakenTransactions(userId),
+      getKrakenTransactionHistoryStatus(userId),
+    ]);
+    return {
+      summary: null,
+      transactions,
+      message: "",
+      error: error instanceof Error ? error.message : "Failed to load older Kraken transactions.",
+      historyStatus,
+    };
+  }
 }
 
 export type KrakenCredentialsActionResult = {

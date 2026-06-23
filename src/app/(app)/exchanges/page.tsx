@@ -2,11 +2,21 @@ import { ExchangesDetailsPage } from "@/components/accounts/exchanges-details-pa
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getUserKrakenAccounts } from "@/lib/exchange/kraken/accounts";
 import { getCurrentKrakenBalances } from "@/lib/exchange/kraken/balances";
+import {
+  getCurrentKrakenTransactions,
+  getKrakenTransactionHistoryStatus,
+} from "@/lib/exchange/kraken/transactions";
 
 export default async function ExchangePage() {
   const userId = await getCurrentUserId();
   const krakenAccounts = userId ? await getUserKrakenAccounts(userId) : [];
-  const balanceResults = await getCurrentKrakenBalances(krakenAccounts);
+  const [balanceResults, transactions, historyStatus] = await Promise.all([
+    getCurrentKrakenBalances(krakenAccounts),
+    userId ? getCurrentKrakenTransactions(userId) : [],
+    userId
+      ? getKrakenTransactionHistoryStatus(userId)
+      : { earliestTransactionAt: null, latestTransactionAt: null, hasMore: false },
+  ]);
   const balanceResultsKey = balanceResults
     .map((result) =>
       result.status === "ready"
@@ -23,6 +33,8 @@ export default async function ExchangePage() {
       <ExchangesDetailsPage
         key={balanceResultsKey}
         initialResults={balanceResults}
+        initialTransactions={transactions}
+        initialHistoryStatus={historyStatus}
       />
     </div>
   );
