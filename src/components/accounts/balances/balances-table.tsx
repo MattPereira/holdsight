@@ -59,7 +59,7 @@ function DesktopTable({
   const secondaryRight = secondaryColumn.align === "right";
 
   return (
-    <div className="hidden overflow-hidden rounded-lg border sm:block">
+    <div className="hidden sm:block">
       <Table className="table-fixed">
         <colgroup>
           <col className="w-[28%]" />
@@ -69,7 +69,7 @@ function DesktopTable({
           <col className="w-[18%]" />
         </colgroup>
         <TableHeader>
-          <TableRow className="bg-muted/30 hover:bg-muted/30">
+          <TableRow className="hover:bg-transparent [&>th]:text-xs [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-muted-foreground">
             <TableHead>Asset</TableHead>
             <TableHead className={secondaryRight ? "text-right" : undefined}>
               {secondaryColumn.header}
@@ -82,23 +82,21 @@ function DesktopTable({
         <TableBody>
           {rows.map((row) => (
             <TableRow key={row.key}>
-              <TableCell className="font-medium">{row.symbol}</TableCell>
+              <TableCell>{row.symbol}</TableCell>
               <TableCell
                 className={
-                  secondaryRight
-                    ? "text-right tabular-nums text-muted-foreground"
-                    : "text-muted-foreground"
+                  secondaryRight ? "text-right tabular-nums" : undefined
                 }
               >
                 {row.secondary}
               </TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground">
+              <TableCell className="text-right tabular-nums">
                 {amountFormat.format(row.amount)}
               </TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground">
+              <TableCell className="text-right tabular-nums">
                 {formatPrice(row.priceUsd)}
               </TableCell>
-              <TableCell className="text-right font-medium tabular-nums">
+              <TableCell className="text-right tabular-nums">
                 {formatUsd(row.valueUsd)}
               </TableCell>
             </TableRow>
@@ -127,7 +125,7 @@ function MobileList({
   secondaryColumn: SecondaryColumn;
 }) {
   return (
-    <ul className="divide-y rounded-lg border sm:hidden">
+    <ul className="divide-y sm:hidden">
       {rows.map((row) => (
         <li key={row.key} className="flex flex-col gap-2 px-4 py-3">
           <div className="flex items-baseline justify-between gap-4">
@@ -176,9 +174,9 @@ export function BalancesTable({
   const hasRows = group.rows.length > 0;
 
   return (
-    <section className="flex flex-col gap-2">
-      <div className="flex items-baseline justify-between gap-4 px-2">
-        <span className="text-sm font-medium">{group.title}</span>
+    <section className="overflow-hidden rounded-lg border">
+      <div className="flex items-baseline justify-between gap-4 border-b bg-muted/50 px-4 py-3 font-medium">
+        <span>{group.title}</span>
         {group.subtitle ? (
           <span className="text-right text-sm font-normal text-muted-foreground">
             {group.subtitle}
@@ -199,7 +197,9 @@ export function BalancesTable({
           />
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">{group.emptyMessage}</p>
+        <p className="px-4 py-3 text-sm text-muted-foreground">
+          {group.emptyMessage}
+        </p>
       )}
     </section>
   );
