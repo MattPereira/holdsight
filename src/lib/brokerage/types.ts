@@ -1,5 +1,4 @@
 import type { brokerageAccountType } from "@/db/schema/investment-accounts";
-import type { InvestmentTransaction, Security } from "plaid";
 
 export type BrokerageAccountTypeValue =
   (typeof brokerageAccountType.enumValues)[number];
@@ -40,15 +39,4 @@ export type BrokerageAccountHoldings = {
 export type HoldingsResult =
   | { status: "ready"; accounts: BrokerageAccountHoldings[] }
   | { status: "login_required" }
-  | { status: "error"; message: string; httpStatus: number };
-
-export type BrokerageTransactionsPageResult =
-  | {
-      status: "ready";
-      transactions: InvestmentTransaction[];
-      securities: Security[];
-      totalInvestmentTransactions: number;
-    }
-  | { status: "login_required" }
-  | { status: "not_ready" }
   | { status: "error"; message: string; httpStatus: number };

@@ -41,6 +41,13 @@ export const plaidItemStatus = pgEnum("plaid_item_status", [
   "disabled",
 ]);
 
+export const brokerageConnectionStatus = pgEnum("brokerage_connection_status", [
+  "active",
+  "login_required",
+  "error",
+  "disabled",
+]);
+
 export const plaidItemTransactionSyncStatus = pgEnum(
   "plaid_item_transaction_sync_status",
   ["idle", "syncing", "success", "rate_limited", "error"],
@@ -224,12 +231,56 @@ export const plaidItems = pgTable(
   ],
 );
 
+// Provider-neutral brokerage login/authorization. This is the long-term home
+// for direct broker integrations such as Schwab, while Plaid rows are mirrored
+// here during the migration away from Plaid-specific brokerage storage.
+export const brokerageConnections = pgTable(
+  "brokerage_connections",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    externalConnectionId: text("external_connection_id").notNull(),
+    accessTokenEncrypted: text("access_token_encrypted").notNull(),
+    refreshTokenEncrypted: text("refresh_token_encrypted"),
+    tokenExpiresAt: timestamp("token_expires_at"),
+    institutionId: text("institution_id"),
+    institutionName: text("institution_name"),
+    status: brokerageConnectionStatus("status").default("active").notNull(),
+    lastSyncedAt: timestamp("last_synced_at"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("brokerage_connections_user_provider_external_idx").on(
+      table.userId,
+      table.provider,
+      table.externalConnectionId,
+    ),
+    index("brokerage_connections_user_id_idx").on(table.userId),
+    index("brokerage_connections_provider_idx").on(table.provider),
+    index("brokerage_connections_status_idx").on(table.status),
+  ],
+);
+
 export const brokerageAccounts = pgTable(
   "brokerage_accounts",
   {
     investmentAccountId: uuid("investment_account_id")
       .primaryKey()
       .references(() => investmentAccounts.id, { onDelete: "cascade" }),
+    brokerageConnectionId: uuid("brokerage_connection_id").references(
+      () => brokerageConnections.id,
+      {
+        onDelete: "cascade",
+      },
+    ),
     plaidItemId: uuid("plaid_item_id").references(() => plaidItems.id, {
       onDelete: "cascade",
     }),
@@ -241,6 +292,9 @@ export const brokerageAccounts = pgTable(
   },
   (table) => [
     index("brokerage_accounts_brokerage_idx").on(table.brokerage),
+    index("brokerage_accounts_connection_id_idx").on(
+      table.brokerageConnectionId,
+    ),
     index("brokerage_accounts_plaid_item_id_idx").on(table.plaidItemId),
   ],
 );
@@ -340,6 +394,7 @@ export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   authAccounts: many(account),
   investmentAccounts: many(investmentAccounts),
+  brokerageConnections: many(brokerageConnections),
 }));
 
 export const investmentAccountsRelations = relations(
@@ -427,6 +482,17 @@ export const plaidItemsRelations = relations(plaidItems, ({ one, many }) => ({
   brokerageAccounts: many(brokerageAccounts),
 }));
 
+export const brokerageConnectionsRelations = relations(
+  brokerageConnections,
+  ({ one, many }) => ({
+    user: one(user, {
+      fields: [brokerageConnections.userId],
+      references: [user.id],
+    }),
+    brokerageAccounts: many(brokerageAccounts),
+  }),
+);
+
 export const brokerageAccountsRelations = relations(
   brokerageAccounts,
   ({ one }) => ({
@@ -437,6 +503,10 @@ export const brokerageAccountsRelations = relations(
     plaidItem: one(plaidItems, {
       fields: [brokerageAccounts.plaidItemId],
       references: [plaidItems.id],
+    }),
+    brokerageConnection: one(brokerageConnections, {
+      fields: [brokerageAccounts.brokerageConnectionId],
+      references: [brokerageConnections.id],
     }),
   }),
 );

@@ -71,11 +71,16 @@ import {
   upsertPlaidItem,
   type SavedPlaidItem,
 } from "@/lib/plaid/items";
-import { getHoldings } from "@/lib/brokerage/client";
+import { getPlaidHoldings } from "@/lib/brokerage/providers/plaid/client";
 import {
   getUserBrokerageAccounts,
   saveBrokerageAccounts,
 } from "@/lib/brokerage/accounts";
+import {
+  getUserSchwabConnections,
+  removeUserSchwabConnection,
+  type SavedBrokerageConnection,
+} from "@/lib/brokerage/connections";
 import {
   applyItemHoldings,
   getCurrentBrokerageBalances,
@@ -127,6 +132,7 @@ import {
   updateAssetGroup,
 } from "@/lib/portfolio/groups";
 import type { BalancesResult } from "@/lib/portfolio/types";
+import { isSchwabConfigured } from "@/lib/brokerage/providers/schwab/config";
 
 export type WalletActionResult = {
   wallets: SavedEvmAccount[];
@@ -670,7 +676,7 @@ async function currentPlaidAccounts(
 
 function plaidResultError(
   result:
-    | Awaited<ReturnType<typeof getHoldings>>
+    | Awaited<ReturnType<typeof getPlaidHoldings>>
     | Awaited<ReturnType<typeof getDepositoryAccounts>>
     | Awaited<ReturnType<typeof getCreditCardAccounts>>,
 ): string | null {
@@ -779,7 +785,7 @@ async function linkPlaidAccountsForFamilies({
     }
 
     if (families.includes("brokerage")) {
-      const holdings = await getHoldings(exchange.accessToken);
+      const holdings = await getPlaidHoldings(exchange.accessToken);
       if (holdings.status === "ready") {
         await saveBrokerageAccounts(
           userId,
@@ -1207,6 +1213,8 @@ export type AccountConnectionsResult = {
   wallets: SavedEvmAccount[];
   krakenAccounts: SavedKrakenAccount[];
   plaidItems: SavedPlaidItem[];
+  schwabConnections: SavedBrokerageConnection[];
+  schwabConfigured: boolean;
   manualItems: ManualBalanceItemRow[];
   error: string | null;
 };
@@ -1222,19 +1230,36 @@ export async function getAccountConnections(): Promise<AccountConnectionsResult>
       wallets: [],
       krakenAccounts: [],
       plaidItems: [],
+      schwabConnections: [],
+      schwabConfigured: isSchwabConfigured(),
       manualItems: [],
       error: "You must be signed in to manage connections.",
     };
   }
 
-  const [wallets, krakenAccounts, plaidItems, manualItems] = await Promise.all([
+  const [
+    wallets,
+    krakenAccounts,
+    plaidItems,
+    schwabConnections,
+    manualItems,
+  ] = await Promise.all([
     getUserEvmAccounts(userId),
     getUserKrakenAccounts(userId),
     getUserPlaidItems(userId),
+    getUserSchwabConnections(userId),
     getUserManualBalanceItems(userId),
   ]);
 
-  return { wallets, krakenAccounts, plaidItems, manualItems, error: null };
+  return {
+    wallets,
+    krakenAccounts,
+    plaidItems,
+    schwabConnections,
+    schwabConfigured: isSchwabConfigured(),
+    manualItems,
+    error: null,
+  };
 }
 
 /**
@@ -1266,6 +1291,29 @@ export async function removePlaidItem(
   }
   revalidatePath("/");
   return { plaidItems: await getUserPlaidItems(userId), error: null };
+}
+
+export async function removeSchwabConnection(
+  connectionId: string,
+): Promise<{
+  schwabConnections: SavedBrokerageConnection[];
+  error: string | null;
+}> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      schwabConnections: [],
+      error: "You must be signed in to remove a connection.",
+    };
+  }
+
+  await removeUserSchwabConnection(userId, connectionId);
+  revalidatePath("/");
+  revalidatePath("/connect");
+  return {
+    schwabConnections: await getUserSchwabConnections(userId),
+    error: null,
+  };
 }
 
 /* --------------------------- manual balances --------------------------- */

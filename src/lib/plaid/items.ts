@@ -7,6 +7,7 @@ import { creditAccounts } from "@/db/schema/credit-accounts";
 import { depositoryAccounts } from "@/db/schema/depository-accounts";
 import {
   brokerageAccounts,
+  brokerageConnections,
   investmentAccounts,
   plaidItems,
 } from "@/db/schema/investment-accounts";
@@ -276,7 +277,10 @@ export async function removeUserPlaidItem(
   plaidItemId: string,
 ): Promise<void> {
   const [item] = await db
-    .select({ accessTokenEncrypted: plaidItems.accessTokenEncrypted })
+    .select({
+      accessTokenEncrypted: plaidItems.accessTokenEncrypted,
+      itemId: plaidItems.itemId,
+    })
     .from(plaidItems)
     .where(and(eq(plaidItems.id, plaidItemId), eq(plaidItems.userId, userId)))
     .limit(1);
@@ -324,5 +328,15 @@ export async function removeUserPlaidItem(
     await tx
       .delete(plaidItems)
       .where(and(eq(plaidItems.id, plaidItemId), eq(plaidItems.userId, userId)));
+
+    await tx
+      .delete(brokerageConnections)
+      .where(
+        and(
+          eq(brokerageConnections.userId, userId),
+          eq(brokerageConnections.provider, "plaid"),
+          eq(brokerageConnections.externalConnectionId, item.itemId),
+        ),
+      );
   });
 }

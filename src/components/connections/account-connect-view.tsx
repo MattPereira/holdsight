@@ -8,6 +8,7 @@ import {
   RiBankLine,
   RiCoinsLine,
   RiExchangeFundsLine,
+  RiLineChartLine,
   RiWalletLine,
 } from "@remixicon/react";
 
@@ -17,6 +18,7 @@ import type { AccountConnectionsResult } from "@/app/actions";
 import { KrakenConnectPanel } from "@/components/connections/connect-panels/kraken-connect-panel";
 import { ManualConnectPanel } from "@/components/connections/connect-panels/manual-connect-panel";
 import { PlaidConnectPanel } from "@/components/connections/connect-panels/plaid-connect-panel";
+import { SchwabConnectPanel } from "@/components/connections/connect-panels/schwab-connect-panel";
 import { WalletConnectPanel } from "@/components/connections/connect-panels/wallet-connect-panel";
 import {
   Field,
@@ -27,7 +29,7 @@ import {
 } from "@/components/ui/field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
-type Provider = "plaid" | "wallet" | "kraken" | "manual";
+type Provider = "plaid" | "schwab" | "wallet" | "kraken" | "manual";
 
 const providerOptions: {
   provider: Provider;
@@ -40,6 +42,12 @@ const providerOptions: {
     label: "Plaid connection",
     description: "Tradfi institutional accounts",
     icon: RiBankLine,
+  },
+  {
+    provider: "schwab",
+    label: "Schwab",
+    description: "Direct brokerage access",
+    icon: RiLineChartLine,
   },
   {
     provider: "wallet",
@@ -72,6 +80,7 @@ export function AccountConnectView({
 
   const hasConnections =
     connections.plaidItems.length > 0 ||
+    connections.schwabConnections.length > 0 ||
     connections.wallets.length > 0 ||
     connections.krakenAccounts.length > 0 ||
     connections.manualItems.length > 0;
@@ -144,6 +153,12 @@ export function AccountConnectView({
                 initialItems={connections.plaidItems}
                 onConnected={handleConnected}
               />
+            ) : provider === "schwab" ? (
+              <SchwabConnectPanel
+                view="add"
+                initialConnections={connections.schwabConnections}
+                configured={connections.schwabConfigured}
+              />
             ) : provider === "wallet" ? (
               <WalletConnectPanel
                 view="add"
@@ -189,6 +204,11 @@ export function AccountConnectView({
             view="remove"
             initialItems={connections.plaidItems}
             onConnected={handleConnected}
+          />
+          <SchwabConnectPanel
+            view="remove"
+            initialConnections={connections.schwabConnections}
+            configured={connections.schwabConfigured}
           />
           <WalletConnectPanel
             view="remove"

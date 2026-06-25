@@ -14,12 +14,13 @@ import {
   getUserBrokerageAccounts,
   type SavedBrokerageAccount,
 } from "@/lib/brokerage/accounts";
-import { getHoldings } from "@/lib/brokerage/client";
+import { upsertPlaidBrokerageConnection } from "@/lib/brokerage/connections";
 import { decrypt } from "@/lib/plaid/crypto";
 import {
   getUserBrokeragePlaidItems,
   type SavedPlaidItem,
 } from "@/lib/plaid/items";
+import { getPlaidHoldings } from "@/lib/brokerage/providers/plaid/client";
 import type {
   BrokerageAccountHoldings,
   BrokerageBalance,
@@ -155,6 +156,8 @@ export async function applyItemHoldings(
       await writeAccountBalances(tx, investmentAccountId, account);
     }
   });
+
+  await upsertPlaidBrokerageConnection(plaidItemId);
 }
 
 /**
@@ -165,7 +168,7 @@ export async function syncPlaidItem(
   item: SavedPlaidItem,
 ): Promise<HoldingsResult> {
   const accessToken = decrypt(item.accessTokenEncrypted);
-  const result = await getHoldings(accessToken);
+  const result = await getPlaidHoldings(accessToken);
   await applyItemHoldings(item.id, result);
   return result;
 }

@@ -8,12 +8,14 @@ import {
   investmentAccounts,
   plaidItems,
 } from "@/db/schema/investment-accounts";
+import { upsertPlaidBrokerageConnection } from "@/lib/brokerage/connections";
 import type { BrokerageAccountHoldings } from "@/lib/brokerage/types";
 
 const PLAID_PROVIDER = "plaid";
 
 export type SavedBrokerageAccount = {
   id: string; // investment_accounts.id
+  brokerageConnectionId: string | null;
   plaidItemId: string | null;
   externalAccountId: string | null;
   brokerage: string;
@@ -43,6 +45,8 @@ export async function saveBrokerageAccounts(
   brokerageLabel: string,
   accounts: BrokerageAccountHoldings[],
 ): Promise<ItemAccountLink[]> {
+  const brokerageConnectionId = await upsertPlaidBrokerageConnection(plaidItemId);
+
   return db.transaction(async (tx) => {
     const links: ItemAccountLink[] = [];
     const currentExternalAccountIds = accounts.map(
@@ -96,7 +100,11 @@ export async function saveBrokerageAccounts(
       if (existing) {
         await tx
           .update(brokerageAccounts)
-          .set({ plaidItemId, accountType: account.accountType })
+          .set({
+            brokerageConnectionId,
+            plaidItemId,
+            accountType: account.accountType,
+          })
           .where(eq(brokerageAccounts.investmentAccountId, existing.id));
         links.push({
           investmentAccountId: existing.id,
@@ -117,6 +125,7 @@ export async function saveBrokerageAccounts(
 
       await tx.insert(brokerageAccounts).values({
         investmentAccountId: created.id,
+        brokerageConnectionId,
         plaidItemId,
         brokerage: brokerageLabel,
         accountType: account.accountType,
@@ -139,6 +148,7 @@ export async function getUserBrokerageAccounts(
   return db
     .select({
       id: investmentAccounts.id,
+      brokerageConnectionId: brokerageAccounts.brokerageConnectionId,
       plaidItemId: brokerageAccounts.plaidItemId,
       externalAccountId: brokerageAccounts.externalAccountId,
       brokerage: brokerageAccounts.brokerage,

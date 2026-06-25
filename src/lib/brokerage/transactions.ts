@@ -14,8 +14,10 @@ import {
   investmentTransactions,
 } from "@/db/schema/investment-transactions";
 import type { SavedBrokerageAccount } from "@/lib/brokerage/accounts";
-import { getInvestmentTransactionsPage } from "@/lib/brokerage/client";
-import type { BrokerageTransactionsPageResult } from "@/lib/brokerage/types";
+import {
+  getPlaidInvestmentTransactionsPage,
+  type PlaidBrokerageTransactionsPageResult,
+} from "@/lib/brokerage/providers/plaid/client";
 import {
   getInvestmentTransactionSyncState,
   saveInvestmentTransactionPage,
@@ -236,7 +238,7 @@ function normalizeBrokerageDetails(
   };
 }
 
-function errorDetails(result: Exclude<BrokerageTransactionsPageResult, { status: "ready" }>) {
+function errorDetails(result: Exclude<PlaidBrokerageTransactionsPageResult, { status: "ready" }>) {
   if (result.status === "error") {
     return { status: result.httpStatus === 429 ? "rate_limited" as const : "error" as const, message: result.message, httpStatus: result.httpStatus };
   }
@@ -306,7 +308,7 @@ export async function processBrokerageTransactionSyncPage(input: {
         offset: 0,
       }
     : checkpoint.page;
-  const result = await getInvestmentTransactionsPage(
+  const result = await getPlaidInvestmentTransactionsPage(
     decrypt(item.accessTokenEncrypted),
     { ...page, accountId: externalAccountId },
   );
