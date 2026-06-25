@@ -43,6 +43,7 @@ import {
 import { syncKrakenTransactionHistory } from "@/workflows/kraken-transaction-sync";
 import {
   claimInvestmentTransactionSyncLease,
+  failInvestmentTransactionSyncLease,
   releaseInvestmentTransactionSyncLease,
 } from "@/lib/investment-transactions/ingestion";
 import {
@@ -82,14 +83,16 @@ import {
   type CurrentBrokerageAccount,
 } from "@/lib/brokerage/balances";
 import {
-  claimBrokerageTransactionImport,
-  completeBrokerageTransactionImport,
   getCurrentBrokerageTransactions,
   getBrokerageTransactionImportStatus,
-  setBrokerageTransactionImportRun,
   type CurrentBrokerageTransaction,
 } from "@/lib/brokerage/transactions";
 import { syncBrokerageTransactionHistory } from "@/workflows/brokerage-transaction-sync";
+import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
+import {
+  mergePortfolioTransactions,
+  type PortfolioTransactionsSnapshot,
+} from "@/lib/portfolio/transactions";
 import {
   getUserDepositoryAccounts,
   saveDepositoryAccounts,
@@ -877,43 +880,62 @@ export async function loadBrokerageTransactions(): Promise<BrokerageTransactions
     let queuedItemCount = 0;
 
     for (const item of items) {
-      const accountIds = accounts
-        .filter((account) => account.plaidItemId === item.id)
-        .map((account) => account.id);
-      if (accountIds.length === 0 || !await claimBrokerageTransactionImport(userId, item.id)) {
+      const itemAccounts = accounts.filter(
+        (account) => account.plaidItemId === item.id,
+      );
+      if (itemAccounts.length === 0) {
         continue;
       }
 
+      const claimedAccounts: Array<{ id: string; leaseToken: string }> = [];
+      for (const account of itemAccounts) {
+        const leaseToken = randomUUID();
+        const claimed = await claimInvestmentTransactionSyncLease({
+          userId,
+          investmentAccountId: account.id,
+          provider: "plaid",
+          leaseToken,
+        });
+        if (claimed) claimedAccounts.push({ id: account.id, leaseToken });
+      }
+      if (claimedAccounts.length === 0) continue;
+
       try {
-        const run = await start(syncBrokerageTransactionHistory, [
+        await start(syncBrokerageTransactionHistory, [
           userId,
           item.id,
-          accountIds,
+          claimedAccounts,
         ]);
-        await setBrokerageTransactionImportRun(userId, item.id, run.runId);
         queuedItemCount += 1;
       } catch (error) {
-        await completeBrokerageTransactionImport({
-          userId,
-          plaidItemId: item.id,
-          status: "error",
-          error: {
-            message: error instanceof Error ? error.message : "Failed to queue brokerage transaction sync.",
-            httpStatus: null,
-          },
-        });
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Failed to queue brokerage transaction sync.";
+        await Promise.all(
+          claimedAccounts.map(({ id, leaseToken }) =>
+            failInvestmentTransactionSyncLease({
+              userId,
+              investmentAccountId: id,
+              provider: "plaid",
+              leaseToken,
+              message,
+            }),
+          ),
+        );
         throw error;
       }
     }
 
     revalidatePath("/brokerages");
+    const status = await getBrokerageTransactionImportStatus(userId);
     return {
       transactions: await getCurrentBrokerageTransactions(userId),
       message: queuedItemCount > 0
         ? `Queued transaction history sync for ${queuedItemCount} Plaid ${queuedItemCount === 1 ? "connection" : "connections"}.`
         : "Transaction history sync is already running.",
       error: null,
-      isSyncing: queuedItemCount > 0 || items.some((item) => item.transactionSyncStatus === "syncing"),
+      isSyncing: status.isSyncing,
     };
   } catch (error) {
     const [transactions, status] = await Promise.all([
@@ -949,6 +971,110 @@ export async function pollBrokerageTransactions(): Promise<BrokerageTransactions
     getBrokerageTransactionImportStatus(userId),
   ]);
   return { transactions, message: "", error: null, isSyncing: status.isSyncing };
+}
+
+export type PortfolioTransactionsActionResult = {
+  transactions: InvestmentTransactionListItem[];
+  message: string;
+  error: string | null;
+  historyStatus: PortfolioTransactionsSnapshot["historyStatus"];
+  isSyncing: boolean;
+};
+
+const WALLET_SOURCE_NOT_CONFIGURED_ERROR =
+  "Add at least one wallet before syncing transactions.";
+const KRAKEN_SOURCE_NOT_CONFIGURED_ERROR =
+  "Add Kraken API credentials before syncing transactions.";
+
+function portfolioTransactionError(error: string | null): string | null {
+  if (
+    error === WALLET_SOURCE_NOT_CONFIGURED_ERROR ||
+    error === KRAKEN_SOURCE_NOT_CONFIGURED_ERROR
+  ) {
+    return null;
+  }
+
+  return error;
+}
+
+function activePortfolioTransactionMessage(
+  message: string,
+  isActive: boolean,
+): string | null {
+  return isActive && message ? message : null;
+}
+
+function combinePortfolioTransactionResults(
+  wallet: WalletTransactionsActionResult,
+  kraken: KrakenTransactionsActionResult,
+  brokerage: BrokerageTransactionsActionResult,
+): PortfolioTransactionsActionResult {
+  const snapshot = mergePortfolioTransactions(
+    [
+      wallet.transactions ?? [],
+      kraken.transactions,
+      brokerage.transactions,
+    ],
+    {
+      walletPhase: wallet.historyStatus.phase,
+      walletHasMore: wallet.historyStatus.hasMore,
+      walletLatestTransactionUpdatedAt:
+        wallet.historyStatus.latestTransactionUpdatedAt,
+      krakenPhase: kraken.historyStatus.phase,
+      krakenHasMore: kraken.historyStatus.hasMore,
+      brokerageIsSyncing: brokerage.isSyncing,
+    },
+  );
+
+  const messages = [
+    activePortfolioTransactionMessage(
+      wallet.message,
+      wallet.historyStatus.hasMore,
+    ),
+    activePortfolioTransactionMessage(
+      kraken.message,
+      kraken.historyStatus.hasMore,
+    ),
+    activePortfolioTransactionMessage(brokerage.message, brokerage.isSyncing),
+  ].filter((message): message is string => Boolean(message));
+  const errors = [
+    portfolioTransactionError(wallet.error),
+    portfolioTransactionError(kraken.error),
+    brokerage.error,
+  ].filter((error): error is string => Boolean(error));
+
+  return {
+    transactions: snapshot.transactions,
+    message: messages.join(" "),
+    error: errors.length > 0 ? errors.join(" ") : null,
+    historyStatus: snapshot.historyStatus,
+    isSyncing: snapshot.isSyncing,
+  };
+}
+
+/**
+ * Sync every investment transaction source (wallets, exchanges, brokerages) and
+ * return the merged feed for the home page's Transactions tab. Fans out to the
+ * per-source loaders so each still claims its own leases and starts its own
+ * workflows.
+ */
+export async function loadPortfolioTransactions(): Promise<PortfolioTransactionsActionResult> {
+  const [wallet, kraken, brokerage] = await Promise.all([
+    loadWalletTransactions(),
+    loadKrakenTransactions(),
+    loadBrokerageTransactions(),
+  ]);
+  return combinePortfolioTransactionResults(wallet, kraken, brokerage);
+}
+
+/** Read-only snapshot of the merged transaction feed for polling a sync. */
+export async function pollPortfolioTransactions(): Promise<PortfolioTransactionsActionResult> {
+  const [wallet, kraken, brokerage] = await Promise.all([
+    pollWalletTransactions(),
+    pollKrakenTransactions(),
+    pollBrokerageTransactions(),
+  ]);
+  return combinePortfolioTransactionResults(wallet, kraken, brokerage);
 }
 
 /**

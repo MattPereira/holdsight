@@ -1,12 +1,16 @@
 import "server-only";
 
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { InvestmentTransaction, Security } from "plaid";
 
 import { db } from "@/db";
-import { investmentAccounts, plaidItems } from "@/db/schema/investment-accounts";
+import {
+  brokerageAccounts,
+  investmentAccounts,
+} from "@/db/schema/investment-accounts";
 import {
   brokerageTransactionDetails,
+  investmentTransactionSyncs,
   investmentTransactions,
 } from "@/db/schema/investment-transactions";
 import type { SavedBrokerageAccount } from "@/lib/brokerage/accounts";
@@ -253,65 +257,30 @@ async function getBrokeragePlaidItem(userId: string, account: SavedBrokerageAcco
   return { item, externalAccountId: account.externalAccountId };
 }
 
-export async function claimBrokerageTransactionImport(
-  userId: string,
-  plaidItemId: string,
-): Promise<boolean> {
-  const [claimed] = await db
-    .update(plaidItems)
-    .set({
-      transactionSyncStatus: "syncing",
-      transactionSyncRunId: null,
-      transactionSyncStartedAt: new Date(),
-      transactionSyncCompletedAt: null,
-      transactionSyncHttpStatus: null,
-      transactionSyncErrorMessage: null,
-    })
-    .where(
-      and(
-        eq(plaidItems.id, plaidItemId),
-        eq(plaidItems.userId, userId),
-        ne(plaidItems.transactionSyncStatus, "syncing"),
-      ),
-    )
-    .returning({ id: plaidItems.id });
-
-  return Boolean(claimed);
-}
-
-export async function setBrokerageTransactionImportRun(
-  userId: string,
-  plaidItemId: string,
-  runId: string,
-): Promise<void> {
-  await db
-    .update(plaidItems)
-    .set({ transactionSyncRunId: runId })
-    .where(and(eq(plaidItems.id, plaidItemId), eq(plaidItems.userId, userId)));
-}
-
-export async function completeBrokerageTransactionImport(input: {
-  userId: string;
-  plaidItemId: string;
-  status: "success" | "rate_limited" | "error";
-  error?: { message: string; httpStatus: number | null };
-}): Promise<void> {
-  await db
-    .update(plaidItems)
-    .set({
-      transactionSyncStatus: input.status,
-      transactionSyncCompletedAt: new Date(),
-      transactionSyncHttpStatus: input.error?.httpStatus ?? null,
-      transactionSyncErrorMessage: input.error?.message ?? null,
-    })
-    .where(and(eq(plaidItems.id, input.plaidItemId), eq(plaidItems.userId, input.userId)));
-}
-
 export async function getBrokerageTransactionImportStatus(
   userId: string,
 ): Promise<BrokerageTransactionImportStatus> {
-  const items = await getUserBrokeragePlaidItems(userId);
-  return { isSyncing: items.some((item) => item.transactionSyncStatus === "syncing") };
+  const [active] = await db
+    .select({ id: investmentTransactionSyncs.id })
+    .from(investmentTransactionSyncs)
+    .innerJoin(
+      brokerageAccounts,
+      eq(
+        brokerageAccounts.investmentAccountId,
+        investmentTransactionSyncs.investmentAccountId,
+      ),
+    )
+    .where(
+      and(
+        eq(investmentTransactionSyncs.userId, userId),
+        eq(investmentTransactionSyncs.provider, PLAID_PROVIDER),
+        eq(investmentTransactionSyncs.status, "syncing"),
+        sql`${investmentTransactionSyncs.leaseExpiresAt} > now()`,
+      ),
+    )
+    .limit(1);
+
+  return { isSyncing: Boolean(active) };
 }
 
 /** Advances one durable, account-scoped Plaid transaction page. */

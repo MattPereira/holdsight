@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { TransactionHistoryStatus } from "@/components/accounts/transactions/types";
+import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import {
   investmentAccountSections,
   type InvestmentAccountSection,
@@ -12,6 +14,10 @@ import {
   getCurrentPortfolioBalanceSnapshot,
   type CurrentPortfolioBalanceSnapshot,
 } from "@/lib/portfolio/balances";
+import {
+  emptyPortfolioTransactionsSnapshot,
+  getCurrentPortfolioTransactions,
+} from "@/lib/portfolio/transactions";
 
 export type PortfolioAccountsData = {
   accounts: DepositoryAccountRow[];
@@ -23,6 +29,8 @@ export type PortfolioAccountsData = {
 export type PortfolioHomeData = {
   portfolioSummary: ReturnType<typeof portfolioAssetSummary>;
   accountData: PortfolioAccountsData;
+  transactions: InvestmentTransactionListItem[];
+  transactionHistoryStatus: TransactionHistoryStatus;
 };
 
 export function emptyPortfolioAccountsData(): PortfolioAccountsData {
@@ -35,9 +43,12 @@ export function emptyPortfolioAccountsData(): PortfolioAccountsData {
 }
 
 export function emptyPortfolioHomeData(): PortfolioHomeData {
+  const transactions = emptyPortfolioTransactionsSnapshot();
   return {
     portfolioSummary: portfolioAssetSummary([]),
     accountData: emptyPortfolioAccountsData(),
+    transactions: transactions.transactions,
+    transactionHistoryStatus: transactions.historyStatus,
   };
 }
 
@@ -59,10 +70,15 @@ function portfolioAccountsDataFromSnapshot(
 export async function getCurrentPortfolioHomeData(
   userId: string,
 ): Promise<PortfolioHomeData> {
-  const snapshot = await getCurrentPortfolioBalanceSnapshot(userId);
+  const [snapshot, transactions] = await Promise.all([
+    getCurrentPortfolioBalanceSnapshot(userId),
+    getCurrentPortfolioTransactions(userId),
+  ]);
 
   return {
     portfolioSummary: portfolioAssetSummary(snapshot.portfolioResults),
     accountData: portfolioAccountsDataFromSnapshot(snapshot),
+    transactions: transactions.transactions,
+    transactionHistoryStatus: transactions.historyStatus,
   };
 }

@@ -16,6 +16,8 @@ export default async function Home() {
       initialData={{
         portfolioSummary: data.portfolioSummary,
         accountData: data.accountData,
+        transactions: data.transactions,
+        transactionHistoryStatus: data.transactionHistoryStatus,
       }}
     />
   );

@@ -1,16 +1,26 @@
 "use client";
 
 import { RiRefreshLine } from "@remixicon/react";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { loadPortfolioPageData } from "@/app/actions";
+import {
+  loadPortfolioPageData,
+  loadPortfolioTransactions,
+  pollPortfolioTransactions,
+  type PortfolioTransactionsActionResult,
+} from "@/app/actions";
 import { PortfolioAccountsList } from "@/components/portfolio/portfolio-accounts-list";
 import { useAssetGroups } from "@/components/portfolio/asset-groups-context";
 import { PortfolioAllocations } from "@/components/portfolio/portfolio-allocations";
+import type { TransactionHistoryStatus } from "@/components/accounts/transactions/types";
+import { TransactionsTabContent } from "@/components/accounts/transactions/transactions-tab-content";
+import { useTransactionsPanel } from "@/components/accounts/transactions/use-transactions-panel";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CreditCardAccountRow } from "@/lib/credit-card/accounts";
 import type { DepositoryAccountRow } from "@/lib/depository/accounts";
+import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import type { ManualBalanceItemRow } from "@/lib/manual-balance/items";
 import type { InvestmentAccountSection } from "@/lib/portfolio/account-asset-rows";
 import type { PortfolioAssetSummary } from "@/lib/portfolio/asset-totals";
@@ -24,6 +34,8 @@ export type PortfolioPageData = {
     manualItems: ManualBalanceItemRow[];
     investmentAccountSections: InvestmentAccountSection[];
   };
+  transactions: InvestmentTransactionListItem[];
+  transactionHistoryStatus: TransactionHistoryStatus;
 };
 
 export function PortfolioPage({
@@ -48,6 +60,7 @@ export function PortfolioPage({
     InvestmentAccountSection[]
   >(initialData.accountData.investmentAccountSections);
   const [isPending, startTransition] = useTransition();
+  const [activeTab, setActiveTab] = useState("balances");
 
   // Re-seed local state whenever the server sends fresh data — e.g. after the
   // global "Manage accounts" sheet calls router.refresh(). Adjusting state
@@ -64,6 +77,28 @@ export function PortfolioPage({
       initialData.accountData.investmentAccountSections,
     );
   }
+
+  const transactionsConfig = useMemo(
+    () => ({
+      initialTransactions: initialData.transactions,
+      loadTransactions: loadPortfolioTransactions,
+      pollTransactions: pollPortfolioTransactions,
+      getTransactions: (result: PortfolioTransactionsActionResult) =>
+        result.transactions,
+      getError: (result: PortfolioTransactionsActionResult) => result.error,
+      getMessage: (result: PortfolioTransactionsActionResult) =>
+        result.message || null,
+      initialHistoryStatus: initialData.transactionHistoryStatus,
+      getHistoryStatus: (result: PortfolioTransactionsActionResult) =>
+        result.historyStatus,
+      initialIsSyncing: initialData.transactionHistoryStatus.hasMore,
+      getIsSyncing: (result: PortfolioTransactionsActionResult) =>
+        result.isSyncing,
+    }),
+    [initialData.transactions, initialData.transactionHistoryStatus],
+  );
+
+  const transactionsPanel = useTransactionsPanel(transactionsConfig);
 
   function handleRefresh() {
     startTransition(async () => {
@@ -84,45 +119,79 @@ export function PortfolioPage({
     });
   }
 
-  return (
-    <div className="flex flex-col gap-10">
-      <div className="flex flex-col">
-        <div className="flex items-center justify-start gap-2">
-          <h1 className="text-xl font-semibold">Portfolio</h1>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="px-1.5"
-            onClick={handleRefresh}
-            disabled={isPending}
-          >
-            <RiRefreshLine className={cn(isPending && "animate-spin")} />
-          </Button>
-        </div>
+  const onTransactionsTab = activeTab === "transactions";
+  const refresh = onTransactionsTab
+    ? transactionsPanel?.onRefresh
+    : handleRefresh;
+  const refreshBusy = onTransactionsTab
+    ? (transactionsPanel?.busy ?? false)
+    : isPending;
 
-        <div
-          aria-busy={isPending}
-          className={cn(
-            "transition-opacity duration-200",
-            isPending && "pointer-events-none opacity-60",
-          )}
+  return (
+    <Tabs
+      value={activeTab}
+      onValueChange={setActiveTab}
+      className="flex flex-col gap-6"
+    >
+      <div className="flex items-center justify-start gap-3">
+        <h1 className="text-xl font-semibold">Portfolio</h1>
+
+        <TabsList>
+          <TabsTrigger value="balances">Balances</TabsTrigger>
+          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+        </TabsList>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          onClick={refresh}
+          disabled={refreshBusy}
+          aria-label={
+            onTransactionsTab
+              ? refreshBusy
+                ? "Syncing"
+                : "Sync"
+              : refreshBusy
+                ? "Refreshing"
+                : "Refresh"
+          }
         >
-          <PortfolioAllocations
-            grandTotalValue={summary.grandTotalValue}
-            totals={summary.totals}
-            groups={groups}
-            allSymbols={summary.totals.map((total) => total.symbol)}
-          />
-        </div>
+          <RiRefreshLine className={cn(refreshBusy && "animate-spin")} />
+        </Button>
       </div>
 
-      <PortfolioAccountsList
-        accounts={accounts}
-        creditCardAccounts={creditCardAccounts}
-        manualItems={manualItems}
-        investmentAccountSections={investmentAccountSections}
-      />
-    </div>
+      <TabsContent value="balances">
+        <div className="flex flex-col gap-10">
+          <div
+            aria-busy={isPending}
+            className={cn(
+              "transition-opacity duration-200",
+              isPending && "pointer-events-none opacity-60",
+            )}
+          >
+            <PortfolioAllocations
+              grandTotalValue={summary.grandTotalValue}
+              totals={summary.totals}
+              groups={groups}
+              allSymbols={summary.totals.map((total) => total.symbol)}
+            />
+          </div>
+
+          <PortfolioAccountsList
+            accounts={accounts}
+            creditCardAccounts={creditCardAccounts}
+            manualItems={manualItems}
+            investmentAccountSections={investmentAccountSections}
+          />
+        </div>
+      </TabsContent>
+
+      <TabsContent value="transactions">
+        {transactionsPanel ? (
+          <TransactionsTabContent panel={transactionsPanel} />
+        ) : null}
+      </TabsContent>
+    </Tabs>
   );
 }
