@@ -162,6 +162,13 @@
       "when": 1782345526052,
       "tag": "0022_backfill_wallet_labels",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1782348580770,
+      "tag": "0023_puzzling_absorbing_man",
+      "breakpoints": true
     }
   ]
 }

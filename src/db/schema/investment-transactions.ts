@@ -165,6 +165,69 @@ export const hyperCoreTransactionDetails = pgTable(
   ],
 );
 
+export const hyperCorePerpEvents = pgTable(
+  "hyper_core_perp_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull(),
+    investmentAccountId: uuid("investment_account_id").notNull(),
+    sourceEventId: text("source_event_id").notNull(),
+    sourceTransactionIds: jsonb("source_transaction_ids")
+      .$type<string[]>()
+      .notNull(),
+    executedAt: timestamp("executed_at").notNull(),
+    market: text("market").notNull(),
+    positionSide: text("position_side").notNull(),
+    eventType: text("event_type").notNull(),
+    baseAssetSymbol: text("base_asset_symbol").notNull(),
+    baseAmount: numeric("base_amount", { precision: 36, scale: 18 }).notNull(),
+    entryNotionalUsd: numeric("entry_notional_usd", {
+      precision: 36,
+      scale: 18,
+    }),
+    exitNotionalUsd: numeric("exit_notional_usd", {
+      precision: 36,
+      scale: 18,
+    }),
+    entryPrice: numeric("entry_price", { precision: 36, scale: 18 }),
+    exitPrice: numeric("exit_price", { precision: 36, scale: 18 }),
+    grossPnlUsd: numeric("gross_pnl_usd", { precision: 36, scale: 18 }),
+    feeUsd: numeric("fee_usd", { precision: 36, scale: 18 }),
+    netPnlUsd: numeric("net_pnl_usd", { precision: 36, scale: 18 }),
+    raw: jsonb("raw").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("hyper_core_perp_events_source_unique").on(
+      table.investmentAccountId,
+      table.sourceEventId,
+    ),
+    index("hyper_core_perp_events_user_executed_at_idx").on(
+      table.userId,
+      table.executedAt,
+    ),
+    index("hyper_core_perp_events_account_executed_at_idx").on(
+      table.investmentAccountId,
+      table.executedAt,
+    ),
+    index("hyper_core_perp_events_market_idx").on(table.market),
+    foreignKey({
+      name: "hyper_core_perp_events_investment_account_user_fk",
+      columns: [table.investmentAccountId, table.userId],
+      foreignColumns: [investmentAccounts.id, investmentAccounts.userId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "hyper_core_perp_events_user_fk",
+      columns: [table.userId],
+      foreignColumns: [user.id],
+    }).onDelete("cascade"),
+  ],
+);
+
 export const brokerageTransactionDetails = pgTable(
   "brokerage_transaction_details",
   {
@@ -270,6 +333,20 @@ export const hyperCoreTransactionDetailsRelations = relations(
     transaction: one(investmentTransactions, {
       fields: [hyperCoreTransactionDetails.transactionId],
       references: [investmentTransactions.id],
+    }),
+  }),
+);
+
+export const hyperCorePerpEventsRelations = relations(
+  hyperCorePerpEvents,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [hyperCorePerpEvents.userId],
+      references: [user.id],
+    }),
+    investmentAccount: one(investmentAccounts, {
+      fields: [hyperCorePerpEvents.investmentAccountId],
+      references: [investmentAccounts.id],
     }),
   }),
 );

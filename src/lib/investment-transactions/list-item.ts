@@ -25,4 +25,11 @@ export type InvestmentTransactionListItem = {
   feeAmount: number | null;
   feeAssetSymbol: string | null;
   status: InvestmentTransactionStatus;
+  displayType?: "transaction" | "perp_event";
+  perpEventType?: "open" | "increase" | "decrease" | "close";
+  perpPositionSide?: "long" | "short";
+  entryPrice?: number | null;
+  exitPrice?: number | null;
+  grossPnlUsd?: number | null;
+  netPnlUsd?: number | null;
 };

@@ -347,11 +347,22 @@ export async function fetchHyperCoreFillsPage(input: {
 /** Resolves HyperCore's `@<spot market index>` notation to a display pair. */
 export async function getHyperCoreSpotMarketSymbols(): Promise<Map<string, string>> {
   const marketData = await fetchSpotMarketData();
+  const meta = marketData.meta;
   const symbols = new Map<string, string>();
 
-  for (const [position, market] of (marketData.meta.universe ?? []).entries()) {
+  for (const [position, market] of (meta.universe ?? []).entries()) {
     const index = market.index ?? position;
-    if (market.name) symbols.set(`@${index}`, market.name);
+    // Only canonical markets (e.g. PURR/USDC) carry a real `name`; every other
+    // spot market's name is just the `@<index>` form again, so build the pair
+    // from its two token indices.
+    const [baseToken, quoteToken] = market.tokens ?? [];
+    const base = baseToken === undefined ? null : tokenName(meta, baseToken);
+    const quote = quoteToken === undefined ? null : tokenName(meta, quoteToken);
+    const pair = base && quote ? `${base}/${quote}` : market.name ?? null;
+    if (!pair) continue;
+
+    symbols.set(`@${index}`, pair);
+    if (market.name) symbols.set(market.name, pair);
   }
 
   return symbols;

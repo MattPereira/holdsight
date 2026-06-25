@@ -1,10 +1,14 @@
 import "server-only";
 
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { investmentAccounts } from "@/db/schema/investment-accounts";
-import { investmentTransactions } from "@/db/schema/investment-transactions";
+import {
+  hyperCorePerpEvents,
+  hyperCoreTransactionDetails,
+  investmentTransactions,
+} from "@/db/schema/investment-transactions";
 import type { SavedHyperCoreAccount } from "@/lib/hyper-core/accounts";
 import {
   fetchHyperCoreFillsPage,
@@ -47,6 +51,53 @@ export type HyperCoreTransactionSyncPageResult = {
 
 export type CurrentHyperCoreTransaction = InvestmentTransactionListItem;
 
+type AggregatedHyperCoreFill = {
+  sourceTransactionId: string;
+  coin: string;
+  oid: number;
+  time: number;
+  side: HyperCoreFill["side"];
+  dir: string;
+  crossed: boolean;
+  feeToken: string | null;
+  hash: string | null;
+  fillIds: string[];
+  baseAmount: number;
+  quoteAmount: number | null;
+  priceQuote: number | null;
+  feeAmount: number | null;
+  fills: HyperCoreFill[];
+};
+
+type PerpPositionSide = "long" | "short";
+type PerpEventType = "open" | "increase" | "decrease" | "close";
+
+type PerpLot = {
+  sourceTransactionId: string;
+  remainingBaseAmount: number;
+  remainingEntryNotionalUsd: number;
+  remainingFeeUsd: number;
+};
+
+type DerivedPerpEvent = {
+  sourceEventId: string;
+  sourceTransactionIds: string[];
+  executedAt: Date;
+  market: string;
+  positionSide: PerpPositionSide;
+  eventType: PerpEventType;
+  baseAssetSymbol: string;
+  baseAmount: number;
+  entryNotionalUsd: number | null;
+  exitNotionalUsd: number | null;
+  entryPrice: number | null;
+  exitPrice: number | null;
+  grossPnlUsd: number | null;
+  feeUsd: number | null;
+  netPnlUsd: number | null;
+  raw: unknown;
+};
+
 function numberOrNull(value: string | null): number | null {
   return value === null ? null : Number(value);
 }
@@ -85,69 +136,396 @@ function sourceTransactionId(fill: HyperCoreFill): string {
   return `fill:${fill.tid}`;
 }
 
-function sideForFill(fill: HyperCoreFill): InvestmentTransactionSide {
-  const direction = fill.dir.toLowerCase();
+function sourceOrderTransactionId(
+  fill: Pick<HyperCoreFill, "coin" | "dir" | "oid" | "side">,
+): string {
+  return `order:${fill.oid}:${fill.coin}:${fill.side}:${fill.dir}`;
+}
+
+function sideForDirection(
+  directionValue: string,
+  sideValue: HyperCoreFill["side"],
+): InvestmentTransactionSide {
+  const direction = directionValue.toLowerCase();
   if (direction.startsWith("open")) return "open";
   if (direction.startsWith("close")) return "close";
   if (direction === "buy") return "buy";
   if (direction === "sell") return "sell";
-  return fill.side === "B" ? "buy" : "sell";
+  return sideValue === "B" ? "buy" : "sell";
 }
 
-function amountAtPrice(fill: HyperCoreFill): number | null {
-  const price = Number(fill.px);
-  const amount = Number(fill.sz);
-  if (!Number.isFinite(price) || !Number.isFinite(amount)) return null;
-  return price * amount;
+function finiteNumber(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function decimalValue(value: number | null): string | null {
+  return value === null ? null : String(value);
+}
+
+function perpPositionSide(direction: string | null): PerpPositionSide | null {
+  const normalized = direction?.toLowerCase() ?? "";
+  if (normalized.includes("long")) return "long";
+  if (normalized.includes("short")) return "short";
+  return null;
+}
+
+function isOpeningPerp(direction: string | null): boolean {
+  return direction?.toLowerCase().startsWith("open") ?? false;
+}
+
+function isClosingPerp(direction: string | null): boolean {
+  return direction?.toLowerCase().startsWith("close") ?? false;
+}
+
+function oppositePositionSide(side: PerpPositionSide): PerpPositionSide {
+  return side === "long" ? "short" : "long";
 }
 
 function assetSymbolsForFill(
-  fill: HyperCoreFill,
+  coin: string,
   spotMarketSymbols: Map<string, string>,
 ): { base: string; quote: string } {
-  const spotPair = spotMarketSymbols.get(fill.coin);
-  if (!spotPair) return { base: fill.coin, quote: "USDC" };
+  const spotPair = spotMarketSymbols.get(coin);
+  if (!spotPair) return { base: coin, quote: "USDC" };
 
   const [base, quote] = spotPair.split("/");
-  return { base: base || fill.coin, quote: quote || "USDC" };
+  return { base: base || coin, quote: quote || "USDC" };
 }
 
-function normalizeFill(
-  fill: HyperCoreFill,
+function aggregateFillGroup(fills: HyperCoreFill[]): AggregatedHyperCoreFill {
+  const [first] = fills;
+  if (!first) throw new Error("Cannot aggregate an empty HyperCore fill group.");
+
+  const fillIds = fills.map((fill) => String(fill.tid));
+  let baseAmount = 0;
+  let quoteAmount = 0;
+  let hasQuoteAmount = false;
+  let feeAmount = 0;
+  let hasFeeAmount = false;
+  const feeTokens = new Set<string>();
+
+  for (const fill of fills) {
+    const amount = finiteNumber(fill.sz);
+    if (amount !== null) baseAmount += amount;
+
+    const price = finiteNumber(fill.px);
+    if (amount !== null && price !== null) {
+      quoteAmount += amount * price;
+      hasQuoteAmount = true;
+    }
+
+    const fee = finiteNumber(fill.fee);
+    if (fee !== null) {
+      feeAmount += fee;
+      hasFeeAmount = true;
+    }
+    if (fill.feeToken) feeTokens.add(fill.feeToken);
+  }
+
+  return {
+    sourceTransactionId: sourceOrderTransactionId(first),
+    coin: first.coin,
+    oid: first.oid,
+    time: Math.min(...fills.map((fill) => fill.time)),
+    side: first.side,
+    dir: first.dir,
+    crossed: fills.some((fill) => fill.crossed),
+    feeToken: feeTokens.size === 1 ? [...feeTokens][0] : null,
+    hash: fills.find((fill) => fill.hash)?.hash ?? null,
+    fillIds,
+    baseAmount,
+    quoteAmount: hasQuoteAmount ? quoteAmount : null,
+    priceQuote: hasQuoteAmount && baseAmount > 0 ? quoteAmount / baseAmount : null,
+    feeAmount: hasFeeAmount ? feeAmount : null,
+    fills,
+  };
+}
+
+function aggregateFillsByOrder(fills: HyperCoreFill[]): AggregatedHyperCoreFill[] {
+  const groups = new Map<string, HyperCoreFill[]>();
+
+  for (const fill of fills) {
+    const key = `${fill.oid}:${fill.coin}:${fill.side}:${fill.dir}`;
+    groups.set(key, [...(groups.get(key) ?? []), fill]);
+  }
+
+  return [...groups.values()]
+    .map(aggregateFillGroup)
+    .sort((a, b) => a.time - b.time);
+}
+
+async function deleteSupersededFillTransactions(input: {
+  userId: string;
+  investmentAccountId: string;
+  sourceTransactionIds: string[];
+}): Promise<void> {
+  if (input.sourceTransactionIds.length === 0) return;
+
+  await db
+    .delete(investmentTransactions)
+    .where(
+      and(
+        eq(investmentTransactions.userId, input.userId),
+        eq(investmentTransactions.investmentAccountId, input.investmentAccountId),
+        eq(investmentTransactions.sourceProvider, HYPERLIQUID_PROVIDER),
+        inArray(
+          investmentTransactions.sourceTransactionId,
+          input.sourceTransactionIds,
+        ),
+      ),
+    );
+}
+
+export async function rebuildHyperCorePerpEvents(input: {
+  userId: string;
+  investmentAccountId: string;
+}): Promise<void> {
+  const sourceRows = await db
+    .select({
+      id: investmentTransactions.id,
+      sourceTransactionId: investmentTransactions.sourceTransactionId,
+      executedAt: investmentTransactions.executedAt,
+      market: hyperCoreTransactionDetails.market,
+      direction: hyperCoreTransactionDetails.direction,
+      baseAssetSymbol: investmentTransactions.baseAssetSymbol,
+      baseAmount: investmentTransactions.baseAmount,
+      quoteAmount: investmentTransactions.quoteAmount,
+      priceQuote: investmentTransactions.priceQuote,
+      feeAmount: investmentTransactions.feeAmount,
+      feeAssetSymbol: investmentTransactions.feeAssetSymbol,
+      raw: investmentTransactions.raw,
+    })
+    .from(investmentTransactions)
+    .innerJoin(
+      hyperCoreTransactionDetails,
+      eq(hyperCoreTransactionDetails.transactionId, investmentTransactions.id),
+    )
+    .where(
+      and(
+        eq(investmentTransactions.userId, input.userId),
+        eq(investmentTransactions.investmentAccountId, input.investmentAccountId),
+        eq(investmentTransactions.sourceProvider, HYPERLIQUID_PROVIDER),
+      ),
+    )
+    .orderBy(asc(investmentTransactions.executedAt));
+
+  const lots = new Map<string, PerpLot[]>();
+  const events: DerivedPerpEvent[] = [];
+
+  for (const row of sourceRows) {
+    const positionSide = perpPositionSide(row.direction);
+    if (!positionSide) continue;
+
+    const baseAmount = finiteNumber(row.baseAmount);
+    if (baseAmount === null || baseAmount <= 0) continue;
+
+    const baseAssetSymbol = row.baseAssetSymbol ?? row.market;
+    const quoteAmount = finiteNumber(row.quoteAmount);
+    const feeUsd = row.feeAssetSymbol === "USDC" ? finiteNumber(row.feeAmount) : null;
+    const priceQuote = finiteNumber(row.priceQuote);
+
+    if (isOpeningPerp(row.direction)) {
+      const key = `${row.market}:${positionSide}`;
+      const existingLots = lots.get(key) ?? [];
+      const eventType: PerpEventType = existingLots.length > 0 ? "increase" : "open";
+      const entryNotionalUsd = quoteAmount;
+
+      existingLots.push({
+        sourceTransactionId: row.sourceTransactionId,
+        remainingBaseAmount: baseAmount,
+        remainingEntryNotionalUsd: entryNotionalUsd ?? 0,
+        remainingFeeUsd: feeUsd ?? 0,
+      });
+      lots.set(key, existingLots);
+
+      events.push({
+        sourceEventId: `perp:${row.sourceTransactionId}`,
+        sourceTransactionIds: [row.sourceTransactionId],
+        executedAt: row.executedAt,
+        market: row.market,
+        positionSide,
+        eventType,
+        baseAssetSymbol,
+        baseAmount,
+        entryNotionalUsd,
+        exitNotionalUsd: null,
+        entryPrice: priceQuote,
+        exitPrice: null,
+        grossPnlUsd: null,
+        feeUsd,
+        netPnlUsd: null,
+        raw: { source: row.raw },
+      });
+      continue;
+    }
+
+    if (!isClosingPerp(row.direction)) continue;
+
+    const key = `${row.market}:${positionSide}`;
+    const openLots = lots.get(key) ?? [];
+    let remainingCloseAmount = baseAmount;
+    let matchedBaseAmount = 0;
+    let matchedEntryNotionalUsd = 0;
+    let matchedEntryFeeUsd = 0;
+    const matchedSourceTransactionIds: string[] = [];
+
+    while (remainingCloseAmount > 0 && openLots.length > 0) {
+      const lot = openLots[0];
+      const matchedAmount = Math.min(remainingCloseAmount, lot.remainingBaseAmount);
+      const matchRatio = matchedAmount / lot.remainingBaseAmount;
+
+      matchedBaseAmount += matchedAmount;
+      matchedEntryNotionalUsd += lot.remainingEntryNotionalUsd * matchRatio;
+      matchedEntryFeeUsd += lot.remainingFeeUsd * matchRatio;
+      matchedSourceTransactionIds.push(lot.sourceTransactionId);
+
+      lot.remainingBaseAmount -= matchedAmount;
+      lot.remainingEntryNotionalUsd -= lot.remainingEntryNotionalUsd * matchRatio;
+      lot.remainingFeeUsd -= lot.remainingFeeUsd * matchRatio;
+      remainingCloseAmount -= matchedAmount;
+
+      if (lot.remainingBaseAmount <= 1e-12) openLots.shift();
+    }
+
+    lots.set(key, openLots);
+
+    const exitNotionalUsd = quoteAmount === null
+      ? null
+      : quoteAmount * (matchedBaseAmount > 0 ? matchedBaseAmount / baseAmount : 1);
+    const closeFeeUsd = feeUsd === null
+      ? null
+      : feeUsd * (matchedBaseAmount > 0 ? matchedBaseAmount / baseAmount : 1);
+    const grossPnlUsd = exitNotionalUsd === null || matchedBaseAmount === 0
+      ? null
+      : positionSide === "long"
+        ? exitNotionalUsd - matchedEntryNotionalUsd
+        : matchedEntryNotionalUsd - exitNotionalUsd;
+    const totalFeeUsd = closeFeeUsd === null
+      ? matchedEntryFeeUsd || null
+      : matchedEntryFeeUsd + closeFeeUsd;
+    const netPnlUsd = grossPnlUsd === null
+      ? null
+      : grossPnlUsd - (totalFeeUsd ?? 0);
+    const remainingPositionAmount = openLots.reduce(
+      (sum, lot) => sum + lot.remainingBaseAmount,
+      0,
+    );
+
+    events.push({
+      sourceEventId: `perp:${row.sourceTransactionId}`,
+      sourceTransactionIds: [
+        ...new Set([...matchedSourceTransactionIds, row.sourceTransactionId]),
+      ],
+      executedAt: row.executedAt,
+      market: row.market,
+      positionSide,
+      eventType: remainingPositionAmount > 0 ? "decrease" : "close",
+      baseAssetSymbol,
+      baseAmount: matchedBaseAmount || baseAmount,
+      entryNotionalUsd: matchedBaseAmount > 0 ? matchedEntryNotionalUsd : null,
+      exitNotionalUsd,
+      entryPrice: matchedBaseAmount > 0 ? matchedEntryNotionalUsd / matchedBaseAmount : null,
+      exitPrice: priceQuote,
+      grossPnlUsd,
+      feeUsd: totalFeeUsd,
+      netPnlUsd,
+      raw: { source: row.raw, matchedSourceTransactionIds },
+    });
+
+    if (remainingCloseAmount > 1e-12) {
+      const flippedSide = oppositePositionSide(positionSide);
+      const flippedKey = `${row.market}:${flippedSide}`;
+      const flippedLots = lots.get(flippedKey) ?? [];
+      const remainingRatio = remainingCloseAmount / baseAmount;
+      flippedLots.push({
+        sourceTransactionId: row.sourceTransactionId,
+        remainingBaseAmount: remainingCloseAmount,
+        remainingEntryNotionalUsd: (quoteAmount ?? 0) * remainingRatio,
+        remainingFeeUsd: (feeUsd ?? 0) * remainingRatio,
+      });
+      lots.set(flippedKey, flippedLots);
+    }
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(hyperCorePerpEvents)
+      .where(
+        and(
+          eq(hyperCorePerpEvents.userId, input.userId),
+          eq(hyperCorePerpEvents.investmentAccountId, input.investmentAccountId),
+        ),
+      );
+
+    if (events.length === 0) return;
+
+    await tx.insert(hyperCorePerpEvents).values(
+      events.map((event) => ({
+        userId: input.userId,
+        investmentAccountId: input.investmentAccountId,
+        sourceEventId: event.sourceEventId,
+        sourceTransactionIds: event.sourceTransactionIds,
+        executedAt: event.executedAt,
+        market: event.market,
+        positionSide: event.positionSide,
+        eventType: event.eventType,
+        baseAssetSymbol: event.baseAssetSymbol,
+        baseAmount: String(event.baseAmount),
+        entryNotionalUsd: decimalValue(event.entryNotionalUsd),
+        exitNotionalUsd: decimalValue(event.exitNotionalUsd),
+        entryPrice: decimalValue(event.entryPrice),
+        exitPrice: decimalValue(event.exitPrice),
+        grossPnlUsd: decimalValue(event.grossPnlUsd),
+        feeUsd: decimalValue(event.feeUsd),
+        netPnlUsd: decimalValue(event.netPnlUsd),
+        raw: event.raw,
+      })),
+    );
+  });
+}
+
+function normalizeAggregatedFill(
+  fill: AggregatedHyperCoreFill,
   spotMarketSymbols: Map<string, string>,
 ): NormalizedInvestmentTransaction {
-  const assets = assetSymbolsForFill(fill, spotMarketSymbols);
-  const quoteAmount = amountAtPrice(fill);
+  const assets = assetSymbolsForFill(fill.coin, spotMarketSymbols);
 
   return {
     sourceProvider: HYPERLIQUID_PROVIDER,
-    sourceTransactionId: sourceTransactionId(fill),
+    sourceTransactionId: fill.sourceTransactionId,
     sourceAccountId: null,
     executedAt: new Date(fill.time),
     kind: "trade",
-    side: sideForFill(fill),
+    side: sideForDirection(fill.dir, fill.side),
     baseAssetSymbol: assets.base,
-    baseAssetId: fill.coin,
-    baseAmount: fill.sz,
+    baseAssetId: assets.base,
+    baseAmount: fill.baseAmount,
     quoteAssetSymbol: assets.quote,
-    quoteAmount,
-    priceQuote: fill.px,
-    valueUsd: assets.quote === "USDC" ? quoteAmount : null,
-    feeAmount: fill.fee,
+    quoteAssetId: assets.quote,
+    quoteAmount: fill.quoteAmount,
+    priceQuote: fill.priceQuote,
+    valueUsd: assets.quote === "USDC" ? fill.quoteAmount : null,
+    feeAmount: fill.feeAmount,
     feeAssetSymbol: fill.feeToken,
     chainId: HYPERCORE_CHAIN_ID,
     txHash: fill.hash,
     status: "confirmed",
-    raw: fill,
+    raw: {
+      aggregateBy: "hyperliquid_order",
+      fillIds: fill.fillIds,
+      fills: fill.fills,
+    },
   };
 }
 
-function normalizeFillDetails(fill: HyperCoreFill): NormalizedHyperCoreTransactionDetails {
+function normalizeFillDetails(fill: AggregatedHyperCoreFill): NormalizedHyperCoreTransactionDetails {
   return {
-    sourceTransactionId: sourceTransactionId(fill),
+    sourceTransactionId: fill.sourceTransactionId,
     market: fill.coin,
     orderId: String(fill.oid),
-    fillId: String(fill.tid),
+    fillId: fill.fillIds.join(","),
     direction: fill.dir,
     crossed: fill.crossed,
     feeToken: fill.feeToken,
@@ -202,12 +580,13 @@ export async function processHyperCoreTransactionSyncPage(input: {
     : { version: 1, phase: "up_to_date", scannedThroughTime: scan.endTime };
   const syncCompleted = nextCheckpoint.phase === "up_to_date";
   const nowDate = new Date();
+  const aggregatedFills = aggregateFillsByOrder(fills);
   const saved = await saveInvestmentTransactionPage({
     transactions: {
       userId: input.userId,
       investmentAccountId: input.account.id,
-      transactions: fills.map((fill) => normalizeFill(fill, spotMarketSymbols)),
-      hyperCoreDetails: fills.map(normalizeFillDetails),
+      transactions: aggregatedFills.map((fill) => normalizeAggregatedFill(fill, spotMarketSymbols)),
+      hyperCoreDetails: aggregatedFills.map(normalizeFillDetails),
     },
     syncState: {
       userId: input.userId,
@@ -223,6 +602,15 @@ export async function processHyperCoreTransactionSyncPage(input: {
       lastHttpStatus: null,
       lastErrorMessage: null,
     },
+  });
+  await deleteSupersededFillTransactions({
+    userId: input.userId,
+    investmentAccountId: input.account.id,
+    sourceTransactionIds: fills.map(sourceTransactionId),
+  });
+  await rebuildHyperCorePerpEvents({
+    userId: input.userId,
+    investmentAccountId: input.account.id,
   });
 
   return {
