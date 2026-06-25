@@ -41,7 +41,15 @@ function historyLabel(panel: TransactionsPanel, total: number): string {
 
   const range = `${dateFormat.format(new Date(earliestTransactionAt))} to ${dateFormat.format(new Date(latestTransactionAt))}`;
   const label = `${count} from ${range}`;
-  return hasMore ? `${label} · syncing…` : label;
+  if (!hasMore) return label;
+
+  const phaseLabel =
+    status.phase === "backfilling"
+      ? "importing history…"
+      : status.phase === "catching_up"
+        ? "catching up…"
+        : "syncing…";
+  return `${label} · ${phaseLabel}`;
 }
 
 export function TransactionsTabContent({

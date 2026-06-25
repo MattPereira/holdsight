@@ -3,6 +3,7 @@
 import {
   loadBrokerageBalances,
   loadBrokerageTransactions,
+  pollBrokerageTransactions,
 } from "@/app/actions";
 import { AccountDetailsClient } from "@/components/accounts/account-details-client";
 import {
@@ -79,6 +80,7 @@ export function BrokerageDetailsPage({
       transactions={{
         initialTransactions,
         loadTransactions: loadBrokerageTransactions,
+        pollTransactions: pollBrokerageTransactions,
         getTransactions: (result) => result.transactions,
         getError: (result) => result.error,
         getMessage: (result) => result.message || null,

@@ -6,6 +6,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   evmWalletAccounts,
+  hyperCoreAccounts,
   investmentAccounts,
 } from "@/db/schema/investment-accounts";
 
@@ -95,45 +96,115 @@ export async function userHasEvmAccountAddress(
   return Boolean(account);
 }
 
-export async function addUserEvmAccounts(
+export async function addUserEvmAccount(
   userId: string,
-  input: string,
+  rawAddress: string,
+  rawLabel: string,
 ): Promise<{ added: number; error: string | null }> {
-  const addresses = parseEvmAddresses(input);
-  if (addresses.length === 0) {
-    return { added: 0, error: "Enter at least one wallet address." };
+  const address = normalizeEvmAddress(rawAddress);
+  if (!address) {
+    return { added: 0, error: "Enter a wallet address." };
+  }
+  if (!isValidEvmAddress(address)) {
+    return { added: 0, error: `Invalid wallet address: ${address}` };
   }
 
-  const invalidAddress = addresses.find((address) => !isValidEvmAddress(address));
-  if (invalidAddress) {
-    return { added: 0, error: `Invalid wallet address: ${invalidAddress}` };
+  const label = rawLabel.trim();
+  if (!label) {
+    return { added: 0, error: "Enter a label for this wallet." };
   }
 
-  let added = 0;
-  for (const address of addresses) {
-    const exists = await userHasEvmAccountAddress(userId, address);
-    if (exists) continue;
+  const exists = await userHasEvmAccountAddress(userId, address);
+  if (exists) {
+    return { added: 0, error: "This wallet is already connected." };
+  }
 
-    const investmentAccountId = randomUUID();
-    await db.transaction(async (tx) => {
-      await tx.insert(investmentAccounts).values({
-        id: investmentAccountId,
-        userId,
-        kind: "evm_wallet",
-        provider: "manual",
-      });
-
-      await tx.insert(evmWalletAccounts).values({
-        investmentAccountId,
-        userId,
-        address,
-      });
+  const investmentAccountId = randomUUID();
+  await db.transaction(async (tx) => {
+    await tx.insert(investmentAccounts).values({
+      id: investmentAccountId,
+      userId,
+      kind: "evm_wallet",
+      provider: "manual",
+      label,
     });
 
-    added += 1;
+    await tx.insert(evmWalletAccounts).values({
+      investmentAccountId,
+      userId,
+      address,
+    });
+  });
+
+  return { added: 1, error: null };
+}
+
+export async function renameUserEvmAccount(
+  userId: string,
+  address: string,
+  rawLabel: string,
+): Promise<{ error: string | null }> {
+  const normalized = normalizeEvmAddress(address);
+  const label = rawLabel.trim();
+  if (!label) {
+    return { error: "Enter a label for this wallet." };
   }
 
-  return { added, error: null };
+  const [account] = await db
+    .select({ id: evmWalletAccounts.investmentAccountId })
+    .from(evmWalletAccounts)
+    .innerJoin(
+      investmentAccounts,
+      eq(evmWalletAccounts.investmentAccountId, investmentAccounts.id),
+    )
+    .where(
+      and(
+        eq(evmWalletAccounts.userId, userId),
+        eq(evmWalletAccounts.address, normalized),
+        eq(investmentAccounts.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  if (!account) {
+    return { error: "Wallet not found." };
+  }
+
+  // Rename the EVM wallet and keep its derived HyperCore account (mirrored by
+  // address) in sync, since labels are copied only at creation time.
+  await db
+    .update(investmentAccounts)
+    .set({ label })
+    .where(
+      and(
+        eq(investmentAccounts.id, account.id),
+        eq(investmentAccounts.userId, userId),
+      ),
+    );
+
+  const hyperCoreMatches = await db
+    .select({ id: hyperCoreAccounts.investmentAccountId })
+    .from(hyperCoreAccounts)
+    .where(
+      and(
+        eq(hyperCoreAccounts.userId, userId),
+        eq(hyperCoreAccounts.address, normalized),
+      ),
+    );
+
+  for (const match of hyperCoreMatches) {
+    await db
+      .update(investmentAccounts)
+      .set({ label })
+      .where(
+        and(
+          eq(investmentAccounts.id, match.id),
+          eq(investmentAccounts.userId, userId),
+        ),
+      );
+  }
+
+  return { error: null };
 }
 
 export async function removeUserEvmAccount(

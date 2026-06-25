@@ -3,6 +3,7 @@
 import {
   loadKrakenBalances,
   loadKrakenTransactions,
+  pollKrakenTransactions,
 } from "@/app/actions";
 import { AccountDetailsClient } from "@/components/accounts/account-details-client";
 import {
@@ -41,6 +42,7 @@ export function ExchangesDetailsPage({
       transactions={{
         initialTransactions,
         loadTransactions: loadKrakenTransactions,
+        pollTransactions: pollKrakenTransactions,
         getTransactions: (result) => result.transactions,
         getError: (result) => result.error,
         getMessage: (result) => result.message || null,

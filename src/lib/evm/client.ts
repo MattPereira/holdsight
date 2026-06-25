@@ -6,6 +6,41 @@ const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 const CURRENCY_RE = /^[a-z]{3}$/i;
 const CHAIN_IDS_RE = /^[a-zA-Z0-9_-]+(?:,[a-zA-Z0-9_-]+)*$/;
 
+export type ZerionTransaction = {
+  id: string;
+  attributes: {
+    operation_type?: string;
+    hash?: string;
+    mined_at_block?: number | null;
+    mined_at?: string;
+    sent_from?: string | null;
+    sent_to?: string | null;
+    status?: string;
+    fee?: ZerionTransfer | null;
+    transfers?: ZerionTransfer[];
+    application_metadata?: {
+      name?: string;
+      method?: { name?: string };
+    } | null;
+  };
+  relationships?: { chain?: { data?: { id?: string } } };
+};
+
+export type ZerionTransfer = {
+  direction?: "in" | "out";
+  quantity?: { numeric?: string; float?: number | null };
+  value?: number | null;
+  price?: number | null;
+  sender?: string | null;
+  recipient?: string | null;
+  fungible_info?: { id?: string; symbol?: string } | null;
+};
+
+export type ZerionTransactionsPage =
+  | { status: "ready"; transactions: ZerionTransaction[]; next: string | null }
+  | { status: "rate_limited"; httpStatus: 429 }
+  | { status: "error"; httpStatus: number; message: string };
+
 function authHeader() {
   const key = process.env.ZERION_API_KEY;
   if (!key) throw new Error("ZERION_API_KEY is not set");
@@ -19,6 +54,7 @@ function authHeader() {
 // sequentially for this to be meaningful.
 let lastSecond: { remaining: number; reset: number } | null = null;
 let zerionQueue: Promise<void> = Promise.resolve();
+let lastZerionRequestAt = 0;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -28,10 +64,13 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
  * so we don't burn more of the daily quota.
  */
 async function pacedFetch(url: string, headers: HeadersInit): Promise<Response> {
+  const elapsed = Date.now() - lastZerionRequestAt;
+  if (elapsed < 1_000) await sleep(1_000 - elapsed);
   if (lastSecond && lastSecond.remaining <= 0) {
     await sleep(Math.max(lastSecond.reset, 1) * 1000);
   }
 
+  lastZerionRequestAt = Date.now();
   const res = await fetch(url, { headers, cache: "no-store" });
 
   const remaining = Number(res.headers.get("RateLimit-Org-Second-Remaining"));
@@ -53,6 +92,48 @@ function queuedPacedFetch(
     () => undefined,
   );
   return request;
+}
+
+/** Fetches one Zerion cursor page. Callers must persist and reuse `next` verbatim. */
+export async function getWalletTransactionsPage(input: {
+  address: string;
+  next?: string | null;
+  minMinedAt?: number;
+}): Promise<ZerionTransactionsPage> {
+  if (!EVM_ADDRESS_RE.test(input.address)) {
+    return { status: "error", httpStatus: 400, message: "Invalid wallet address" };
+  }
+
+  const url = input.next
+    ? input.next
+    : (() => {
+        const initial = new URL(`${ZERION_BASE}/wallets/${input.address}/transactions/`);
+        initial.searchParams.set("currency", "usd");
+        initial.searchParams.set("page[size]", "100");
+        initial.searchParams.set("filter[trash]", "only_non_trash");
+        if (input.minMinedAt) {
+          initial.searchParams.set("filter[min_mined_at]", String(input.minMinedAt));
+        }
+        return initial.toString();
+      })();
+  const res = await queuedPacedFetch(url, {
+    accept: "application/json",
+    authorization: authHeader(),
+  });
+  if (res.status === 429) return { status: "rate_limited", httpStatus: 429 };
+  if (!res.ok) {
+    return {
+      status: "error",
+      httpStatus: res.status,
+      message: `Zerion API error ${res.status}`,
+    };
+  }
+
+  const body = (await res.json()) as {
+    data: ZerionTransaction[];
+    links?: { next?: string | null };
+  };
+  return { status: "ready", transactions: body.data, next: body.links?.next ?? null };
 }
 
 type RawInvestmentBalance = {

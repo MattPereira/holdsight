@@ -1,4 +1,4 @@
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 import { AccountDetailsShell } from "@/components/accounts/account-details-shell";
 import type { TransactionHistoryStatus } from "@/components/accounts/transactions/types";
@@ -6,12 +6,21 @@ import type { BalanceGroup, SecondaryColumn } from "@/components/accounts/types"
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import type { PortfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 
+const TRANSACTION_SYNC_POLL_MS = 4000;
+
 type TransactionsConfig<TTransactionResult> = {
   initialTransactions: InvestmentTransactionListItem[];
   loadTransactions: () => Promise<TTransactionResult>;
+  // Read-only counterpart used to poll an in-progress sync. It receives the
+  // rendered count so implementations can avoid returning an unchanged list.
+  // Falls back to loadTransactions when omitted.
+  pollTransactions?: (
+    knownTransactionCount?: number,
+    knownLatestTransactionUpdatedAt?: string | null,
+  ) => Promise<TTransactionResult>;
   getTransactions: (
     result: TTransactionResult,
-  ) => InvestmentTransactionListItem[];
+  ) => InvestmentTransactionListItem[] | null;
   getError?: (result: TTransactionResult) => string | null;
   getMessage?: (result: TTransactionResult) => string | null;
   initialIsSyncing?: boolean;
@@ -112,20 +121,76 @@ export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResu
     });
   }
 
+  const applyTransactionResult = useCallback(
+    (result: TTransactionResult) => {
+      if (!transactions) return;
+      const nextTransactions = transactions.getTransactions(result);
+      if (nextTransactions) setCurrentTransactions(nextTransactions);
+      setTransactionError(transactions.getError?.(result) ?? null);
+      setTransactionMessage(transactions.getMessage?.(result) ?? null);
+      setTransactionHistoryStatus(transactions.getHistoryStatus?.(result));
+      setTransactionSyncing(transactions.getIsSyncing?.(result) ?? false);
+    },
+    [transactions],
+  );
+
   function handleRefreshTransactions() {
     if (!transactions) return;
 
     setTransactionError(null);
     setTransactionMessage(null);
     startTransactionTransition(async () => {
-      const result = await transactions.loadTransactions();
-      setCurrentTransactions(transactions.getTransactions(result));
-      setTransactionError(transactions.getError?.(result) ?? null);
-      setTransactionMessage(transactions.getMessage?.(result) ?? null);
-      setTransactionHistoryStatus(transactions.getHistoryStatus?.(result));
-      setTransactionSyncing(transactions.getIsSyncing?.(result) ?? false);
+      applyTransactionResult(await transactions.loadTransactions());
     });
   }
+
+  // A sync runs in durable background workflows, so a single load only captures
+  // a snapshot. While more pages remain, poll so the count climbs live and the
+  // status resolves to a terminal state on its own.
+  const isTransactionSyncActive =
+    isTransactionSyncing || Boolean(transactionHistoryStatus?.hasMore);
+
+  useEffect(() => {
+    if (
+      !transactions ||
+      !isTransactionSyncActive ||
+      transactionError ||
+      isTransactionPending
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    let inFlight = false;
+    const interval = setInterval(async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const result = await (transactions.pollTransactions
+          ? transactions.pollTransactions(
+              currentTransactions?.length,
+              transactionHistoryStatus?.latestTransactionUpdatedAt,
+            )
+          : transactions.loadTransactions());
+        if (!cancelled) applyTransactionResult(result);
+      } finally {
+        inFlight = false;
+      }
+    }, TRANSACTION_SYNC_POLL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [
+    transactions,
+    isTransactionSyncActive,
+    transactionError,
+    isTransactionPending,
+    applyTransactionResult,
+    currentTransactions?.length,
+    transactionHistoryStatus?.latestTransactionUpdatedAt,
+  ]);
 
   return (
     <AccountDetailsShell
@@ -142,7 +207,7 @@ export function AccountDetailsClient<TBalances, TBalanceResult, TTransactionResu
           ? {
               transactions: currentTransactions,
               onRefresh: handleRefreshTransactions,
-              busy: isTransactionPending || isTransactionSyncing,
+              busy: isTransactionPending || isTransactionSyncActive,
               error: transactionError,
               message: transactionMessage,
               historyStatus: transactionHistoryStatus,

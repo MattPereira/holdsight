@@ -1,10 +1,16 @@
 "use client";
 
-import { RiAddLine, RiDeleteBinLine } from "@remixicon/react";
+import {
+  RiAddLine,
+  RiCheckLine,
+  RiCloseLine,
+  RiDeleteBinLine,
+  RiPencilLine,
+} from "@remixicon/react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { addWallets, removeWallet } from "@/app/actions";
+import { addWallets, removeWallet, renameWallet } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import {
   Field,
@@ -31,7 +37,10 @@ export function WalletConnectPanel({
 }) {
   const router = useRouter();
   const [wallets, setWallets] = useState(initialWallets);
-  const [input, setInput] = useState("");
+  const [address, setAddress] = useState("");
+  const [label, setLabel] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftLabel, setDraftLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -39,11 +48,12 @@ export function WalletConnectPanel({
     event.preventDefault();
 
     startTransition(async () => {
-      const result = await addWallets(input);
+      const result = await addWallets(address, label);
       setWallets(result.wallets);
       setError(result.error);
       if (!result.error) {
-        setInput("");
+        setAddress("");
+        setLabel("");
         // Close on a successful add; the page refresh surfaces new balances.
         onConnected();
       }
@@ -60,6 +70,29 @@ export function WalletConnectPanel({
     });
   }
 
+  function startEditing(walletId: string, currentLabel: string | null) {
+    setEditingId(walletId);
+    setDraftLabel(currentLabel ?? "");
+    setError(null);
+  }
+
+  function cancelEditing() {
+    setEditingId(null);
+    setDraftLabel("");
+  }
+
+  function handleRename(address: string) {
+    startTransition(async () => {
+      const result = await renameWallet(address, draftLabel);
+      setWallets(result.wallets);
+      setError(result.error);
+      if (!result.error) {
+        cancelEditing();
+        router.refresh();
+      }
+    });
+  }
+
   if (view === "remove") {
     if (wallets.length === 0) return null;
 
@@ -68,55 +101,127 @@ export function WalletConnectPanel({
         <h3 className="text-base font-medium">EVM wallets</h3>
         {error ? <FieldError>{error}</FieldError> : null}
         <ul className="divide-y rounded-lg border">
-          {wallets.map((wallet) => (
-            <li
-              key={wallet.id}
-              className="flex items-center justify-between gap-3 px-3 py-2"
-            >
-              <span className="min-w-0 truncate font-mono text-sm">
-                <span className="sm:hidden">
-                  {shortenAddress(wallet.address)}
-                </span>
-                <span className="hidden sm:inline">{wallet.address}</span>
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`Remove ${wallet.address}`}
-                onClick={() => handleRemove(wallet.address)}
-                disabled={isPending}
+          {wallets.map((wallet) => {
+            const isEditing = editingId === wallet.id;
+            return (
+              <li
+                key={wallet.id}
+                className="flex items-center justify-between gap-3 px-3 py-2"
               >
-                <RiDeleteBinLine />
-              </Button>
-            </li>
-          ))}
+                {isEditing ? (
+                  <Input
+                    value={draftLabel}
+                    onChange={(event) => setDraftLabel(event.target.value)}
+                    placeholder='Label e.g. "Cold wallet"'
+                    autoComplete="off"
+                    aria-label={`Label for ${wallet.address}`}
+                    disabled={isPending}
+                    autoFocus
+                    className="h-8"
+                  />
+                ) : (
+                  <span className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm">
+                      {wallet.label ?? "Unnamed wallet"}
+                    </span>
+                    <span className="truncate font-mono text-xs text-muted-foreground">
+                      {shortenAddress(wallet.address)}
+                    </span>
+                  </span>
+                )}
+                <div className="flex shrink-0 items-center gap-1">
+                  {isEditing ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Save label"
+                        onClick={() => handleRename(wallet.address)}
+                        disabled={isPending || draftLabel.trim() === ""}
+                      >
+                        <RiCheckLine />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label="Cancel"
+                        onClick={cancelEditing}
+                        disabled={isPending}
+                      >
+                        <RiCloseLine />
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Rename ${wallet.address}`}
+                        onClick={() => startEditing(wallet.id, wallet.label)}
+                        disabled={isPending}
+                      >
+                        <RiPencilLine />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`Remove ${wallet.address}`}
+                        onClick={() => handleRemove(wallet.address)}
+                        disabled={isPending}
+                      >
+                        <RiDeleteBinLine />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </div>
     );
   }
 
+  const canSubmit = address.trim() !== "" && label.trim() !== "";
+
   return (
     <form onSubmit={handleSubmit}>
       <FieldGroup>
         <Field data-invalid={Boolean(error)}>
-          <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="flex flex-col gap-2">
             <Input
-              id="wallet-addresses"
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
+              id="wallet-address"
+              value={address}
+              onChange={(event) => setAddress(event.target.value)}
               placeholder="0x..."
               autoComplete="off"
+              aria-label="Wallet address"
               aria-invalid={Boolean(error)}
               disabled={isPending}
             />
-            <Button type="submit" disabled={isPending}>
-              <RiAddLine data-icon="inline-start" />
-              Add
-            </Button>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                id="wallet-label"
+                value={label}
+                onChange={(event) => setLabel(event.target.value)}
+                placeholder='Label e.g. "Cold wallet"'
+                autoComplete="off"
+                aria-label="Wallet label"
+                aria-invalid={Boolean(error)}
+                disabled={isPending}
+              />
+              <Button type="submit" disabled={isPending || !canSubmit}>
+                <RiAddLine data-icon="inline-start" />
+                Add
+              </Button>
+            </div>
           </div>
           <FieldDescription>
-            Paste addresses separated by spaces or commas
+            Add one wallet address and a label to identify it
           </FieldDescription>
           <FieldError>{error}</FieldError>
         </Field>

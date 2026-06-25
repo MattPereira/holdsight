@@ -8,9 +8,11 @@ import { investmentTransactions } from "@/db/schema/investment-transactions";
 import {
   getInvestmentTransactionSyncState,
   saveInvestmentTransactionPage,
+  summarizeSyncPhase,
   type InvestmentTransactionSyncCheckpoint,
   type InvestmentTransactionSyncState,
   type NormalizedInvestmentTransaction,
+  type TransactionSyncPhase,
 } from "@/lib/investment-transactions/ingestion";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 
@@ -36,6 +38,7 @@ export type KrakenTransactionHistoryStatus = {
   earliestTransactionAt: string | null;
   latestTransactionAt: string | null;
   hasMore: boolean;
+  phase: TransactionSyncPhase;
 };
 
 type KrakenBackfillCursor = {
@@ -355,7 +358,7 @@ export async function getKrakenTransactionHistoryStatus(
 ): Promise<KrakenTransactionHistoryStatus> {
   const accounts = await getUserKrakenAccounts(userId);
   if (accounts.length === 0) {
-    return { earliestTransactionAt: null, latestTransactionAt: null, hasMore: false };
+    return { earliestTransactionAt: null, latestTransactionAt: null, hasMore: false, phase: "up_to_date" };
   }
 
   const [earliest, latest, states] = await Promise.all([
@@ -376,5 +379,6 @@ export async function getKrakenTransactionHistoryStatus(
     hasMore: states.some(
       (state) => !isKrakenTransactionSyncComplete(state?.checkpoint ?? null),
     ),
+    phase: summarizeSyncPhase(states),
   };
 }

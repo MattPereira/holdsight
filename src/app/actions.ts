@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { start } from "workflow/api";
 
@@ -8,12 +9,19 @@ import {
   getCurrentEvmBalances,
   syncEvmWalletBalances,
 } from "@/lib/evm/balances";
-import { ensureUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
+import { ensureUserHyperCoreAccounts, getUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
 import {
   getCurrentHyperCoreBalances,
   syncHyperCoreAccounts,
 } from "@/lib/hyper-core/balances";
+import {
+  getCurrentWalletTransactions,
+  getWalletTransactionHistoryStatus,
+  type WalletTransactionHistoryStatus,
+} from "@/lib/wallets/transactions";
 import { mergeWalletBalanceResults } from "@/lib/wallets/balances";
+import { syncEvmTransactionHistory } from "@/workflows/evm-transaction-sync";
+import { syncHyperCoreTransactionHistory } from "@/workflows/hyper-core-transaction-sync";
 import {
   ensureUserKrakenAccount,
   getUserKrakenAccounts,
@@ -34,9 +42,14 @@ import {
 } from "@/lib/exchange/kraken/transactions";
 import { syncKrakenTransactionHistory } from "@/workflows/kraken-transaction-sync";
 import {
-  addUserEvmAccounts,
+  claimInvestmentTransactionSyncLease,
+  releaseInvestmentTransactionSyncLease,
+} from "@/lib/investment-transactions/ingestion";
+import {
+  addUserEvmAccount,
   getUserEvmAccounts,
   removeUserEvmAccount,
+  renameUserEvmAccount,
   validateUserEvmAccounts,
   type SavedEvmAccount,
 } from "@/lib/evm/accounts";
@@ -137,11 +150,14 @@ function unauthorizedBalancesResult(): BalancesResult[] {
   ];
 }
 
-export async function addWallets(input: string): Promise<WalletActionResult> {
+export async function addWallets(
+  address: string,
+  label: string,
+): Promise<WalletActionResult> {
   const userId = await getCurrentUserId();
   if (!userId) return unauthorizedWalletResult();
 
-  const result = await addUserEvmAccounts(userId, input);
+  const result = await addUserEvmAccount(userId, address, label);
   const wallets = await getUserEvmAccounts(userId);
   if (result.error) {
     return { wallets, message: "", error: result.error };
@@ -150,12 +166,26 @@ export async function addWallets(input: string): Promise<WalletActionResult> {
   revalidatePath("/");
   return {
     wallets,
-    message:
-      result.added === 0
-        ? "No new wallets added."
-        : `Added ${result.added} wallet${result.added === 1 ? "" : "s"}.`,
+    message: "Wallet added.",
     error: null,
   };
+}
+
+export async function renameWallet(
+  address: string,
+  label: string,
+): Promise<WalletActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) return unauthorizedWalletResult();
+
+  const result = await renameUserEvmAccount(userId, address, label);
+  const wallets = await getUserEvmAccounts(userId);
+  if (result.error) {
+    return { wallets, message: "", error: result.error };
+  }
+
+  revalidatePath("/");
+  return { wallets, message: "Wallet renamed.", error: null };
 }
 
 export async function removeWallet(
@@ -258,6 +288,149 @@ export async function loadWalletBalances(): Promise<BalancesResult[]> {
   return mergeWalletBalanceResults(evmResults, hyperCoreResults);
 }
 
+export type WalletTransactionsActionResult = {
+  transactions: Awaited<ReturnType<typeof getCurrentWalletTransactions>> | null;
+  message: string;
+  error: string | null;
+  historyStatus: WalletTransactionHistoryStatus;
+};
+
+export async function loadWalletTransactions(): Promise<WalletTransactionsActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      transactions: [],
+      message: "",
+      error: "You must be signed in to refresh transactions.",
+      historyStatus: { transactionCount: 0, earliestTransactionAt: null, latestTransactionAt: null, latestTransactionUpdatedAt: null, hasMore: false, phase: "up_to_date" },
+    };
+  }
+
+  const wallets = await getUserEvmAccounts(userId);
+  const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
+  if (wallets.length === 0) {
+    return {
+      transactions: [],
+      message: "",
+      error: "Add at least one wallet before syncing transactions.",
+      historyStatus: { transactionCount: 0, earliestTransactionAt: null, latestTransactionAt: null, latestTransactionUpdatedAt: null, hasMore: false, phase: "up_to_date" },
+    };
+  }
+
+  try {
+    let queuedHyperCoreAccountCount = 0;
+    for (const account of hyperCoreAccounts) {
+      const leaseToken = randomUUID();
+      const claimed = await claimInvestmentTransactionSyncLease({
+        userId,
+        investmentAccountId: account.id,
+        provider: "hyperliquid",
+        leaseToken,
+      });
+      if (!claimed) continue;
+
+      try {
+        await start(syncHyperCoreTransactionHistory, [userId, account.id, leaseToken]);
+        queuedHyperCoreAccountCount += 1;
+      } catch (error) {
+        await releaseInvestmentTransactionSyncLease({
+          userId,
+          investmentAccountId: account.id,
+          provider: "hyperliquid",
+          leaseToken,
+        });
+        throw error;
+      }
+    }
+
+    const evmWorkflowAccounts: Array<{ id: string; leaseToken: string }> = [];
+    for (const account of wallets) {
+      const leaseToken = randomUUID();
+      const claimed = await claimInvestmentTransactionSyncLease({
+        userId, investmentAccountId: account.id, provider: "zerion", leaseToken,
+      });
+      if (claimed) evmWorkflowAccounts.push({ id: account.id, leaseToken });
+    }
+    if (evmWorkflowAccounts.length > 0) {
+      try {
+        await start(syncEvmTransactionHistory, [userId, evmWorkflowAccounts]);
+      } catch (error) {
+        await Promise.all(evmWorkflowAccounts.map(({ id, leaseToken }) =>
+          releaseInvestmentTransactionSyncLease({ userId, investmentAccountId: id, provider: "zerion", leaseToken }),
+        ));
+        throw error;
+      }
+    }
+
+    revalidatePath("/wallets");
+    const [transactions, historyStatus] = await Promise.all([
+      getCurrentWalletTransactions(userId),
+      getWalletTransactionHistoryStatus(userId, wallets, hyperCoreAccounts),
+    ]);
+    const messages = [
+      queuedHyperCoreAccountCount > 0
+        ? `Queued HyperCore history for ${queuedHyperCoreAccountCount} ${queuedHyperCoreAccountCount === 1 ? "wallet" : "wallets"}.`
+        : null,
+      evmWorkflowAccounts.length > 0
+        ? `Queued EVM history for ${evmWorkflowAccounts.length} ${evmWorkflowAccounts.length === 1 ? "wallet" : "wallets"}.`
+        : null,
+    ].filter(Boolean);
+    return {
+      transactions,
+      message: messages.join(" ") || "Transaction history sync is already running.",
+      error: null,
+      historyStatus,
+    };
+  } catch (error) {
+    const [transactions, historyStatus] = await Promise.all([
+      getCurrentWalletTransactions(userId),
+      getWalletTransactionHistoryStatus(userId, wallets, hyperCoreAccounts),
+    ]);
+    return {
+      transactions,
+      message: "",
+      error: error instanceof Error ? error.message : "Failed to refresh wallet transactions.",
+      historyStatus,
+    };
+  }
+}
+
+/**
+ * Read-only snapshot of wallet transactions for polling an in-progress sync.
+ * Unlike loadWalletTransactions it never claims leases, starts workflows, or
+ * revalidates — it only reads the latest rows and sync status.
+ */
+export async function pollWalletTransactions(
+  knownTransactionCount = 0,
+  knownLatestTransactionUpdatedAt: string | null = null,
+): Promise<WalletTransactionsActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      transactions: null,
+      message: "",
+      error: "You must be signed in to refresh transactions.",
+      historyStatus: { transactionCount: 0, earliestTransactionAt: null, latestTransactionAt: null, latestTransactionUpdatedAt: null, hasMore: false, phase: "up_to_date" },
+    };
+  }
+
+  const [wallets, hyperCoreAccounts] = await Promise.all([
+    getUserEvmAccounts(userId),
+    getUserHyperCoreAccounts(userId),
+  ]);
+  const historyStatus = await getWalletTransactionHistoryStatus(
+    userId,
+    wallets,
+    hyperCoreAccounts,
+  );
+  const transactions =
+    historyStatus.transactionCount === knownTransactionCount &&
+    historyStatus.latestTransactionUpdatedAt === knownLatestTransactionUpdatedAt
+      ? null
+      : await getCurrentWalletTransactions(userId);
+  return { transactions, message: "", error: null, historyStatus };
+}
+
 export async function loadKrakenBalances(): Promise<BalancesResult[]> {
   const userId = await getCurrentUserId();
   if (!userId) return unauthorizedBalancesResult();
@@ -282,7 +455,7 @@ export async function loadKrakenTransactions(): Promise<KrakenTransactionsAction
       transactions: [],
       message: "",
       error: "You must be signed in to refresh transactions.",
-      historyStatus: { earliestTransactionAt: null, latestTransactionAt: null, hasMore: false },
+      historyStatus: { earliestTransactionAt: null, latestTransactionAt: null, hasMore: false, phase: "up_to_date" },
     };
   }
 
@@ -297,15 +470,35 @@ export async function loadKrakenTransactions(): Promise<KrakenTransactionsAction
           earliestTransactionAt: null,
           latestTransactionAt: null,
           hasMore: false,
+          phase: "up_to_date",
         },
       };
     }
 
-    await Promise.all(
-      accounts.map((account) =>
-        start(syncKrakenTransactionHistory, [userId, account.id]),
-      ),
-    );
+    let queuedAccountCount = 0;
+    for (const account of accounts) {
+      const leaseToken = randomUUID();
+      const claimed = await claimInvestmentTransactionSyncLease({
+        userId,
+        investmentAccountId: account.id,
+        provider: "kraken",
+        leaseToken,
+      });
+      if (!claimed) continue;
+
+      try {
+        await start(syncKrakenTransactionHistory, [userId, account.id, leaseToken]);
+        queuedAccountCount += 1;
+      } catch (error) {
+        await releaseInvestmentTransactionSyncLease({
+          userId,
+          investmentAccountId: account.id,
+          provider: "kraken",
+          leaseToken,
+        });
+        throw error;
+      }
+    }
     revalidatePath("/exchanges");
     const [transactions, historyStatus] = await Promise.all([
       getCurrentKrakenTransactions(userId),
@@ -313,7 +506,9 @@ export async function loadKrakenTransactions(): Promise<KrakenTransactionsAction
     ]);
     return {
       transactions,
-      message: `Queued full transaction history sync for ${accounts.length} Kraken ${accounts.length === 1 ? "account" : "accounts"}.`,
+      message: queuedAccountCount > 0
+        ? `Queued transaction history sync for ${queuedAccountCount} Kraken ${queuedAccountCount === 1 ? "account" : "accounts"}.`
+        : "Transaction history sync is already running.",
       error: null,
       historyStatus,
     };
@@ -329,6 +524,25 @@ export async function loadKrakenTransactions(): Promise<KrakenTransactionsAction
       historyStatus,
     };
   }
+}
+
+/** Read-only snapshot of Kraken transactions for polling an in-progress sync. */
+export async function pollKrakenTransactions(): Promise<KrakenTransactionsActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      transactions: [],
+      message: "",
+      error: "You must be signed in to refresh transactions.",
+      historyStatus: { earliestTransactionAt: null, latestTransactionAt: null, hasMore: false, phase: "up_to_date" },
+    };
+  }
+
+  const [transactions, historyStatus] = await Promise.all([
+    getCurrentKrakenTransactions(userId),
+    getKrakenTransactionHistoryStatus(userId),
+  ]);
+  return { transactions, message: "", error: null, historyStatus };
 }
 
 export type KrakenCredentialsActionResult = {
@@ -716,6 +930,25 @@ export async function loadBrokerageTransactions(): Promise<BrokerageTransactions
       isSyncing: status.isSyncing,
     };
   }
+}
+
+/** Read-only snapshot of brokerage transactions for polling an in-progress sync. */
+export async function pollBrokerageTransactions(): Promise<BrokerageTransactionsActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      transactions: [],
+      message: "",
+      error: "You must be signed in to refresh transactions.",
+      isSyncing: false,
+    };
+  }
+
+  const [transactions, status] = await Promise.all([
+    getCurrentBrokerageTransactions(userId),
+    getBrokerageTransactionImportStatus(userId),
+  ]);
+  return { transactions, message: "", error: null, isSyncing: status.isSyncing };
 }
 
 /**

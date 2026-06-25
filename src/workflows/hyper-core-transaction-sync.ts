@@ -1,18 +1,14 @@
 import { FatalError } from "workflow";
 
-import {
-  getUserKrakenAccounts,
-} from "@/lib/exchange/kraken/accounts";
-import {
-  processKrakenTransactionSyncPage,
-} from "@/lib/exchange/kraken/transactions";
+import { getUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
+import { processHyperCoreTransactionSyncPage } from "@/lib/hyper-core/transactions";
 import {
   failInvestmentTransactionSyncLease,
   releaseInvestmentTransactionSyncLease,
   renewInvestmentTransactionSyncLease,
 } from "@/lib/investment-transactions/ingestion";
 
-const KRAKEN_PROVIDER = "kraken";
+const HYPERLIQUID_PROVIDER = "hyperliquid";
 
 async function processPage(userId: string, accountId: string, leaseToken: string) {
   "use step";
@@ -20,17 +16,17 @@ async function processPage(userId: string, accountId: string, leaseToken: string
   const hasLease = await renewInvestmentTransactionSyncLease({
     userId,
     investmentAccountId: accountId,
-    provider: KRAKEN_PROVIDER,
+    provider: HYPERLIQUID_PROVIDER,
     leaseToken,
   });
-  if (!hasLease) throw new FatalError("Kraken transaction sync lease was lost.");
+  if (!hasLease) throw new FatalError("HyperCore transaction sync lease was lost.");
 
-  const account = (await getUserKrakenAccounts(userId)).find(
+  const account = (await getUserHyperCoreAccounts(userId)).find(
     (candidate) => candidate.id === accountId,
   );
-  if (!account) throw new FatalError("Kraken account no longer exists.");
+  if (!account) throw new FatalError("HyperCore account no longer exists.");
 
-  return processKrakenTransactionSyncPage({ userId, account });
+  return processHyperCoreTransactionSyncPage({ userId, account });
 }
 
 async function releaseLease(userId: string, accountId: string, leaseToken: string) {
@@ -39,7 +35,7 @@ async function releaseLease(userId: string, accountId: string, leaseToken: strin
   await releaseInvestmentTransactionSyncLease({
     userId,
     investmentAccountId: accountId,
-    provider: KRAKEN_PROVIDER,
+    provider: HYPERLIQUID_PROVIDER,
     leaseToken,
   });
 }
@@ -55,14 +51,14 @@ async function markLeaseFailed(
   await failInvestmentTransactionSyncLease({
     userId,
     investmentAccountId: accountId,
-    provider: KRAKEN_PROVIDER,
+    provider: HYPERLIQUID_PROVIDER,
     leaseToken,
     message,
   });
 }
 
-/** Runs one bounded Kraken page at a time until the durable checkpoint is current. */
-export async function syncKrakenTransactionHistory(
+/** Runs one durable HyperCore fills page at a time until its checkpoint is current. */
+export async function syncHyperCoreTransactionHistory(
   userId: string,
   accountId: string,
   leaseToken: string,
@@ -84,7 +80,7 @@ export async function syncKrakenTransactionHistory(
       userId,
       accountId,
       leaseToken,
-      error instanceof Error ? error.message : "Kraken transaction sync failed.",
+      error instanceof Error ? error.message : "HyperCore transaction sync failed.",
     );
     throw error;
   }

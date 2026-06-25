@@ -64,6 +64,21 @@ export type HyperCoreBalancesResult =
   | { status: "rate_limited"; address: string }
   | { status: "error"; address: string; message: string; httpStatus: number };
 
+export type HyperCoreFill = {
+  coin: string;
+  px: string;
+  sz: string;
+  side: "A" | "B";
+  time: number;
+  dir: string;
+  hash: string;
+  oid: number;
+  crossed: boolean;
+  fee: string;
+  feeToken: string;
+  tid: number;
+};
+
 function toNumber(value: string | number | null | undefined): number {
   if (value === null || value === undefined || value === "") return 0;
   const parsed = Number(value);
@@ -312,4 +327,32 @@ export async function fetchHyperCoreBalances(
 
 export async function getHyperCoreSpotMarketData(): Promise<HyperliquidSpotMarketData> {
   return fetchSpotMarketData();
+}
+
+/** Fetches one time-bounded page of unaggregated HyperCore fills. */
+export async function fetchHyperCoreFillsPage(input: {
+  address: string;
+  startTime: number;
+  endTime: number;
+}): Promise<HyperCoreFill[]> {
+  return readInfo<HyperCoreFill[]>({
+    type: "userFillsByTime",
+    user: input.address,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    aggregateByTime: false,
+  });
+}
+
+/** Resolves HyperCore's `@<spot market index>` notation to a display pair. */
+export async function getHyperCoreSpotMarketSymbols(): Promise<Map<string, string>> {
+  const marketData = await fetchSpotMarketData();
+  const symbols = new Map<string, string>();
+
+  for (const [position, market] of (marketData.meta.universe ?? []).entries()) {
+    const index = market.index ?? position;
+    if (market.name) symbols.set(`@${index}`, market.name);
+  }
+
+  return symbols;
 }

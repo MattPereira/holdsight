@@ -11,6 +11,8 @@ import {
   investmentTransactions,
 } from "@/db/schema/investment-transactions";
 
+const TRANSACTION_SYNC_LEASE_DURATION_MS = 15 * 60 * 1_000;
+
 export type InvestmentTransactionKind =
   | "trade"
   | "transfer"
@@ -56,6 +58,44 @@ export type InvestmentTransactionSyncStatus =
  * here, while other providers can use their own cursor formats.
  */
 export type InvestmentTransactionSyncCheckpoint = Record<string, unknown>;
+
+/**
+ * User-facing summary of how far along a transaction import is, normalized
+ * across providers whose internal checkpoint phases differ.
+ */
+export type TransactionSyncPhase = "backfilling" | "catching_up" | "up_to_date";
+
+const SYNC_PHASE_RANK: Record<TransactionSyncPhase, number> = {
+  backfilling: 0,
+  catching_up: 1,
+  up_to_date: 2,
+};
+
+function phaseFromState(
+  state: { checkpoint: InvestmentTransactionSyncCheckpoint | null; status: InvestmentTransactionSyncStatus } | null | undefined,
+): TransactionSyncPhase {
+  // A missing sync row means the account has not started importing yet.
+  if (!state) return "backfilling";
+  const phase = typeof state.checkpoint?.phase === "string" ? state.checkpoint.phase : null;
+  if (phase === "backfilling") return "backfilling";
+  if (phase === "up_to_date") return "up_to_date";
+  // Providers that page through history without an explicit phase (e.g. Zerion)
+  // are treated as catching up until their sync state reports success.
+  if (!phase) return state.status === "success" ? "up_to_date" : "catching_up";
+  return "catching_up"; // forward_sync, catching_up, …
+}
+
+/** Picks the least-complete phase across a set of per-account sync states. */
+export function summarizeSyncPhase(
+  states: Array<{ checkpoint: InvestmentTransactionSyncCheckpoint | null; status: InvestmentTransactionSyncStatus } | null | undefined>,
+): TransactionSyncPhase {
+  let summary: TransactionSyncPhase = "up_to_date";
+  for (const state of states) {
+    const phase = phaseFromState(state);
+    if (SYNC_PHASE_RANK[phase] < SYNC_PHASE_RANK[summary]) summary = phase;
+  }
+  return summary;
+}
 
 export type NormalizedInvestmentTransaction = {
   sourceProvider: string;
@@ -137,6 +177,8 @@ export type InvestmentTransactionSyncState = {
   provider: string;
   status: InvestmentTransactionSyncStatus;
   checkpoint: InvestmentTransactionSyncCheckpoint | null;
+  leaseToken: string | null;
+  leaseExpiresAt: Date | null;
   earliestBackfilledAt: Date | null;
   latestSyncedExecutedAt: Date | null;
   backfillStartedAt: Date | null;
@@ -144,6 +186,13 @@ export type InvestmentTransactionSyncState = {
   lastSyncedAt: Date | null;
   lastHttpStatus: number | null;
   lastErrorMessage: string | null;
+};
+
+export type ClaimInvestmentTransactionSyncLeaseInput = {
+  userId: string;
+  investmentAccountId: string;
+  provider: string;
+  leaseToken: string;
 };
 
 export type UpsertInvestmentTransactionSyncStateInput = {
@@ -196,6 +245,8 @@ export async function getInvestmentTransactionSyncState(input: {
       provider: investmentTransactionSyncs.provider,
       status: investmentTransactionSyncs.status,
       checkpoint: investmentTransactionSyncs.checkpoint,
+      leaseToken: investmentTransactionSyncs.leaseToken,
+      leaseExpiresAt: investmentTransactionSyncs.leaseExpiresAt,
       earliestBackfilledAt: investmentTransactionSyncs.earliestBackfilledAt,
       latestSyncedExecutedAt:
         investmentTransactionSyncs.latestSyncedExecutedAt,
@@ -219,6 +270,127 @@ export async function getInvestmentTransactionSyncState(input: {
     .limit(1);
 
   return state ?? null;
+}
+
+/**
+ * Claims one account/provider transaction sync until the workflow completes
+ * or its lease expires. This keeps duplicate refresh requests from advancing
+ * the same checkpoint concurrently.
+ */
+export async function claimInvestmentTransactionSyncLease(
+  input: ClaimInvestmentTransactionSyncLeaseInput,
+): Promise<boolean> {
+  const now = new Date();
+  const leaseExpiresAt = new Date(now.getTime() + TRANSACTION_SYNC_LEASE_DURATION_MS);
+  const [claimed] = await db
+    .insert(investmentTransactionSyncs)
+    .values({
+      userId: input.userId,
+      investmentAccountId: input.investmentAccountId,
+      provider: input.provider,
+      status: "syncing",
+      leaseToken: input.leaseToken,
+      leaseExpiresAt,
+      lastSyncedAt: now,
+      lastHttpStatus: null,
+      lastErrorMessage: null,
+    })
+    .onConflictDoUpdate({
+      target: [
+        investmentTransactionSyncs.investmentAccountId,
+        investmentTransactionSyncs.provider,
+      ],
+      set: {
+        status: "syncing",
+        leaseToken: input.leaseToken,
+        leaseExpiresAt,
+        lastSyncedAt: now,
+        lastHttpStatus: null,
+        lastErrorMessage: null,
+        updatedAt: now,
+      },
+      where: sql`${investmentTransactionSyncs.leaseExpiresAt} IS NULL OR ${investmentTransactionSyncs.leaseExpiresAt} <= ${now}`,
+    })
+    .returning({ id: investmentTransactionSyncs.id });
+
+  return Boolean(claimed);
+}
+
+/** Renews a lease immediately before an account/provider workflow page runs. */
+export async function renewInvestmentTransactionSyncLease(input: {
+  userId: string;
+  investmentAccountId: string;
+  provider: string;
+  leaseToken: string;
+}): Promise<boolean> {
+  const now = new Date();
+  const [renewed] = await db
+    .update(investmentTransactionSyncs)
+    .set({
+      leaseExpiresAt: new Date(now.getTime() + TRANSACTION_SYNC_LEASE_DURATION_MS),
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(investmentTransactionSyncs.userId, input.userId),
+        eq(investmentTransactionSyncs.investmentAccountId, input.investmentAccountId),
+        eq(investmentTransactionSyncs.provider, input.provider),
+        eq(investmentTransactionSyncs.leaseToken, input.leaseToken),
+      ),
+    )
+    .returning({ id: investmentTransactionSyncs.id });
+
+  return Boolean(renewed);
+}
+
+/** Releases a lease only when held by the supplied workflow token. */
+export async function releaseInvestmentTransactionSyncLease(input: {
+  userId: string;
+  investmentAccountId: string;
+  provider: string;
+  leaseToken: string;
+}): Promise<void> {
+  await db
+    .update(investmentTransactionSyncs)
+    .set({ leaseToken: null, leaseExpiresAt: null })
+    .where(
+      and(
+        eq(investmentTransactionSyncs.userId, input.userId),
+        eq(investmentTransactionSyncs.investmentAccountId, input.investmentAccountId),
+        eq(investmentTransactionSyncs.provider, input.provider),
+        eq(investmentTransactionSyncs.leaseToken, input.leaseToken),
+      ),
+    );
+}
+
+/** Records a workflow failure without discarding its durable checkpoint. */
+export async function failInvestmentTransactionSyncLease(input: {
+  userId: string;
+  investmentAccountId: string;
+  provider: string;
+  leaseToken: string;
+  message: string;
+}): Promise<void> {
+  const now = new Date();
+  await db
+    .update(investmentTransactionSyncs)
+    .set({
+      status: "error",
+      leaseToken: null,
+      leaseExpiresAt: null,
+      lastSyncedAt: now,
+      lastHttpStatus: null,
+      lastErrorMessage: input.message,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(investmentTransactionSyncs.userId, input.userId),
+        eq(investmentTransactionSyncs.investmentAccountId, input.investmentAccountId),
+        eq(investmentTransactionSyncs.provider, input.provider),
+        eq(investmentTransactionSyncs.leaseToken, input.leaseToken),
+      ),
+    );
 }
 
 export async function upsertInvestmentTransactionSyncState(
@@ -275,6 +447,8 @@ async function upsertInvestmentTransactionSyncStateInTransaction(
       provider: investmentTransactionSyncs.provider,
       status: investmentTransactionSyncs.status,
       checkpoint: investmentTransactionSyncs.checkpoint,
+      leaseToken: investmentTransactionSyncs.leaseToken,
+      leaseExpiresAt: investmentTransactionSyncs.leaseExpiresAt,
       earliestBackfilledAt: investmentTransactionSyncs.earliestBackfilledAt,
       latestSyncedExecutedAt:
         investmentTransactionSyncs.latestSyncedExecutedAt,

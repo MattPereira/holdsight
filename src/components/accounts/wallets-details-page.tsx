@@ -1,6 +1,10 @@
 "use client";
 
-import { loadWalletBalances } from "@/app/actions";
+import {
+  loadWalletBalances,
+  loadWalletTransactions,
+  pollWalletTransactions,
+} from "@/app/actions";
 import { AccountDetailsClient } from "@/components/accounts/account-details-client";
 import {
   WALLET_SECONDARY_COLUMN,
@@ -8,6 +12,8 @@ import {
 } from "@/components/accounts/balances/groups";
 import { portfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 import type { BalancesResult } from "@/lib/portfolio/types";
+import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
+import type { WalletTransactionHistoryStatus } from "@/lib/wallets/transactions";
 
 function identityBalancesResult(results: BalancesResult[]): BalancesResult[] {
   return results;
@@ -15,8 +21,12 @@ function identityBalancesResult(results: BalancesResult[]): BalancesResult[] {
 
 export function WalletsDetailsPage({
   initialResults,
+  initialTransactions,
+  initialHistoryStatus,
 }: {
   initialResults: BalancesResult[];
+  initialTransactions: InvestmentTransactionListItem[];
+  initialHistoryStatus: WalletTransactionHistoryStatus;
 }) {
   return (
     <AccountDetailsClient
@@ -27,6 +37,16 @@ export function WalletsDetailsPage({
       balancesToGroups={balancesResultsToGroups}
       balancesToSummary={portfolioAssetSummary}
       secondaryColumn={WALLET_SECONDARY_COLUMN}
+      transactions={{
+        initialTransactions,
+        loadTransactions: loadWalletTransactions,
+        pollTransactions: pollWalletTransactions,
+        getTransactions: (result) => result.transactions,
+        getError: (result) => result.error,
+        getMessage: (result) => result.message || null,
+        initialHistoryStatus,
+        getHistoryStatus: (result) => result.historyStatus,
+      }}
     />
   );
 }

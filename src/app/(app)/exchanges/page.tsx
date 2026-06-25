@@ -15,7 +15,7 @@ export default async function ExchangePage() {
     userId ? getCurrentKrakenTransactions(userId) : [],
     userId
       ? getKrakenTransactionHistoryStatus(userId)
-      : { earliestTransactionAt: null, latestTransactionAt: null, hasMore: false },
+      : { earliestTransactionAt: null, latestTransactionAt: null, hasMore: false, phase: "up_to_date" as const },
   ]);
   const balanceResultsKey = balanceResults
     .map((result) =>
