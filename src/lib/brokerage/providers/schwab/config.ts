@@ -3,6 +3,8 @@ import "server-only";
 const DEFAULT_AUTHORIZATION_URL =
   "https://api.schwabapi.com/v1/oauth/authorize";
 const DEFAULT_TOKEN_URL = "https://api.schwabapi.com/v1/oauth/token";
+const DEFAULT_ACCOUNTS_URL =
+  "https://api.schwabapi.com/trader/v1/accounts";
 
 export const SCHWAB_BROKERAGE_PROVIDER = "schwab";
 
@@ -12,6 +14,7 @@ export type SchwabConfig = {
   redirectUri: string;
   authorizationUrl: string;
   tokenUrl: string;
+  accountsUrl: string;
   scope: string | null;
 };
 
@@ -47,6 +50,7 @@ export function getSchwabConfig(): SchwabConfig {
     authorizationUrl:
       env("SCHWAB_AUTHORIZATION_URL") ?? DEFAULT_AUTHORIZATION_URL,
     tokenUrl: env("SCHWAB_TOKEN_URL") ?? DEFAULT_TOKEN_URL,
+    accountsUrl: env("SCHWAB_ACCOUNTS_URL") ?? DEFAULT_ACCOUNTS_URL,
     scope: env("SCHWAB_SCOPE"),
   };
 }

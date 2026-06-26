@@ -2,6 +2,8 @@ import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getCurrentUserId } from "@/lib/auth/session";
+import { getUserSchwabConnections } from "@/lib/brokerage/connections";
+import { syncSchwabConnection } from "@/lib/brokerage/balances";
 import {
   exchangeSchwabAuthorizationCode,
   saveSchwabOAuthConnection,
@@ -41,9 +43,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   try {
     const tokens = await exchangeSchwabAuthorizationCode(code);
-    await saveSchwabOAuthConnection({ userId, tokens });
+    const connectionId = await saveSchwabOAuthConnection({ userId, tokens });
+    const connection = (await getUserSchwabConnections(userId)).find(
+      (item) => item.id === connectionId,
+    );
+    if (connection) {
+      try {
+        await syncSchwabConnection(connection);
+      } catch (syncError) {
+        console.error("Initial Schwab account sync failed", syncError);
+      }
+    }
     revalidatePath("/");
     revalidatePath("/connect");
+    revalidatePath("/brokerages");
     return clearStateCookie(connectRedirect(request, "connected"));
   } catch (exchangeError) {
     console.error("Schwab OAuth callback failed", exchangeError);

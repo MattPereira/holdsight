@@ -13,7 +13,7 @@ import {
 
 const SCHWAB_CONNECTION_EXTERNAL_ID = "default";
 
-type SchwabTokenResponse = {
+export type SchwabTokenResponse = {
   access_token: string;
   refresh_token?: string;
   expires_in?: number;
@@ -50,7 +50,9 @@ function basicAuth(config: SchwabConfig): string {
   );
 }
 
-function tokenExpiresAt(expiresInSeconds: number | undefined): Date | null {
+export function schwabTokenExpiresAt(
+  expiresInSeconds: number | undefined,
+): Date | null {
   if (!expiresInSeconds || expiresInSeconds <= 0) return null;
   return new Date(Date.now() + expiresInSeconds * 1000);
 }
@@ -106,6 +108,27 @@ export async function exchangeSchwabAuthorizationCode(
   return readTokenResponse(response);
 }
 
+export async function refreshSchwabAccessToken(
+  refreshToken: string,
+): Promise<SchwabTokenResponse> {
+  const config = getSchwabConfig();
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+
+  const response = await fetch(config.tokenUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${basicAuth(config)}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+
+  return readTokenResponse(response);
+}
+
 export async function saveSchwabOAuthConnection(input: {
   userId: string;
   tokens: SchwabTokenResponse;
@@ -122,7 +145,7 @@ export async function saveSchwabOAuthConnection(input: {
       externalConnectionId: SCHWAB_CONNECTION_EXTERNAL_ID,
       accessTokenEncrypted: encryptBrokerageToken(input.tokens.access_token),
       refreshTokenEncrypted,
-      tokenExpiresAt: tokenExpiresAt(input.tokens.expires_in),
+      tokenExpiresAt: schwabTokenExpiresAt(input.tokens.expires_in),
       institutionName: "Charles Schwab",
       status: "active",
       metadata: {
@@ -142,7 +165,7 @@ export async function saveSchwabOAuthConnection(input: {
       set: {
         accessTokenEncrypted: encryptBrokerageToken(input.tokens.access_token),
         refreshTokenEncrypted,
-        tokenExpiresAt: tokenExpiresAt(input.tokens.expires_in),
+        tokenExpiresAt: schwabTokenExpiresAt(input.tokens.expires_in),
         institutionName: "Charles Schwab",
         status: "active",
         metadata: {

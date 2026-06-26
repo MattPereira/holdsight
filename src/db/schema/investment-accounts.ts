@@ -192,7 +192,7 @@ export const exchangeApiCredentials = pgTable(
   ],
 );
 
-// A Plaid Item is one institution login (e.g. a single Charles Schwab login).
+// A Plaid Item is one institution login (e.g. a single Chase Bank login).
 // One Item can expose multiple brokerage accounts. The access token is the
 // long-lived secret used for every subsequent Plaid API call for this Item.
 // SECURITY: this column holds the AES-256-GCM ciphertext of the access token
@@ -211,7 +211,9 @@ export const plaidItems = pgTable(
     institutionName: text("institution_name"),
     status: plaidItemStatus("status").default("active").notNull(),
     lastSyncedAt: timestamp("last_synced_at"),
-    transactionSyncStatus: plaidItemTransactionSyncStatus("transaction_sync_status")
+    transactionSyncStatus: plaidItemTransactionSyncStatus(
+      "transaction_sync_status",
+    )
       .default("idle")
       .notNull(),
     transactionSyncRunId: text("transaction_sync_run_id"),

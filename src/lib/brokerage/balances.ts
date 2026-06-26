@@ -5,28 +5,44 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   brokerageAccounts,
+  brokerageConnections,
   investmentAccounts,
   investmentBalances,
   plaidItems,
 } from "@/db/schema/investment-accounts";
 import {
+  getConnectionAccountLinks,
   getItemAccountLinks,
   getUserBrokerageAccounts,
+  saveBrokerageConnectionAccounts,
   type SavedBrokerageAccount,
 } from "@/lib/brokerage/accounts";
-import { upsertPlaidBrokerageConnection } from "@/lib/brokerage/connections";
+import {
+  getUserSchwabConnections,
+  upsertPlaidBrokerageConnection,
+  type SavedBrokerageConnection,
+} from "@/lib/brokerage/connections";
+import {
+  decryptBrokerageToken,
+  encryptBrokerageToken,
+} from "@/lib/brokerage/crypto";
 import { decrypt } from "@/lib/plaid/crypto";
 import {
   getUserBrokeragePlaidItems,
   type SavedPlaidItem,
 } from "@/lib/plaid/items";
 import { getPlaidHoldings } from "@/lib/brokerage/providers/plaid/client";
+import { getSchwabHoldings } from "@/lib/brokerage/providers/schwab/client";
+import { SCHWAB_BROKERAGE_PROVIDER } from "@/lib/brokerage/providers/schwab/config";
+import {
+  refreshSchwabAccessToken,
+  schwabTokenExpiresAt,
+} from "@/lib/brokerage/providers/schwab/oauth";
 import type {
   BrokerageAccountHoldings,
   BrokerageBalance,
   HoldingsResult,
 } from "@/lib/brokerage/types";
-
 const PLAID_PROVIDER = "plaid";
 
 export type CurrentBrokerageAccount = SavedBrokerageAccount & {
@@ -55,11 +71,12 @@ async function writeAccountBalances(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
   investmentAccountId: string,
   account: BrokerageAccountHoldings,
+  provider: string,
 ): Promise<void> {
   await tx
     .update(investmentAccounts)
     .set({
-      syncProvider: PLAID_PROVIDER,
+      syncProvider: provider,
       syncStatus: "success",
       syncHttpStatus: null,
       syncErrorMessage: null,
@@ -92,12 +109,13 @@ async function markAccountsFailed(
   investmentAccountIds: string[],
   message: string,
   httpStatus: number | null,
+  provider: string,
 ): Promise<void> {
   for (const id of investmentAccountIds) {
     await tx
       .update(investmentAccounts)
       .set({
-        syncProvider: PLAID_PROVIDER,
+        syncProvider: provider,
         syncStatus: "error",
         syncHttpStatus: httpStatus,
         syncErrorMessage: message,
@@ -126,7 +144,12 @@ export async function applyItemHoldings(
     await tx
       .update(plaidItems)
       .set({
-        status: result.status === "ready" ? "active" : result.status === "login_required" ? "login_required" : "error",
+        status:
+          result.status === "ready"
+            ? "active"
+            : result.status === "login_required"
+              ? "login_required"
+              : "error",
         lastSyncedAt: new Date(),
       })
       .where(eq(plaidItems.id, plaidItemId));
@@ -142,6 +165,7 @@ export async function applyItemHoldings(
         links.map((link) => link.investmentAccountId),
         message,
         httpStatus,
+        PLAID_PROVIDER,
       );
       return;
     }
@@ -153,7 +177,12 @@ export async function applyItemHoldings(
       // Accounts added at the institution after linking won't have a row yet;
       // they get picked up the next time the user re-links.
       if (!investmentAccountId) continue;
-      await writeAccountBalances(tx, investmentAccountId, account);
+      await writeAccountBalances(
+        tx,
+        investmentAccountId,
+        account,
+        PLAID_PROVIDER,
+      );
     }
   });
 
@@ -173,14 +202,130 @@ export async function syncPlaidItem(
   return result;
 }
 
+export async function applySchwabConnectionHoldings(
+  connectionId: string,
+  result: HoldingsResult,
+): Promise<void> {
+  const links = await getConnectionAccountLinks(connectionId);
+  const accountIdByExternal = new Map(
+    links.map((link) => [link.externalAccountId, link.investmentAccountId]),
+  );
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(brokerageConnections)
+      .set({
+        status:
+          result.status === "ready"
+            ? "active"
+            : result.status === "login_required"
+              ? "login_required"
+              : "error",
+        lastSyncedAt: new Date(),
+      })
+      .where(eq(brokerageConnections.id, connectionId));
+
+    if (result.status !== "ready") {
+      const message =
+        result.status === "login_required"
+          ? "Login required — please reconnect Schwab."
+          : result.message;
+      const httpStatus = result.status === "error" ? result.httpStatus : null;
+      await markAccountsFailed(
+        tx,
+        links.map((link) => link.investmentAccountId),
+        message,
+        httpStatus,
+        SCHWAB_BROKERAGE_PROVIDER,
+      );
+      return;
+    }
+
+    for (const account of result.accounts) {
+      const investmentAccountId = accountIdByExternal.get(
+        account.externalAccountId,
+      );
+      if (!investmentAccountId) continue;
+      await writeAccountBalances(
+        tx,
+        investmentAccountId,
+        account,
+        SCHWAB_BROKERAGE_PROVIDER,
+      );
+    }
+  });
+}
+
+export async function syncSchwabConnection(
+  connection: SavedBrokerageConnection,
+): Promise<HoldingsResult> {
+  const accessToken = await getUsableSchwabAccessToken(connection);
+  const result = await getSchwabHoldings(accessToken);
+
+  if (result.status === "ready") {
+    await saveBrokerageConnectionAccounts(
+      connection.userId,
+      connection.id,
+      SCHWAB_BROKERAGE_PROVIDER,
+      connection.institutionName ?? "Charles Schwab",
+      result.accounts,
+    );
+  }
+
+  await applySchwabConnectionHoldings(connection.id, result);
+  return result;
+}
+
+async function getUsableSchwabAccessToken(
+  connection: SavedBrokerageConnection,
+): Promise<string> {
+  const expiresAt = connection.tokenExpiresAt?.getTime() ?? null;
+  const refreshBefore = Date.now() + 60_000;
+
+  if (!expiresAt || expiresAt > refreshBefore) {
+    return decryptBrokerageToken(connection.accessTokenEncrypted);
+  }
+
+  if (!connection.refreshTokenEncrypted) {
+    return decryptBrokerageToken(connection.accessTokenEncrypted);
+  }
+
+  const refreshToken = decryptBrokerageToken(connection.refreshTokenEncrypted);
+  const tokens = await refreshSchwabAccessToken(refreshToken);
+  const refreshTokenEncrypted = tokens.refresh_token
+    ? encryptBrokerageToken(tokens.refresh_token)
+    : connection.refreshTokenEncrypted;
+
+  await db
+    .update(brokerageConnections)
+    .set({
+      accessTokenEncrypted: encryptBrokerageToken(tokens.access_token),
+      refreshTokenEncrypted,
+      tokenExpiresAt: schwabTokenExpiresAt(tokens.expires_in),
+      status: "active",
+      updatedAt: new Date(),
+    })
+    .where(eq(brokerageConnections.id, connection.id));
+
+  return tokens.access_token;
+}
+
 /**
  * Sync every Plaid Item the user has linked. Items are independent logins, so a
  * failure on one doesn't stop the others.
  */
 export async function syncUserBrokerageBalances(userId: string): Promise<void> {
-  const items = await getUserBrokeragePlaidItems(userId);
+  const [items, schwabConnections] = await Promise.all([
+    getUserBrokeragePlaidItems(userId),
+    getUserSchwabConnections(userId),
+  ]);
+
   for (const item of items) {
     await syncPlaidItem(item);
+  }
+
+  for (const connection of schwabConnections) {
+    await syncSchwabConnection(connection);
   }
 }
 
@@ -211,7 +356,8 @@ function toBrokerageBalance(row: {
     amount: Number(row.amount),
     priceUsd: Number(row.priceUsd),
     valueUsd: Number(row.valueUsd),
-    costBasisUsd: row.costBasisUsd === null ? undefined : Number(row.costBasisUsd),
+    costBasisUsd:
+      row.costBasisUsd === null ? undefined : Number(row.costBasisUsd),
   };
 }
 

@@ -36,7 +36,6 @@ export type SavedPlaidItem = {
   accessTokenEncrypted: string;
   institutionName: string | null;
   status: "active" | "login_required" | "error" | "disabled";
-  transactionSyncStatus: "idle" | "syncing" | "success" | "rate_limited" | "error";
   accountNames?: string[];
 };
 
@@ -86,7 +85,6 @@ export async function getUserPlaidItems(
       accessTokenEncrypted: plaidItems.accessTokenEncrypted,
       institutionName: plaidItems.institutionName,
       status: plaidItems.status,
-      transactionSyncStatus: plaidItems.transactionSyncStatus,
     })
     .from(plaidItems)
     .where(eq(plaidItems.userId, userId))
@@ -210,7 +208,6 @@ export async function getUserBrokeragePlaidItems(
       accessTokenEncrypted: plaidItems.accessTokenEncrypted,
       institutionName: plaidItems.institutionName,
       status: plaidItems.status,
-      transactionSyncStatus: plaidItems.transactionSyncStatus,
     })
     .from(plaidItems)
     .innerJoin(
@@ -233,7 +230,6 @@ export async function getUserDepositoryPlaidItems(
       accessTokenEncrypted: plaidItems.accessTokenEncrypted,
       institutionName: plaidItems.institutionName,
       status: plaidItems.status,
-      transactionSyncStatus: plaidItems.transactionSyncStatus,
     })
     .from(plaidItems)
     .innerJoin(
@@ -256,7 +252,6 @@ export async function getUserCreditCardPlaidItems(
       accessTokenEncrypted: plaidItems.accessTokenEncrypted,
       institutionName: plaidItems.institutionName,
       status: plaidItems.status,
-      transactionSyncStatus: plaidItems.transactionSyncStatus,
     })
     .from(plaidItems)
     .innerJoin(creditAccounts, eq(creditAccounts.plaidItemId, plaidItems.id))

@@ -5,6 +5,7 @@ import { and, desc, eq, notInArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   brokerageAccounts,
+  brokerageConnections,
   investmentAccounts,
   plaidItems,
 } from "@/db/schema/investment-accounts";
@@ -142,10 +143,110 @@ export async function saveBrokerageAccounts(
   });
 }
 
+export async function saveBrokerageConnectionAccounts(
+  userId: string,
+  brokerageConnectionId: string,
+  provider: string,
+  brokerageLabel: string,
+  accounts: BrokerageAccountHoldings[],
+): Promise<ItemAccountLink[]> {
+  return db.transaction(async (tx) => {
+    const links: ItemAccountLink[] = [];
+    const currentExternalAccountIds = accounts.map(
+      (account) => account.externalAccountId,
+    );
+
+    const staleAccounts = await tx
+      .select({ id: brokerageAccounts.investmentAccountId })
+      .from(brokerageAccounts)
+      .innerJoin(
+        investmentAccounts,
+        eq(brokerageAccounts.investmentAccountId, investmentAccounts.id),
+      )
+      .where(
+        and(
+          eq(investmentAccounts.userId, userId),
+          eq(brokerageAccounts.brokerageConnectionId, brokerageConnectionId),
+          currentExternalAccountIds.length > 0
+            ? notInArray(
+                brokerageAccounts.externalAccountId,
+                currentExternalAccountIds,
+              )
+            : undefined,
+        ),
+      );
+
+    for (const account of staleAccounts) {
+      await tx
+        .delete(investmentAccounts)
+        .where(eq(investmentAccounts.id, account.id));
+    }
+
+    for (const account of accounts) {
+      const [existing] = await tx
+        .select({ id: brokerageAccounts.investmentAccountId })
+        .from(brokerageAccounts)
+        .innerJoin(
+          investmentAccounts,
+          eq(brokerageAccounts.investmentAccountId, investmentAccounts.id),
+        )
+        .where(
+          and(
+            eq(investmentAccounts.userId, userId),
+            eq(brokerageAccounts.brokerageConnectionId, brokerageConnectionId),
+            eq(brokerageAccounts.externalAccountId, account.externalAccountId),
+          ),
+        )
+        .limit(1);
+
+      if (existing) {
+        await tx
+          .update(investmentAccounts)
+          .set({ label: account.accountName })
+          .where(eq(investmentAccounts.id, existing.id));
+        await tx
+          .update(brokerageAccounts)
+          .set({ accountType: account.accountType })
+          .where(eq(brokerageAccounts.investmentAccountId, existing.id));
+        links.push({
+          investmentAccountId: existing.id,
+          externalAccountId: account.externalAccountId,
+        });
+        continue;
+      }
+
+      const [created] = await tx
+        .insert(investmentAccounts)
+        .values({
+          userId,
+          kind: "brokerage",
+          provider,
+          label: account.accountName,
+        })
+        .returning({ id: investmentAccounts.id });
+
+      await tx.insert(brokerageAccounts).values({
+        investmentAccountId: created.id,
+        brokerageConnectionId,
+        brokerage: brokerageLabel,
+        accountType: account.accountType,
+        externalAccountId: account.externalAccountId,
+      });
+
+      links.push({
+        investmentAccountId: created.id,
+        externalAccountId: account.externalAccountId,
+      });
+    }
+
+    return links;
+  });
+}
+
 export async function getUserBrokerageAccounts(
   userId: string,
 ): Promise<SavedBrokerageAccount[]> {
-  return db
+  const rows = await db
     .select({
       id: investmentAccounts.id,
       brokerageConnectionId: brokerageAccounts.brokerageConnectionId,
@@ -154,7 +255,8 @@ export async function getUserBrokerageAccounts(
       brokerage: brokerageAccounts.brokerage,
       accountType: brokerageAccounts.accountType,
       label: investmentAccounts.label,
-      institutionName: plaidItems.institutionName,
+      plaidInstitutionName: plaidItems.institutionName,
+      connectionInstitutionName: brokerageConnections.institutionName,
       syncStatus: investmentAccounts.syncStatus,
       syncHttpStatus: investmentAccounts.syncHttpStatus,
       syncErrorMessage: investmentAccounts.syncErrorMessage,
@@ -165,6 +267,10 @@ export async function getUserBrokerageAccounts(
       eq(brokerageAccounts.investmentAccountId, investmentAccounts.id),
     )
     .leftJoin(plaidItems, eq(brokerageAccounts.plaidItemId, plaidItems.id))
+    .leftJoin(
+      brokerageConnections,
+      eq(brokerageAccounts.brokerageConnectionId, brokerageConnections.id),
+    )
     .where(
       and(
         eq(investmentAccounts.userId, userId),
@@ -173,6 +279,11 @@ export async function getUserBrokerageAccounts(
       ),
     )
     .orderBy(desc(investmentAccounts.createdAt));
+
+  return rows.map((row) => ({
+    ...row,
+    institutionName: row.plaidInstitutionName ?? row.connectionInstitutionName,
+  }));
 }
 
 export async function getItemAccountLinks(
@@ -185,6 +296,29 @@ export async function getItemAccountLinks(
     })
     .from(brokerageAccounts)
     .where(eq(brokerageAccounts.plaidItemId, plaidItemId));
+
+  return rows.flatMap((row) =>
+    row.externalAccountId
+      ? [
+          {
+            investmentAccountId: row.investmentAccountId,
+            externalAccountId: row.externalAccountId,
+          },
+        ]
+      : [],
+  );
+}
+
+export async function getConnectionAccountLinks(
+  brokerageConnectionId: string,
+): Promise<ItemAccountLink[]> {
+  const rows = await db
+    .select({
+      investmentAccountId: brokerageAccounts.investmentAccountId,
+      externalAccountId: brokerageAccounts.externalAccountId,
+    })
+    .from(brokerageAccounts)
+    .where(eq(brokerageAccounts.brokerageConnectionId, brokerageConnectionId));
 
   return rows.flatMap((row) =>
     row.externalAccountId

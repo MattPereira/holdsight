@@ -12,6 +12,7 @@ import { SCHWAB_BROKERAGE_PROVIDER } from "@/lib/brokerage/providers/schwab/conf
 
 export type SavedBrokerageConnection = {
   id: string;
+  userId: string;
   provider: string;
   externalConnectionId: string;
   accessTokenEncrypted: string;
@@ -29,6 +30,7 @@ export async function getUserSchwabConnections(
   return db
     .select({
       id: brokerageConnections.id,
+      userId: brokerageConnections.userId,
       provider: brokerageConnections.provider,
       externalConnectionId: brokerageConnections.externalConnectionId,
       accessTokenEncrypted: brokerageConnections.accessTokenEncrypted,
