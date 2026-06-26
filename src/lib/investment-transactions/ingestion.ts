@@ -309,7 +309,13 @@ export async function claimInvestmentTransactionSyncLease(
         lastErrorMessage: null,
         updatedAt: now,
       },
-      where: sql`${investmentTransactionSyncs.leaseExpiresAt} IS NULL OR ${investmentTransactionSyncs.leaseExpiresAt} <= ${now}`,
+      // Only an active syncing lease blocks a new run. Terminal rows can keep
+      // a lease after an interrupted workflow and should be reclaimable.
+      where: sql`
+        ${investmentTransactionSyncs.status} <> 'syncing'
+        OR ${investmentTransactionSyncs.leaseExpiresAt} IS NULL
+        OR ${investmentTransactionSyncs.leaseExpiresAt} <= ${now}
+      `,
     })
     .returning({ id: investmentTransactionSyncs.id });
 
