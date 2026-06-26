@@ -12,6 +12,7 @@ import {
 import { getUserEvmAccounts } from "@/lib/evm/accounts";
 import { getUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
 import type { TransactionSyncPhase } from "@/lib/investment-transactions/ingestion";
+import { withTransactionJournalSummaries } from "@/lib/investment-transactions/journal";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import {
   getCurrentWalletTransactions,
@@ -118,7 +119,7 @@ export async function getCurrentPortfolioTransactions(
     getBrokerageTransactionImportStatus(userId),
   ]);
 
-  return mergePortfolioTransactions(
+  const snapshot = mergePortfolioTransactions(
     [walletTransactions, krakenTransactions, brokerageTransactions],
     {
       walletPhase: walletStatus.phase,
@@ -129,6 +130,14 @@ export async function getCurrentPortfolioTransactions(
       brokerageIsSyncing: brokerageStatus.isSyncing,
     },
   );
+
+  return {
+    ...snapshot,
+    transactions: await withTransactionJournalSummaries(
+      userId,
+      snapshot.transactions,
+    ),
+  };
 }
 
 export function emptyPortfolioTransactionsSnapshot(): PortfolioTransactionsSnapshot {

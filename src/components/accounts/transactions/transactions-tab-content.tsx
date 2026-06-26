@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 
+import { JournalEntrySheet } from "@/components/accounts/transactions/journal-entry-sheet";
 import { TransactionsTable } from "@/components/accounts/transactions/transactions-table";
 import type { TransactionsPanel } from "@/components/accounts/transactions/types";
+import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import {
   Pagination,
   PaginationContent,
@@ -61,6 +63,9 @@ export function TransactionsTabContent({
 
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [page, setPage] = useState(1);
+  const [editing, setEditing] = useState<InvestmentTransactionListItem | null>(
+    null,
+  );
   // Snap back to the first page whenever the underlying set changes (e.g. a
   // sync adds rows), so we never linger on a page that no longer exists.
   const [syncedTotal, setSyncedTotal] = useState(total);
@@ -123,7 +128,10 @@ export function TransactionsTabContent({
         </div>
       ) : null}
 
-      <TransactionsTable transactions={pageTransactions} />
+      <TransactionsTable
+        transactions={pageTransactions}
+        onEditJournal={setEditing}
+      />
 
       {pageCount > 1 ? (
         <Pagination className="mx-0 w-auto justify-end">
@@ -158,6 +166,14 @@ export function TransactionsTabContent({
           </PaginationContent>
         </Pagination>
       ) : null}
+
+      <JournalEntrySheet
+        transaction={editing}
+        open={editing !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+      />
     </div>
   );
 }

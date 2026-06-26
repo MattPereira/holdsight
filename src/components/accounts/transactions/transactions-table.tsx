@@ -1,5 +1,10 @@
+import { RiPencilFill, RiPencilLine } from "@remixicon/react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
+import { TRADE_JOURNAL_REASON_LABELS } from "@/lib/investment-transactions/journal-labels";
 
 const usdFormat = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -11,7 +16,6 @@ const amountFormat = new Intl.NumberFormat("en-US", {
 });
 
 const dateParts = new Intl.DateTimeFormat("en-US", {
-  year: "2-digit",
   month: "2-digit",
   day: "2-digit",
   hour: "numeric",
@@ -19,14 +23,14 @@ const dateParts = new Intl.DateTimeFormat("en-US", {
   hour12: true,
 });
 
-// Renders "06/24/26 @ 3:30pm" — Intl can't emit the "@" separator or a
+// Renders "06/24 @ 3:30pm" — Intl can't emit the "@" separator or a
 // lowercase meridiem, so we assemble the parts ourselves.
 function formatDate(date: Date): string {
   const parts = dateParts.formatToParts(date);
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((part) => part.type === type)?.value ?? "";
   const meridiem = get("dayPeriod").toLowerCase();
-  return `${get("month")}/${get("day")}/${get("year")} @ ${get("hour")}:${get("minute")}${meridiem}`;
+  return `${get("month")}/${get("day")} @ ${get("hour")}:${get("minute")}${meridiem}`;
 }
 
 type LegDirection = "in" | "out" | "neutral";
@@ -237,10 +241,44 @@ function Leg({ leg }: { leg: TransactionLeg }) {
   );
 }
 
+function JournalCell({
+  transaction,
+  onEditJournal,
+}: {
+  transaction: InvestmentTransactionListItem;
+  onEditJournal: (transaction: InvestmentTransactionListItem) => void;
+}) {
+  const summary = transaction.journalSummary;
+  const hasEntry = Boolean(summary);
+  const reasonLabel = summary?.tradeReason
+    ? TRADE_JOURNAL_REASON_LABELS[summary.tradeReason]
+    : null;
+
+  // Edit control and the reason tag on a single row.
+  return (
+    <div className="flex items-center gap-0">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label={hasEntry ? "Edit journal entry" : "Add journal entry"}
+        className={cn("text-muted-foreground", hasEntry && "text-primary")}
+        onClick={() => onEditJournal(transaction)}
+      >
+        {hasEntry ? <RiPencilFill /> : <RiPencilLine />}
+      </Button>
+      {reasonLabel ? (
+        <Badge variant="secondary">{reasonLabel}</Badge>
+      ) : null}
+    </div>
+  );
+}
+
 export function TransactionsTable({
   transactions,
+  onEditJournal,
 }: {
   transactions: InvestmentTransactionListItem[];
+  onEditJournal: (transaction: InvestmentTransactionListItem) => void;
 }) {
   if (transactions.length === 0) {
     return (
@@ -255,9 +293,9 @@ export function TransactionsTable({
       {transactions.map((transaction) => (
         <li
           key={transaction.id}
-          className="flex items-start justify-between gap-4 py-3"
+          className="flex items-start gap-3 py-2.5"
         >
-          <div className="flex flex-col">
+          <div className="flex min-w-0 flex-col">
             <span className="text-sm">
               {transaction.displayType === "perp_event"
                 ? perpActionLabel(transaction)
@@ -274,7 +312,14 @@ export function TransactionsTable({
               </span>
             ) : null}
           </div>
-          <div className="flex flex-col items-end">
+
+          {/* Journal cluster sits just right of the description. */}
+          <JournalCell
+            transaction={transaction}
+            onEditJournal={onEditJournal}
+          />
+
+          <div className="ml-auto flex flex-col items-end">
             {transactionLegs(transaction).map((leg, i) => (
               <Leg key={i} leg={leg} />
             ))}

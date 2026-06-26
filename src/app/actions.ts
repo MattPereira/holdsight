@@ -47,6 +47,14 @@ import {
   releaseInvestmentTransactionSyncLease,
 } from "@/lib/investment-transactions/ingestion";
 import {
+  getUserInvestmentTransactionJournalEntry,
+  removeUserInvestmentTransactionJournalEntry,
+  saveUserInvestmentTransactionJournalEntry,
+  withTransactionJournalSummaries,
+  type TradeJournalEntryInput,
+  type TradeJournalEntryRow,
+} from "@/lib/investment-transactions/journal";
+import {
   addUserEvmAccount,
   getUserEvmAccounts,
   removeUserEvmAccount,
@@ -1064,13 +1072,29 @@ function combinePortfolioTransactionResults(
  * per-source loaders so each still claims its own leases and starts its own
  * workflows.
  */
+async function attachJournalSummaries(
+  result: PortfolioTransactionsActionResult,
+): Promise<PortfolioTransactionsActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) return result;
+  return {
+    ...result,
+    transactions: await withTransactionJournalSummaries(
+      userId,
+      result.transactions,
+    ),
+  };
+}
+
 export async function loadPortfolioTransactions(): Promise<PortfolioTransactionsActionResult> {
   const [wallet, kraken, brokerage] = await Promise.all([
     loadWalletTransactions(),
     loadKrakenTransactions(),
     loadBrokerageTransactions(),
   ]);
-  return combinePortfolioTransactionResults(wallet, kraken, brokerage);
+  return attachJournalSummaries(
+    combinePortfolioTransactionResults(wallet, kraken, brokerage),
+  );
 }
 
 /** Read-only snapshot of the merged transaction feed for polling a sync. */
@@ -1080,7 +1104,82 @@ export async function pollPortfolioTransactions(): Promise<PortfolioTransactions
     pollKrakenTransactions(),
     pollBrokerageTransactions(),
   ]);
-  return combinePortfolioTransactionResults(wallet, kraken, brokerage);
+  return attachJournalSummaries(
+    combinePortfolioTransactionResults(wallet, kraken, brokerage),
+  );
+}
+
+/* ------------------------ transaction journal ------------------------ */
+
+export type TransactionJournalActionResult = {
+  entry: TradeJournalEntryRow | null;
+  error: string | null;
+};
+
+function revalidateTransactionJournalPaths(): void {
+  revalidatePath("/");
+  revalidatePath("/wallets");
+  revalidatePath("/exchange");
+  revalidatePath("/brokerages");
+}
+
+export async function getTransactionJournalEntry(
+  transactionId: string,
+): Promise<TransactionJournalActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      entry: null,
+      error: "You must be signed in to view journal entries.",
+    };
+  }
+
+  return {
+    entry: await getUserInvestmentTransactionJournalEntry(
+      userId,
+      transactionId,
+    ),
+    error: null,
+  };
+}
+
+export async function saveTransactionJournalEntry(
+  transactionId: string,
+  input: TradeJournalEntryInput,
+): Promise<TransactionJournalActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      entry: null,
+      error: "You must be signed in to manage journal entries.",
+    };
+  }
+
+  const result = await saveUserInvestmentTransactionJournalEntry(
+    userId,
+    transactionId,
+    input,
+  );
+  if (!result.error) revalidateTransactionJournalPaths();
+
+  return result;
+}
+
+export async function removeTransactionJournalEntry(
+  transactionId: string,
+): Promise<TransactionJournalActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      entry: null,
+      error: "You must be signed in to manage journal entries.",
+    };
+  }
+
+  await removeUserInvestmentTransactionJournalEntry(userId, transactionId);
+  revalidateTransactionJournalPaths();
+
+  return { entry: null, error: null };
 }
 
 /**

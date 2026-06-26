@@ -1,6 +1,7 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   foreignKey,
   index,
   integer,
@@ -10,6 +11,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
@@ -58,6 +60,36 @@ export const investmentTransactionSyncStatus = pgEnum(
   ["idle", "syncing", "success", "rate_limited", "error"],
 );
 
+export const tradeJournalReason = pgEnum("trade_journal_reason", [
+  "risk_reduction",
+  "dip_buy",
+  "breakout_buy",
+  "take_profit",
+  "stop_loss",
+  "panic_sell",
+  "fomo",
+  "rebalance",
+  "thesis_change",
+  "cash_raise",
+]);
+
+export const tradeJournalEmotion = pgEnum("trade_journal_emotion", [
+  "calm",
+  "confident",
+  "uncertain",
+  "fearful",
+  "greedy",
+  "fomo",
+  "frustrated",
+  "patient",
+  "impulsive",
+  "disciplined",
+  "stressed",
+  "excited",
+  "regretful",
+  "neutral",
+]);
+
 export const investmentTransactions = pgTable(
   "investment_transactions",
   {
@@ -94,6 +126,10 @@ export const investmentTransactions = pgTable(
       .notNull(),
   },
   (table) => [
+    unique("investment_transactions_id_user_id_unique").on(
+      table.id,
+      table.userId,
+    ),
     uniqueIndex("investment_transactions_source_unique").on(
       table.investmentAccountId,
       table.sourceProvider,
@@ -119,6 +155,53 @@ export const investmentTransactions = pgTable(
       columns: [table.userId],
       foreignColumns: [user.id],
     }).onDelete("cascade"),
+  ],
+);
+
+export const investmentTransactionJournalEntries = pgTable(
+  "investment_transaction_journal_entries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull(),
+    transactionId: uuid("transaction_id").notNull(),
+    note: text("note"),
+    tradeReason: tradeJournalReason("trade_reason"),
+    emotions: tradeJournalEmotion("emotions")
+      .array()
+      .default(sql`ARRAY[]::trade_journal_emotion[]`)
+      .notNull(),
+    confidence: integer("confidence"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("investment_transaction_journal_entries_transaction_unique").on(
+      table.transactionId,
+    ),
+    index("investment_transaction_journal_entries_user_created_at_idx").on(
+      table.userId,
+      table.createdAt,
+    ),
+    index(
+      "investment_transaction_journal_entries_transaction_created_at_idx",
+    ).on(table.transactionId, table.createdAt),
+    foreignKey({
+      name: "investment_transaction_journal_entries_transaction_user_fk",
+      columns: [table.transactionId, table.userId],
+      foreignColumns: [investmentTransactions.id, investmentTransactions.userId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "investment_transaction_journal_entries_user_fk",
+      columns: [table.userId],
+      foreignColumns: [user.id],
+    }).onDelete("cascade"),
+    check(
+      "investment_transaction_journal_entries_confidence_check",
+      sql`${table.confidence} is null or (${table.confidence} >= 1 and ${table.confidence} <= 10)`,
+    ),
   ],
 );
 
@@ -302,7 +385,7 @@ export const investmentTransactionSyncs = pgTable(
 
 export const investmentTransactionsRelations = relations(
   investmentTransactions,
-  ({ one }) => ({
+  ({ many, one }) => ({
     user: one(user, {
       fields: [investmentTransactions.userId],
       references: [user.id],
@@ -314,6 +397,21 @@ export const investmentTransactionsRelations = relations(
     evmDetails: one(evmTransactionDetails),
     hyperCoreDetails: one(hyperCoreTransactionDetails),
     brokerageDetails: one(brokerageTransactionDetails),
+    journalEntries: many(investmentTransactionJournalEntries),
+  }),
+);
+
+export const investmentTransactionJournalEntriesRelations = relations(
+  investmentTransactionJournalEntries,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [investmentTransactionJournalEntries.userId],
+      references: [user.id],
+    }),
+    transaction: one(investmentTransactions, {
+      fields: [investmentTransactionJournalEntries.transactionId],
+      references: [investmentTransactions.id],
+    }),
   }),
 );
 
