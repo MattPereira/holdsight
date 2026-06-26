@@ -56,6 +56,13 @@ function formatCostBasis(value: number | undefined): string {
   return value === undefined ? "—" : usdFormat.format(value);
 }
 
+// Closed positions are still reported by some sources (e.g. Schwab) with a zero
+// quantity. They carry no value and only clutter the table, so drop them while
+// keeping non-zero holdings — including negative (short) positions.
+function hasBalance(balance: { amount: number }): boolean {
+  return balance.amount !== 0;
+}
+
 /**
  * Normalize on-chain / exchange balance results into display groups. Ready-but-
  * empty addresses are dropped (nothing worth showing); non-ready addresses are
@@ -70,7 +77,9 @@ export function balancesResultsToGroups(
         !(result.status === "ready" && result.balances.length === 0),
     )
     .map((result, idx) => {
-      const balances = result.status === "ready" ? result.balances : [];
+      const balances = (
+        result.status === "ready" ? result.balances : []
+      ).filter(hasBalance);
       const rows: BalanceRow[] = balances.map((balance, i) => ({
         key: investmentRowKey(balance, i),
         symbol: balance.symbol,
@@ -100,15 +109,19 @@ export function brokerageAccountsToGroups(
   accounts: CurrentBrokerageAccount[],
 ): BalanceGroup[] {
   return accounts
+    .map((account) => ({
+      account,
+      balances: account.balances.filter(hasBalance),
+    }))
     .filter(
-      (account) =>
-        account.balances.length > 0 || account.syncStatus === "error",
+      ({ account, balances }) =>
+        balances.length > 0 || account.syncStatus === "error",
     )
-    .map((account) => {
+    .map(({ account, balances }) => {
       const institution = account.institutionName ?? account.brokerage;
       const label = account.label ?? institution;
       const subtitle = institution !== label ? institution : undefined;
-      const rows: BalanceRow[] = account.balances.map((balance, i) => ({
+      const rows: BalanceRow[] = balances.map((balance, i) => ({
         key: brokerageRowKey(balance, i),
         symbol: balance.symbol,
         secondary: formatCostBasis(balance.costBasisUsd),
@@ -122,12 +135,9 @@ export function brokerageAccountsToGroups(
         title: label,
         subtitle,
         rows,
-        total: account.balances.reduce(
-          (sum, balance) => sum + balance.valueUsd,
-          0,
-        ),
+        total: balances.reduce((sum, balance) => sum + balance.valueUsd, 0),
         emptyMessage:
-          account.balances.length === 0
+          balances.length === 0
             ? account.syncStatus === "error"
               ? (account.syncErrorMessage ?? "Sync failed.")
               : "No holdings. Refresh to load."
