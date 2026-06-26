@@ -51,6 +51,19 @@ type SchwabAccountResponse = {
   securitiesAccount?: SchwabSecuritiesAccount;
 };
 
+type SchwabUserPreferenceAccount = {
+  accountNumber?: string;
+  nickName?: string;
+  displayAcctId?: string;
+  type?: string;
+};
+
+type SchwabUserPreferenceResponse =
+  | SchwabUserPreferenceAccount[]
+  | {
+      accounts?: SchwabUserPreferenceAccount[];
+    };
+
 type SchwabErrorResponse = {
   message?: string;
   error?: string;
@@ -185,11 +198,26 @@ function cashBalance(account: SchwabSecuritiesAccount): BrokerageBalance | null 
   };
 }
 
+function accountLabel(
+  account: SchwabSecuritiesAccount,
+  preference: SchwabUserPreferenceAccount | undefined,
+): string {
+  const nickname = preference?.nickName?.trim();
+  if (nickname) return nickname;
+
+  const displayId = preference?.displayAcctId?.trim();
+  if (displayId) return `Schwab ${displayId}`;
+
+  return `Schwab ${account.accountNumber?.slice(-4) ?? "Account"}`;
+}
+
 function normalizeAccount(
   row: SchwabAccountResponse,
+  preferencesByAccountNumber: Map<string, SchwabUserPreferenceAccount>,
 ): BrokerageAccountHoldings | null {
   const account = row.securitiesAccount;
   if (!account?.accountNumber) return null;
+  const preference = preferencesByAccountNumber.get(account.accountNumber);
 
   const balances = (account.positions ?? [])
     .map(positionToBalance)
@@ -199,11 +227,36 @@ function normalizeAccount(
 
   return {
     externalAccountId: account.accountNumber,
-    accountName: `Schwab ${account.accountNumber.slice(-4)}`,
+    accountName: accountLabel(account, preference),
     accountType: toAccountType(account.type),
     mask: account.accountNumber.slice(-4),
     balances,
   };
+}
+
+function userPreferenceAccounts(
+  body: SchwabUserPreferenceResponse | null,
+): SchwabUserPreferenceAccount[] {
+  if (Array.isArray(body)) return body;
+  return body?.accounts ?? [];
+}
+
+async function getSchwabUserPreferenceAccounts(
+  accessToken: string,
+): Promise<SchwabUserPreferenceAccount[]> {
+  const response = await fetch(getSchwabConfig().userPreferenceUrl, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) return [];
+
+  const body = (await response.json().catch(() => null)) as
+    | SchwabUserPreferenceResponse
+    | null;
+  return userPreferenceAccounts(body);
 }
 
 export async function getSchwabHoldings(
@@ -245,10 +298,19 @@ export async function getSchwabHoldings(
     };
   }
 
+  const preferencesByAccountNumber = new Map(
+    (await getSchwabUserPreferenceAccounts(accessToken)).flatMap(
+      (preference) =>
+        preference.accountNumber
+          ? [[preference.accountNumber, preference] as const]
+          : [],
+    ),
+  );
+
   return {
     status: "ready",
     accounts: body
-      .map(normalizeAccount)
+      .map((account) => normalizeAccount(account, preferencesByAccountNumber))
       .filter((account): account is BrokerageAccountHoldings =>
         Boolean(account),
       ),
