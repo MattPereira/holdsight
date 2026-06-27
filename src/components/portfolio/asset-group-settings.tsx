@@ -14,6 +14,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useAssetGroups } from "@/components/portfolio/asset-groups-context";
 import {
   Sheet,
@@ -36,8 +37,12 @@ type EditorState =
 type GroupFormValues = {
   name: string | null;
   color: string | null;
+  thesis: string | null;
+  targetAllocationPercent: number | null;
   symbols: string[];
 };
+
+const MAX_THESIS_LENGTH = 10_000;
 
 function symbolKey(symbol: string): string {
   return symbol.trim().toUpperCase();
@@ -149,7 +154,17 @@ function AssetGroupManager({
                         {symbol}
                       </Badge>
                     ))}
+                    {group.targetAllocationPercent !== null ? (
+                      <Badge variant="outline">
+                        Target {group.targetAllocationPercent}%
+                      </Badge>
+                    ) : null}
                   </div>
+                  {group.thesis ? (
+                    <p className="line-clamp-2 whitespace-pre-line text-xs text-muted-foreground">
+                      {group.thesis}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex shrink-0 gap-1">
                   <Button
@@ -254,6 +269,10 @@ function GroupEditor({
   const [color, setColor] = useState<string | null>(
     editingGroup?.color ?? null,
   );
+  const [thesis, setThesis] = useState(editingGroup?.thesis ?? "");
+  const [targetAllocation, setTargetAllocation] = useState(
+    editingGroup?.targetAllocationPercent?.toString() ?? "",
+  );
   const [selected, setSelected] = useState<Set<string>>(
     () => new Set((editingGroup?.symbols ?? []).map(symbolKey)),
   );
@@ -290,7 +309,14 @@ function GroupEditor({
     const symbols = selectableSymbols.filter((symbol) =>
       selected.has(symbolKey(symbol)),
     );
-    onSubmit({ name: name.trim() || null, color, symbols });
+    onSubmit({
+      name: name.trim() || null,
+      color,
+      thesis: thesis.trim() || null,
+      targetAllocationPercent:
+        targetAllocation === "" ? null : Number(targetAllocation),
+      symbols,
+    });
   }
 
   const selectedCount = selectableSymbols.filter((symbol) =>
@@ -308,6 +334,37 @@ function GroupEditor({
             onChange={(event) => setName(event.target.value)}
             placeholder="Defaults to the joined symbols"
             autoComplete="off"
+            disabled={isPending}
+          />
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="group-target-allocation">
+            Target allocation (%)
+          </FieldLabel>
+          <Input
+            id="group-target-allocation"
+            type="number"
+            min="0"
+            max="100"
+            step="0.01"
+            inputMode="decimal"
+            value={targetAllocation}
+            onChange={(event) => setTargetAllocation(event.target.value)}
+            placeholder="Optional portfolio target"
+            disabled={isPending}
+          />
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="group-thesis">Thesis</FieldLabel>
+          <Textarea
+            id="group-thesis"
+            value={thesis}
+            onChange={(event) => setThesis(event.target.value)}
+            placeholder="Why you own it, catalysts, risks, and what would invalidate the thesis"
+            maxLength={MAX_THESIS_LENGTH}
+            rows={5}
             disabled={isPending}
           />
         </Field>

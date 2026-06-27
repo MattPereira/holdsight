@@ -1486,6 +1486,8 @@ async function unauthorizedGroupResult(): Promise<AssetGroupActionResult> {
 export async function createGroup(input: {
   name?: string | null;
   color?: string | null;
+  thesis?: string | null;
+  targetAllocationPercent?: number | null;
   symbols: string[];
 }): Promise<AssetGroupActionResult> {
   const userId = await getCurrentUserId();
@@ -1504,7 +1506,13 @@ export async function createGroup(input: {
 
 export async function updateGroup(
   groupId: string,
-  input: { name?: string | null; color?: string | null; symbols: string[] },
+  input: {
+    name?: string | null;
+    color?: string | null;
+    thesis?: string | null;
+    targetAllocationPercent?: number | null;
+    symbols: string[];
+  },
 ): Promise<AssetGroupActionResult> {
   const userId = await getCurrentUserId();
   if (!userId) return unauthorizedGroupResult();

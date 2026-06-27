@@ -1,6 +1,8 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
+  check,
   index,
+  numeric,
   pgTable,
   primaryKey,
   text,
@@ -21,6 +23,12 @@ export const assetGroups = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     name: text("name"),
     color: text("color"),
+    thesis: text("thesis"),
+    targetAllocationPercent: numeric("target_allocation_percent", {
+      precision: 5,
+      scale: 2,
+      mode: "number",
+    }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -30,6 +38,10 @@ export const assetGroups = pgTable(
   (table) => [
     unique("asset_groups_id_user_id_unique").on(table.id, table.userId),
     index("asset_groups_user_id_idx").on(table.userId),
+    check(
+      "asset_groups_target_allocation_percent_check",
+      sql`${table.targetAllocationPercent} is null or (${table.targetAllocationPercent} >= 0 and ${table.targetAllocationPercent} <= 100)`,
+    ),
   ],
 );
 

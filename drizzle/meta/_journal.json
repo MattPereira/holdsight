@@ -225,6 +225,13 @@
       "when": 1782598755736,
       "tag": "0031_furry_lady_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1782601326555,
+      "tag": "0032_sparkling_triathlon",
+      "breakpoints": true
     }
   ]
 }

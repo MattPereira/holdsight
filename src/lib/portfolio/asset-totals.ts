@@ -17,6 +17,8 @@ export type AssetGroup = {
   id: string;
   name: string | null;
   color: string | null;
+  thesis: string | null;
+  targetAllocationPercent: number | null;
   symbols: string[];
 };
 

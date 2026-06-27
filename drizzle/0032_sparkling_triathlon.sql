@@ -1,0 +1,3 @@
+ALTER TABLE "asset_groups" ADD COLUMN "thesis" text;--> statement-breakpoint
+ALTER TABLE "asset_groups" ADD COLUMN "target_allocation_percent" numeric(5, 2);--> statement-breakpoint
+ALTER TABLE "asset_groups" ADD CONSTRAINT "asset_groups_target_allocation_percent_check" CHECK ("asset_groups"."target_allocation_percent" is null or ("asset_groups"."target_allocation_percent" >= 0 and "asset_groups"."target_allocation_percent" <= 100));
