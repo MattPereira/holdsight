@@ -15,22 +15,24 @@ const amountFormat = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 6,
 });
 
-const dateParts = new Intl.DateTimeFormat("en-US", {
-  year: "2-digit",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
+const transactionDateFormat = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
 });
 
-// Renders "06/26/26 · 17:04" — Intl can't reliably emit this exact layout, so
-// we assemble the parts ourselves.
-function formatDate(date: Date): string {
-  const parts = dateParts.formatToParts(date);
-  const get = (type: Intl.DateTimeFormatPartTypes) =>
-    parts.find((part) => part.type === type)?.value ?? "";
-  return `${get("month")}/${get("day")}/${get("year")} · ${get("hour")}:${get("minute")}`;
+const transactionTimeFormat = new Intl.DateTimeFormat("en-US", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: true,
+});
+
+function formatTransactionDate(date: Date): string {
+  return transactionDateFormat.format(date);
+}
+
+function formatTransactionTime(date: Date): string {
+  return transactionTimeFormat.format(date);
 }
 
 type LegDirection = "in" | "out" | "neutral";
@@ -254,7 +256,10 @@ function JournalEditButton({
       variant="ghost"
       size="icon-lg"
       aria-label={hasEntry ? "Edit journal entry" : "Add journal entry"}
-      className={cn("text-muted-foreground", hasEntry && "text-primary")}
+      className={cn(
+        "self-start text-muted-foreground",
+        hasEntry && "text-primary",
+      )}
       onClick={() => onEditJournal(transaction)}
     >
       {hasEntry ? <RiPencilFill /> : <RiPencilLine />}
@@ -288,24 +293,22 @@ export function TransactionsTable({
     <ul className="divide-y">
       {transactions.map((transaction) => {
         const reasonLabel = reasonLabelFor(transaction);
+        const executedAt = new Date(transaction.executedAt);
         return (
-          <li key={transaction.id} className="flex items-start gap-3 py-2.5">
-            {/* Edit control anchored far left so it never drifts with label width. */}
-            <JournalEditButton
-              transaction={transaction}
-              onEditJournal={onEditJournal}
-            />
-
-            <div className="flex min-w-0 flex-col">
-              <span className="text-sm">
+          <li key={transaction.id} className="flex items-start gap-1 py-2.5">
+            <div className="flex min-w-0 flex-col gap-0.5">
+              <span className="text-base">
                 {transaction.displayType === "perp_event"
                   ? perpActionLabel(transaction)
                   : transaction.accountLabel ?? "—"}
               </span>
-              <span className="text-xs text-muted-foreground">
+              <span className="text-sm text-muted-foreground">
                 {transaction.displayType === "perp_event"
-                  ? `${transaction.accountLabel ?? "—"} · ${formatDate(new Date(transaction.executedAt))}`
-                  : formatDate(new Date(transaction.executedAt))}
+                  ? `${transaction.accountLabel ?? "—"} · ${formatTransactionDate(executedAt)}`
+                  : formatTransactionDate(executedAt)}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {formatTransactionTime(executedAt)}
               </span>
               {transaction.displayType === "perp_event" ? (
                 <span className="text-xs text-muted-foreground">
@@ -314,17 +317,19 @@ export function TransactionsTable({
               ) : null}
             </div>
 
-            {reasonLabel ? (
-              <Badge variant="secondary" className="self-end">
-                {reasonLabel}
-              </Badge>
-            ) : null}
-
-            <div className="ml-auto flex flex-col items-end">
+            <div className="ml-auto flex flex-col items-end gap-1">
               {transactionLegs(transaction).map((leg, i) => (
                 <Leg key={i} leg={leg} />
               ))}
+              {reasonLabel ? (
+                <Badge variant="secondary">{reasonLabel}</Badge>
+              ) : null}
             </div>
+
+            <JournalEditButton
+              transaction={transaction}
+              onEditJournal={onEditJournal}
+            />
           </li>
         );
       })}

@@ -1,0 +1,3 @@
+ALTER TABLE "investment_transaction_journal_entries" RENAME COLUMN "confidence" TO "market_bias";--> statement-breakpoint
+ALTER TABLE "investment_transaction_journal_entries" DROP CONSTRAINT "investment_transaction_journal_entries_confidence_check";--> statement-breakpoint
+ALTER TABLE "investment_transaction_journal_entries" ADD CONSTRAINT "investment_transaction_journal_entries_market_bias_check" CHECK ("investment_transaction_journal_entries"."market_bias" is null or ("investment_transaction_journal_entries"."market_bias" >= 1 and "investment_transaction_journal_entries"."market_bias" <= 10));

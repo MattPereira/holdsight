@@ -60,35 +60,10 @@ export const investmentTransactionSyncStatus = pgEnum(
   ["idle", "syncing", "success", "rate_limited", "error"],
 );
 
-export const tradeJournalReason = pgEnum("trade_journal_reason", [
-  "risk_reduction",
-  "dip_buy",
-  "breakout_buy",
-  "take_profit",
-  "stop_loss",
-  "panic_sell",
-  "fomo",
-  "rebalance",
-  "thesis_change",
-  "cash_raise",
-]);
-
-export const tradeJournalEmotion = pgEnum("trade_journal_emotion", [
-  "calm",
-  "confident",
-  "uncertain",
-  "fearful",
-  "greedy",
-  "fomo",
-  "frustrated",
-  "patient",
-  "impulsive",
-  "disciplined",
-  "stressed",
-  "excited",
-  "regretful",
-  "neutral",
-]);
+// Trade journal vocabulary (reasons, emotions) lives as plain `text`/`text[]`
+// columns with the allowed values defined and validated in TypeScript
+// (`@/lib/investment-transactions/journal-labels`). Avoids the painful enum
+// migrations Postgres requires to drop or rename values.
 
 export const investmentTransactions = pgTable(
   "investment_transactions",
@@ -165,12 +140,12 @@ export const investmentTransactionJournalEntries = pgTable(
     userId: uuid("user_id").notNull(),
     transactionId: uuid("transaction_id").notNull(),
     note: text("note"),
-    tradeReason: tradeJournalReason("trade_reason"),
-    emotions: tradeJournalEmotion("emotions")
+    tradeReason: text("trade_reason"),
+    emotions: text("emotions")
       .array()
-      .default(sql`ARRAY[]::trade_journal_emotion[]`)
+      .default(sql`ARRAY[]::text[]`)
       .notNull(),
-    confidence: integer("confidence"),
+    marketBias: integer("market_bias"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -178,6 +153,10 @@ export const investmentTransactionJournalEntries = pgTable(
       .notNull(),
   },
   (table) => [
+    unique("investment_transaction_journal_entries_id_user_id_unique").on(
+      table.id,
+      table.userId,
+    ),
     uniqueIndex("investment_transaction_journal_entries_transaction_unique").on(
       table.transactionId,
     ),
@@ -199,8 +178,93 @@ export const investmentTransactionJournalEntries = pgTable(
       foreignColumns: [user.id],
     }).onDelete("cascade"),
     check(
-      "investment_transaction_journal_entries_confidence_check",
-      sql`${table.confidence} is null or (${table.confidence} >= 1 and ${table.confidence} <= 10)`,
+      "investment_transaction_journal_entries_market_bias_check",
+      sql`${table.marketBias} is null or (${table.marketBias} >= 1 and ${table.marketBias} <= 10)`,
+    ),
+  ],
+);
+
+// Migration 0027 installs a trigger that copies blob pathnames into the durable
+// deletion queue before direct or cascaded deletes remove these rows.
+export const investmentTransactionJournalEntryImages = pgTable(
+  "investment_transaction_journal_entry_images",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull(),
+    journalEntryId: uuid("journal_entry_id").notNull(),
+    blobPathname: text("blob_pathname").notNull(),
+    blobUrl: text("blob_url").notNull(),
+    originalFilename: text("original_filename").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex(
+      "investment_transaction_journal_entry_images_blob_pathname_unique",
+    ).on(table.blobPathname),
+    uniqueIndex(
+      "investment_transaction_journal_entry_images_blob_url_unique",
+    ).on(table.blobUrl),
+    index(
+      "investment_transaction_journal_entry_images_entry_sort_order_idx",
+    ).on(table.journalEntryId, table.sortOrder),
+    foreignKey({
+      name: "investment_transaction_journal_entry_images_entry_user_fk",
+      columns: [table.journalEntryId, table.userId],
+      foreignColumns: [
+        investmentTransactionJournalEntries.id,
+        investmentTransactionJournalEntries.userId,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "investment_transaction_journal_entry_images_user_fk",
+      columns: [table.userId],
+      foreignColumns: [user.id],
+    }).onDelete("cascade"),
+    check(
+      "investment_transaction_journal_entry_images_size_bytes_check",
+      sql`${table.sizeBytes} > 0`,
+    ),
+    check(
+      "investment_transaction_journal_entry_images_sort_order_check",
+      sql`${table.sortOrder} >= 0`,
+    ),
+  ],
+);
+
+export const blobDeletionJobs = pgTable(
+  "blob_deletion_jobs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    blobPathname: text("blob_pathname").notNull(),
+    attemptCount: integer("attempt_count").default(0).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at").defaultNow().notNull(),
+    leaseToken: uuid("lease_token"),
+    leaseExpiresAt: timestamp("lease_expires_at"),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("blob_deletion_jobs_blob_pathname_unique").on(
+      table.blobPathname,
+    ),
+    index("blob_deletion_jobs_pending_idx").on(
+      table.nextAttemptAt,
+      table.leaseExpiresAt,
+    ),
+    check(
+      "blob_deletion_jobs_attempt_count_check",
+      sql`${table.attemptCount} >= 0`,
     ),
   ],
 );
@@ -403,7 +467,7 @@ export const investmentTransactionsRelations = relations(
 
 export const investmentTransactionJournalEntriesRelations = relations(
   investmentTransactionJournalEntries,
-  ({ one }) => ({
+  ({ many, one }) => ({
     user: one(user, {
       fields: [investmentTransactionJournalEntries.userId],
       references: [user.id],
@@ -411,6 +475,27 @@ export const investmentTransactionJournalEntriesRelations = relations(
     transaction: one(investmentTransactions, {
       fields: [investmentTransactionJournalEntries.transactionId],
       references: [investmentTransactions.id],
+    }),
+    images: many(investmentTransactionJournalEntryImages),
+  }),
+);
+
+export const investmentTransactionJournalEntryImagesRelations = relations(
+  investmentTransactionJournalEntryImages,
+  ({ one }) => ({
+    user: one(user, {
+      fields: [investmentTransactionJournalEntryImages.userId],
+      references: [user.id],
+    }),
+    journalEntry: one(investmentTransactionJournalEntries, {
+      fields: [
+        investmentTransactionJournalEntryImages.journalEntryId,
+        investmentTransactionJournalEntryImages.userId,
+      ],
+      references: [
+        investmentTransactionJournalEntries.id,
+        investmentTransactionJournalEntries.userId,
+      ],
     }),
   }),
 );

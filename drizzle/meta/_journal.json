@@ -183,6 +183,48 @@
       "when": 1782510601490,
       "tag": "0025_loving_thena",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1782520266950,
+      "tag": "0026_spotty_zeigeist",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1782520890186,
+      "tag": "0027_material_unus",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1782594516963,
+      "tag": "0028_foamy_maverick",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1782594728483,
+      "tag": "0029_burly_black_bird",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1782595374009,
+      "tag": "0030_rename_risk_reduction_to_rebalance",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1782598755736,
+      "tag": "0031_furry_lady_vermin",
+      "breakpoints": true
     }
   ]
 }

@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -28,6 +29,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { JournalImagesSection } from "@/components/accounts/transactions/journal-images-section";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import type {
   TradeJournalEmotion,
@@ -40,9 +42,20 @@ import {
 import { cn } from "@/lib/utils";
 
 // Radix Select can't hold an empty string value, so an explicit sentinel maps
-// to "no selection" for the nullable reason and confidence fields.
+// to "no selection" for the nullable reason and market bias fields.
 const NONE_VALUE = "__none__";
-const CONFIDENCE_OPTIONS = Array.from({ length: 10 }, (_, i) => i + 1);
+const MARKET_BIAS_OPTIONS = Array.from({ length: 10 }, (_, index) => {
+  const value = index + 1;
+  const label =
+    value === 1
+      ? "1 — Bearish"
+      : value === 5
+        ? "5 — Neutral"
+        : value === 10
+          ? "10 — Bullish"
+          : String(value);
+  return [value, label] as const;
+});
 
 const dateTimeFormat = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -52,29 +65,73 @@ const dateTimeFormat = new Intl.DateTimeFormat("en-US", {
   minute: "2-digit",
 });
 
+const amountFormat = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 6,
+});
+
+const usdFormat = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
+
+const TRANSACTION_ACTION_LABELS: Record<
+  InvestmentTransactionListItem["side"],
+  string
+> = {
+  buy: "Bought",
+  sell: "Sold",
+  swap: "Bought",
+  open: "Opened",
+  close: "Closed",
+  increase: "Increased",
+  decrease: "Reduced",
+  receive: "Received",
+  send: "Sent",
+  unknown: "Transaction",
+};
+
 type FormState = {
   note: string;
   tradeReason: TradeJournalReason | null;
   emotions: TradeJournalEmotion[];
-  confidence: number | null;
+  marketBias: number | null;
 };
 
 const EMPTY_FORM: FormState = {
   note: "",
   tradeReason: null,
   emotions: [],
-  confidence: null,
+  marketBias: null,
 };
 
-function transactionLabel(
+function transactionDescription(
   transaction: InvestmentTransactionListItem,
-): string {
-  const asset = transaction.baseAssetSymbol;
+): { dateTime: string; trade: string | null } {
   const when = dateTimeFormat.format(new Date(transaction.executedAt));
-  const side = transaction.side
-    ? transaction.side.charAt(0).toUpperCase() + transaction.side.slice(1)
-    : null;
-  return [side, asset, "·", when].filter(Boolean).join(" ");
+  const baseAsset =
+    transaction.baseAmount !== null && transaction.baseAssetSymbol
+      ? `${amountFormat.format(Math.abs(transaction.baseAmount))} ${transaction.baseAssetSymbol}`
+      : null;
+  const quoteAsset =
+    transaction.quoteAmount !== null && transaction.quoteAssetSymbol
+      ? `${amountFormat.format(Math.abs(transaction.quoteAmount))} ${transaction.quoteAssetSymbol}`
+      : transaction.valueUsd !== null
+        ? usdFormat.format(Math.abs(transaction.valueUsd))
+        : null;
+
+  if (baseAsset) {
+    const action = TRANSACTION_ACTION_LABELS[transaction.side];
+    const isExchange =
+      transaction.side === "buy" ||
+      transaction.side === "sell" ||
+      transaction.side === "swap";
+    const trade = isExchange && quoteAsset
+      ? `${action} ${baseAsset} for ${quoteAsset}`
+      : `${action} ${baseAsset}`;
+    return { dateTime: when, trade };
+  }
+
+  return { dateTime: when, trade: null };
 }
 
 export function JournalEntrySheet({
@@ -125,7 +182,7 @@ export function JournalEntrySheet({
             note: result.entry.note ?? "",
             tradeReason: result.entry.tradeReason,
             emotions: result.entry.emotions,
-            confidence: result.entry.confidence,
+            marketBias: result.entry.marketBias,
           });
         }
       })
@@ -149,12 +206,16 @@ export function JournalEntrySheet({
 
   function handleSave() {
     if (!transactionId) return;
+    if (form.tradeReason === null || form.marketBias === null) {
+      toast.error("Choose a trade reason and market bias.");
+      return;
+    }
     startSaving(async () => {
       const result = await saveTransactionJournalEntry(transactionId, {
         note: form.note,
         tradeReason: form.tradeReason,
         emotions: form.emotions,
-        confidence: form.confidence,
+        marketBias: form.marketBias,
       });
       if (result.error) {
         toast.error(result.error);
@@ -179,32 +240,25 @@ export function JournalEntrySheet({
   }
 
   const busy = saving || removing;
+  const canSave = form.tradeReason !== null && form.marketBias !== null;
+  const description = transaction
+    ? transactionDescription(transaction)
+    : null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="overflow-y-auto">
+      <SheetContent className="overflow-y-auto data-[side=right]:sm:max-w-lg data-[side=right]:lg:max-w-2xl data-[side=right]:xl:max-w-[60vw]">
         <SheetHeader>
           <SheetTitle>{hasEntry ? "Edit journal entry" : "Add journal entry"}</SheetTitle>
-          {transaction ? (
-            <SheetDescription>{transactionLabel(transaction)}</SheetDescription>
+          {description ? (
+            <SheetDescription className="flex flex-col">
+              <span>{description.dateTime}</span>
+              {description.trade ? <span>{description.trade}</span> : null}
+            </SheetDescription>
           ) : null}
         </SheetHeader>
 
         <div className="flex flex-col gap-5 px-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="journal-note">Note</Label>
-            <Textarea
-              id="journal-note"
-              rows={5}
-              placeholder="What was the thinking behind this trade?"
-              value={form.note}
-              disabled={loading || busy}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, note: event.target.value }))
-              }
-            />
-          </div>
-
           <div className="flex flex-col gap-2">
             <Label htmlFor="journal-reason">Trade reason</Label>
             <Select
@@ -220,16 +274,56 @@ export function JournalEntrySheet({
                 }))
               }
             >
-              <SelectTrigger id="journal-reason" className="w-full">
-                <SelectValue placeholder="Select a reason" />
+              <SelectTrigger
+                id="journal-reason"
+                className="w-full"
+                aria-required="true"
+              >
+                <SelectValue placeholder="Choose" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={NONE_VALUE}>No reason</SelectItem>
-                {TRADE_JOURNAL_REASON_OPTIONS.map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
-                ))}
+                <SelectGroup>
+                  <SelectItem value={NONE_VALUE}>Choose</SelectItem>
+                  {TRADE_JOURNAL_REASON_OPTIONS.map(([value, label]) => (
+                    <SelectItem key={value} value={value}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="journal-market-bias">Market bias</Label>
+            <Select
+              value={
+                form.marketBias === null ? NONE_VALUE : String(form.marketBias)
+              }
+              disabled={loading || busy}
+              onValueChange={(value) =>
+                setForm((prev) => ({
+                  ...prev,
+                  marketBias: value === NONE_VALUE ? null : Number(value),
+                }))
+              }
+            >
+              <SelectTrigger
+                id="journal-market-bias"
+                className="w-full"
+                aria-required="true"
+              >
+                <SelectValue placeholder="Choose" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectItem value={NONE_VALUE}>Choose</SelectItem>
+                  {MARKET_BIAS_OPTIONS.map(([value, label]) => (
+                    <SelectItem key={value} value={String(value)}>
+                      {label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
@@ -261,36 +355,29 @@ export function JournalEntrySheet({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="journal-confidence">Confidence</Label>
-            <Select
-              value={
-                form.confidence === null ? NONE_VALUE : String(form.confidence)
-              }
+            <Label htmlFor="journal-note">Notes</Label>
+            <Textarea
+              id="journal-note"
+              rows={5}
+              placeholder="What was the thinking behind this trade?"
+              value={form.note}
               disabled={loading || busy}
-              onValueChange={(value) =>
-                setForm((prev) => ({
-                  ...prev,
-                  confidence: value === NONE_VALUE ? null : Number(value),
-                }))
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, note: event.target.value }))
               }
-            >
-              <SelectTrigger id="journal-confidence" className="w-full">
-                <SelectValue placeholder="Rate your conviction (1–10)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE_VALUE}>Not rated</SelectItem>
-                {CONFIDENCE_OPTIONS.map((value) => (
-                  <SelectItem key={value} value={String(value)}>
-                    {value} / 10
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           </div>
+
+          <JournalImagesSection
+            transactionId={transactionId}
+            open={open}
+            disabled={busy}
+            onEntryMaterialized={() => setHasEntry(true)}
+          />
         </div>
 
         <SheetFooter>
-          <Button onClick={handleSave} disabled={loading || busy}>
+          <Button onClick={handleSave} disabled={loading || busy || !canSave}>
             {saving ? (
               <RiLoader4Line className="animate-spin" />
             ) : null}

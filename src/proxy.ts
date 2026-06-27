@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/server";
 
 const AUTH_API_PREFIX = "/api/auth";
+const BLOB_CLEANUP_CRON_PATH = "/api/cron/blob-cleanup";
 const MCP_API_PATH = "/api/mcp";
 const MCP_AUTHORIZATION_SERVER_METADATA_PATH =
   "/.well-known/oauth-authorization-server";
@@ -22,6 +23,10 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isAuthApiRoute(pathname)) {
+    return NextResponse.next();
+  }
+
+  if (pathname === BLOB_CLEANUP_CRON_PATH) {
     return NextResponse.next();
   }
 

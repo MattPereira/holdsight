@@ -8,7 +8,7 @@ import type { TradeJournalReason } from "@/lib/investment-transactions/journal";
 /** Lightweight journal preview surfaced inline in the transactions list. */
 export type TradeJournalSummary = {
   tradeReason: TradeJournalReason | null;
-  confidence: number | null;
+  marketBias: number | null;
 };
 
 /** Transaction fields consumed by the shared account transaction UI. */

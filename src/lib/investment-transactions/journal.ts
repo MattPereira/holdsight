@@ -5,10 +5,16 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   investmentTransactionJournalEntries,
+  investmentTransactionJournalEntryImages,
   investmentTransactions,
-  tradeJournalEmotion,
-  tradeJournalReason,
 } from "@/db/schema/investment-transactions";
+import { enqueueBlobDeletion } from "@/lib/blob/deletion-jobs";
+import {
+  TRADE_JOURNAL_EMOTIONS,
+  TRADE_JOURNAL_REASONS,
+  type TradeJournalEmotion,
+  type TradeJournalReason,
+} from "@/lib/investment-transactions/journal-labels";
 import type {
   InvestmentTransactionListItem,
   TradeJournalSummary,
@@ -16,17 +22,22 @@ import type {
 
 const MAX_NOTE_LENGTH = 10_000;
 
-export const TRADE_JOURNAL_REASONS = tradeJournalReason.enumValues;
-export const TRADE_JOURNAL_EMOTIONS = tradeJournalEmotion.enumValues;
-
-export type TradeJournalReason = (typeof TRADE_JOURNAL_REASONS)[number];
-export type TradeJournalEmotion = (typeof TRADE_JOURNAL_EMOTIONS)[number];
+// Re-exported so existing importers of these from the server module keep working;
+// the vocabulary itself now lives in the client-safe journal-labels module.
+export {
+  TRADE_JOURNAL_EMOTIONS,
+  TRADE_JOURNAL_REASONS,
+} from "@/lib/investment-transactions/journal-labels";
+export type {
+  TradeJournalEmotion,
+  TradeJournalReason,
+} from "@/lib/investment-transactions/journal-labels";
 
 export type TradeJournalEntryInput = {
   note?: string | null;
   tradeReason?: TradeJournalReason | null;
   emotions?: TradeJournalEmotion[];
-  confidence?: number | null;
+  marketBias?: number | null;
 };
 
 export type TradeJournalEntryRow = {
@@ -35,7 +46,7 @@ export type TradeJournalEntryRow = {
   note: string | null;
   tradeReason: TradeJournalReason | null;
   emotions: TradeJournalEmotion[];
-  confidence: number | null;
+  marketBias: number | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -50,9 +61,11 @@ function toJournalEntryRow(
     id: row.id,
     transactionId: row.transactionId,
     note: row.note,
-    tradeReason: row.tradeReason,
-    emotions: row.emotions,
-    confidence: row.confidence,
+    // Columns are plain `text`/`text[]`; values are constrained to the vocabulary
+    // by validateJournalEntryInput on write, so narrowing on read is safe.
+    tradeReason: row.tradeReason as TradeJournalReason | null,
+    emotions: row.emotions as TradeJournalEmotion[],
+    marketBias: row.marketBias,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -94,14 +107,14 @@ function validateEmotions(
   return { value: nextEmotions };
 }
 
-function validateConfidence(
-  confidence: TradeJournalEntryInput["confidence"],
+function validateMarketBias(
+  marketBias: TradeJournalEntryInput["marketBias"],
 ): { error: string } | { value: number | null } {
-  if (confidence == null) return { value: null };
-  if (!Number.isInteger(confidence) || confidence < 1 || confidence > 10) {
-    return { error: "Confidence must be a whole number from 1 to 10." };
+  if (marketBias == null) return { value: null };
+  if (!Number.isInteger(marketBias) || marketBias < 1 || marketBias > 10) {
+    return { error: "Market bias must be a whole number from 1 to 10." };
   }
-  return { value: confidence };
+  return { value: marketBias };
 }
 
 function validateJournalEntryInput(
@@ -113,7 +126,7 @@ function validateJournalEntryInput(
         note: string | null;
         tradeReason: TradeJournalReason | null;
         emotions: TradeJournalEmotion[];
-        confidence: number | null;
+        marketBias: number | null;
       };
     } {
   const tradeReason = validateTradeReason(input.tradeReason);
@@ -122,15 +135,15 @@ function validateJournalEntryInput(
   const emotions = validateEmotions(input.emotions);
   if ("error" in emotions) return emotions;
 
-  const confidence = validateConfidence(input.confidence);
-  if ("error" in confidence) return confidence;
+  const marketBias = validateMarketBias(input.marketBias);
+  if ("error" in marketBias) return marketBias;
 
   return {
     values: {
       note: normalizeNote(input.note),
       tradeReason: tradeReason.value,
       emotions: emotions.value,
-      confidence: confidence.value,
+      marketBias: marketBias.value,
     },
   };
 }
@@ -207,7 +220,7 @@ export async function withTransactionJournalSummaries(
     .select({
       transactionId: investmentTransactionJournalEntries.transactionId,
       tradeReason: investmentTransactionJournalEntries.tradeReason,
-      confidence: investmentTransactionJournalEntries.confidence,
+      marketBias: investmentTransactionJournalEntries.marketBias,
     })
     .from(investmentTransactionJournalEntries)
     .where(
@@ -223,7 +236,10 @@ export async function withTransactionJournalSummaries(
   const summaries = new Map<string, TradeJournalSummary>(
     rows.map((row) => [
       row.transactionId,
-      { tradeReason: row.tradeReason, confidence: row.confidence },
+      {
+        tradeReason: row.tradeReason as TradeJournalReason | null,
+        marketBias: row.marketBias,
+      },
     ]),
   );
 
@@ -268,12 +284,56 @@ export async function removeUserInvestmentTransactionJournalEntry(
   userId: string,
   transactionId: string,
 ): Promise<void> {
-  await db
-    .delete(investmentTransactionJournalEntries)
-    .where(
-      and(
-        eq(investmentTransactionJournalEntries.userId, userId),
-        eq(investmentTransactionJournalEntries.transactionId, transactionId),
-      ),
-    );
+  // The image table cascade-deletes with the entry, which would drop the Blob
+  // pathnames before anything records them. Collect them inside the same
+  // transaction, delete the entry, then queue the orphaned Blobs for cleanup.
+  const blobPathnames = await db.transaction(async (tx) => {
+    const images = await tx
+      .select({
+        blobPathname: investmentTransactionJournalEntryImages.blobPathname,
+      })
+      .from(investmentTransactionJournalEntryImages)
+      .innerJoin(
+        investmentTransactionJournalEntries,
+        eq(
+          investmentTransactionJournalEntries.id,
+          investmentTransactionJournalEntryImages.journalEntryId,
+        ),
+      )
+      .where(
+        and(
+          eq(investmentTransactionJournalEntryImages.userId, userId),
+          eq(
+            investmentTransactionJournalEntries.transactionId,
+            transactionId,
+          ),
+        ),
+      );
+
+    await tx
+      .delete(investmentTransactionJournalEntries)
+      .where(
+        and(
+          eq(investmentTransactionJournalEntries.userId, userId),
+          eq(investmentTransactionJournalEntries.transactionId, transactionId),
+        ),
+      );
+
+    return images.map(({ blobPathname }) => blobPathname);
+  });
+
+  // Enqueue failures must not fail the user's delete; the Blobs would simply be
+  // left for a future reconciliation sweep instead.
+  await Promise.all(
+    blobPathnames.map(async (blobPathname) => {
+      try {
+        await enqueueBlobDeletion(blobPathname);
+      } catch (enqueueError) {
+        console.error(
+          "Failed to enqueue journal image Blob cleanup",
+          enqueueError,
+        );
+      }
+    }),
+  );
 }
