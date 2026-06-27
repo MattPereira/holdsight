@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { JournalEntrySheet } from "@/components/accounts/transactions/journal-entry-sheet";
+import { TransactionsSymbolFilter } from "@/components/accounts/transactions/transactions-symbol-filter";
 import { TransactionsTable } from "@/components/accounts/transactions/transactions-table";
 import type { TransactionsPanel } from "@/components/accounts/transactions/types";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
@@ -32,7 +33,7 @@ const dateFormat = new Intl.DateTimeFormat("en-US", {
 });
 
 function historyLabel(panel: TransactionsPanel, total: number): string {
-  const count = `${total} transaction${total === 1 ? "" : "s"}`;
+  const count = `${total} trade${total === 1 ? "" : "s"}`;
   const status = panel.historyStatus;
   if (!status) return count;
 
@@ -59,15 +60,35 @@ export function TransactionsTabContent({
 }: {
   panel: TransactionsPanel;
 }) {
-  const total = panel.transactions.length;
-
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [page, setPage] = useState(1);
+  const [symbol, setSymbol] = useState<string | null>(null);
   const [editing, setEditing] = useState<InvestmentTransactionListItem | null>(
     null,
   );
-  // Snap back to the first page whenever the underlying set changes (e.g. a
-  // sync adds rows), so we never linger on a page that no longer exists.
+
+  // Unique base asset symbols across all loaded transactions, for the filter.
+  const symbols = useMemo(() => {
+    const seen = new Set<string>();
+    for (const tx of panel.transactions) {
+      if (tx.baseAssetSymbol) seen.add(tx.baseAssetSymbol);
+    }
+    return Array.from(seen).sort();
+  }, [panel.transactions]);
+
+  const filteredTransactions = useMemo(
+    () =>
+      symbol
+        ? panel.transactions.filter((tx) => tx.baseAssetSymbol === symbol)
+        : panel.transactions,
+    [panel.transactions, symbol],
+  );
+
+  const total = filteredTransactions.length;
+
+  // Snap back to the first page whenever the visible set changes (a sync adds
+  // rows, or the symbol filter changes), so we never linger on a page that no
+  // longer exists.
   const [syncedTotal, setSyncedTotal] = useState(total);
   if (syncedTotal !== total) {
     setSyncedTotal(total);
@@ -77,7 +98,12 @@ export function TransactionsTabContent({
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.min(page, pageCount);
   const start = (currentPage - 1) * pageSize;
-  const pageTransactions = panel.transactions.slice(start, start + pageSize);
+  const pageTransactions = filteredTransactions.slice(start, start + pageSize);
+
+  function handleSymbolChange(next: string | null) {
+    setSymbol(next);
+    setPage(1);
+  }
 
   function handlePageSizeChange(value: string) {
     setPageSize(Number(value));
@@ -103,28 +129,39 @@ export function TransactionsTabContent({
         </p>
       ) : null}
 
-      {total > 0 ? (
+      {panel.transactions.length > 0 ? (
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <span className="text-sm font-normal text-muted-foreground">
             {status}
           </span>
 
-          <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
-            <SelectTrigger
-              size="sm"
-              aria-label="Transactions per page"
-              className="w-[64px]"
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <TransactionsSymbolFilter
+              symbols={symbols}
+              value={symbol}
+              onChange={handleSymbolChange}
+            />
+
+            <Select
+              value={String(pageSize)}
+              onValueChange={handlePageSizeChange}
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PAGE_SIZE_OPTIONS.map((option) => (
-                <SelectItem key={option} value={String(option)}>
-                  {option}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <SelectTrigger
+                size="sm"
+                aria-label="Transactions per page"
+                className="w-[64px]"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAGE_SIZE_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={String(option)}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       ) : null}
 

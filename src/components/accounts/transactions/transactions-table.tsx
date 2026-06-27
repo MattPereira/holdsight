@@ -16,21 +16,21 @@ const amountFormat = new Intl.NumberFormat("en-US", {
 });
 
 const dateParts = new Intl.DateTimeFormat("en-US", {
+  year: "2-digit",
   month: "2-digit",
   day: "2-digit",
-  hour: "numeric",
+  hour: "2-digit",
   minute: "2-digit",
-  hour12: true,
+  hour12: false,
 });
 
-// Renders "06/24 @ 3:30pm" — Intl can't emit the "@" separator or a
-// lowercase meridiem, so we assemble the parts ourselves.
+// Renders "06/26/26 · 17:04" — Intl can't reliably emit this exact layout, so
+// we assemble the parts ourselves.
 function formatDate(date: Date): string {
   const parts = dateParts.formatToParts(date);
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((part) => part.type === type)?.value ?? "";
-  const meridiem = get("dayPeriod").toLowerCase();
-  return `${get("month")}/${get("day")} @ ${get("hour")}:${get("minute")}${meridiem}`;
+  return `${get("month")}/${get("day")}/${get("year")} · ${get("hour")}:${get("minute")}`;
 }
 
 type LegDirection = "in" | "out" | "neutral";
@@ -241,36 +241,32 @@ function Leg({ leg }: { leg: TransactionLeg }) {
   );
 }
 
-function JournalCell({
+function JournalEditButton({
   transaction,
   onEditJournal,
 }: {
   transaction: InvestmentTransactionListItem;
   onEditJournal: (transaction: InvestmentTransactionListItem) => void;
 }) {
-  const summary = transaction.journalSummary;
-  const hasEntry = Boolean(summary);
-  const reasonLabel = summary?.tradeReason
-    ? TRADE_JOURNAL_REASON_LABELS[summary.tradeReason]
-    : null;
-
-  // Edit control and the reason tag on a single row.
+  const hasEntry = Boolean(transaction.journalSummary);
   return (
-    <div className="flex items-center gap-0">
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={hasEntry ? "Edit journal entry" : "Add journal entry"}
-        className={cn("text-muted-foreground", hasEntry && "text-primary")}
-        onClick={() => onEditJournal(transaction)}
-      >
-        {hasEntry ? <RiPencilFill /> : <RiPencilLine />}
-      </Button>
-      {reasonLabel ? (
-        <Badge variant="secondary">{reasonLabel}</Badge>
-      ) : null}
-    </div>
+    <Button
+      variant="ghost"
+      size="icon-lg"
+      aria-label={hasEntry ? "Edit journal entry" : "Add journal entry"}
+      className={cn("text-muted-foreground", hasEntry && "text-primary")}
+      onClick={() => onEditJournal(transaction)}
+    >
+      {hasEntry ? <RiPencilFill /> : <RiPencilLine />}
+    </Button>
   );
+}
+
+function reasonLabelFor(
+  transaction: InvestmentTransactionListItem,
+): string | null {
+  const reason = transaction.journalSummary?.tradeReason;
+  return reason ? TRADE_JOURNAL_REASON_LABELS[reason] : null;
 }
 
 export function TransactionsTable({
@@ -290,42 +286,48 @@ export function TransactionsTable({
 
   return (
     <ul className="divide-y">
-      {transactions.map((transaction) => (
-        <li
-          key={transaction.id}
-          className="flex items-start gap-3 py-2.5"
-        >
-          <div className="flex min-w-0 flex-col">
-            <span className="text-sm">
-              {transaction.displayType === "perp_event"
-                ? perpActionLabel(transaction)
-                : transaction.accountLabel ?? "—"}
-            </span>
-            <span className="text-xs text-muted-foreground">
-              {transaction.displayType === "perp_event"
-                ? `${transaction.accountLabel ?? "—"} · ${formatDate(new Date(transaction.executedAt))}`
-                : formatDate(new Date(transaction.executedAt))}
-            </span>
-            {transaction.displayType === "perp_event" ? (
-              <span className="text-xs text-muted-foreground">
-                {perpSecondaryLabel(transaction)}
+      {transactions.map((transaction) => {
+        const reasonLabel = reasonLabelFor(transaction);
+        return (
+          <li key={transaction.id} className="flex items-start gap-3 py-2.5">
+            {/* Edit control anchored far left so it never drifts with label width. */}
+            <JournalEditButton
+              transaction={transaction}
+              onEditJournal={onEditJournal}
+            />
+
+            <div className="flex min-w-0 flex-col">
+              <span className="text-sm">
+                {transaction.displayType === "perp_event"
+                  ? perpActionLabel(transaction)
+                  : transaction.accountLabel ?? "—"}
               </span>
+              <span className="text-xs text-muted-foreground">
+                {transaction.displayType === "perp_event"
+                  ? `${transaction.accountLabel ?? "—"} · ${formatDate(new Date(transaction.executedAt))}`
+                  : formatDate(new Date(transaction.executedAt))}
+              </span>
+              {transaction.displayType === "perp_event" ? (
+                <span className="text-xs text-muted-foreground">
+                  {perpSecondaryLabel(transaction)}
+                </span>
+              ) : null}
+            </div>
+
+            {reasonLabel ? (
+              <Badge variant="secondary" className="self-end">
+                {reasonLabel}
+              </Badge>
             ) : null}
-          </div>
 
-          {/* Journal cluster sits just right of the description. */}
-          <JournalCell
-            transaction={transaction}
-            onEditJournal={onEditJournal}
-          />
-
-          <div className="ml-auto flex flex-col items-end">
-            {transactionLegs(transaction).map((leg, i) => (
-              <Leg key={i} leg={leg} />
-            ))}
-          </div>
-        </li>
-      ))}
+            <div className="ml-auto flex flex-col items-end">
+              {transactionLegs(transaction).map((leg, i) => (
+                <Leg key={i} leg={leg} />
+              ))}
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
