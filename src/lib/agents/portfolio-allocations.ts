@@ -19,6 +19,7 @@ export type PortfolioAllocationForAgent =
       id: string;
       name: string;
       userDefinedName: string | null;
+      thesis: string | null;
       valueUsd: number;
       weight: number;
       members: {
@@ -79,6 +80,7 @@ export async function getPortfolioAllocationsForAgent(
           id: row.groupId ?? row.key,
           name: row.label,
           userDefinedName: row.userDefinedName ?? null,
+          thesis: row.thesis ?? null,
           valueUsd: row.valueUsd,
           weight: row.weight,
           members: row.members.map((member) => ({

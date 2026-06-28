@@ -38,6 +38,7 @@ export type PortfolioAllocationRow = {
   isGroup: boolean;
   groupId?: string;
   userDefinedName?: string | null;
+  thesis?: string | null;
   color?: string | null;
   members: PortfolioAllocationMember[];
 };
@@ -98,6 +99,7 @@ export function buildPortfolioAllocations({
         isGroup: row.isGroup,
         groupId,
         userDefinedName: group?.name ?? null,
+        thesis: group?.thesis ?? null,
         color: row.color,
         members: row.members.map((member) => ({
           key: member.key,

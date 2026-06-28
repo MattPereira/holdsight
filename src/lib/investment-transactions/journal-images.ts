@@ -1,7 +1,7 @@
 import "server-only";
 
 import { del, put } from "@vercel/blob";
-import { and, count, eq, max, sql } from "drizzle-orm";
+import { and, count, eq, inArray, max, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -329,6 +329,50 @@ export async function getUserInvestmentTransactionJournalImages(
     );
 
   return rows.map(({ image }) => toJournalImage(image, transactionId));
+}
+
+/**
+ * Batch variant used by agent-facing transaction pages. Ownership is enforced
+ * by the user id on both the journal entry and image rows.
+ */
+export async function getUserInvestmentTransactionJournalImagesForTransactions(
+  userId: string,
+  transactionIds: string[],
+): Promise<InvestmentTransactionJournalImage[]> {
+  if (transactionIds.length === 0) return [];
+
+  const rows = await db
+    .select({
+      transactionId: investmentTransactionJournalEntries.transactionId,
+      image: investmentTransactionJournalEntryImages,
+    })
+    .from(investmentTransactionJournalEntryImages)
+    .innerJoin(
+      investmentTransactionJournalEntries,
+      eq(
+        investmentTransactionJournalEntries.id,
+        investmentTransactionJournalEntryImages.journalEntryId,
+      ),
+    )
+    .where(
+      and(
+        eq(investmentTransactionJournalEntryImages.userId, userId),
+        eq(investmentTransactionJournalEntries.userId, userId),
+        inArray(
+          investmentTransactionJournalEntries.transactionId,
+          transactionIds,
+        ),
+      ),
+    )
+    .orderBy(
+      investmentTransactionJournalEntries.transactionId,
+      investmentTransactionJournalEntryImages.sortOrder,
+      investmentTransactionJournalEntryImages.createdAt,
+    );
+
+  return rows.map(({ transactionId, image }) =>
+    toJournalImage(image, transactionId),
+  );
 }
 
 export async function removeUserInvestmentTransactionJournalImage(
