@@ -1,6 +1,10 @@
 import "server-only";
 
 import { buildPortfolioAllocations } from "@/lib/portfolio/allocations";
+import {
+  serializeAssetGroupThesis,
+  type AssetGroupThesisForAgent,
+} from "@/lib/portfolio/asset-group-thesis";
 import { getCurrentPortfolioHomeData } from "@/lib/portfolio/page-data";
 import { refreshPortfolioForUser } from "@/lib/portfolio/refresh";
 import { getUserAssetGroups } from "@/lib/portfolio/groups";
@@ -12,22 +16,22 @@ export type PortfolioAllocationForAgent =
       name: string | null;
       amount: number;
       valueUsd: number;
-      weight: number;
+      currentAllocationPercent: number;
     }
   | {
       type: "group";
       id: string;
       name: string;
       userDefinedName: string | null;
-      thesis: string | null;
+      thesis: AssetGroupThesisForAgent;
       valueUsd: number;
-      weight: number;
+      currentAllocationPercent: number;
       members: {
         symbol: string;
         name: string | null;
         amount: number;
         valueUsd: number;
-        weight: number;
+        currentAllocationPercent: number;
       }[];
     };
 
@@ -49,7 +53,7 @@ export async function getPortfolioAllocationsForAgent(
     : await getCurrentPortfolioHomeData(userId);
   const groups = await getUserAssetGroups(userId);
   // Agents receive every holding with no declutter cutoff — hiding small
-  // positions is a UI concern, and a full dataset lets weights reconcile to the
+  // positions is a UI concern, and a full dataset lets allocations reconcile to the
   // grand total without an "Other" remainder.
   const allocations = buildPortfolioAllocations({
     grandTotalValueUsd: data.portfolioSummary.grandTotalValue,
@@ -71,8 +75,11 @@ export async function getPortfolioAllocationsForAgent(
             name: row.name ?? null,
             amount: row.amount,
             valueUsd: row.valueUsd,
-            weight: row.weight,
+            currentAllocationPercent: row.weight * 100,
           };
+        }
+        if (!row.thesis) {
+          throw new Error("Asset group allocation is missing thesis metadata.");
         }
 
         return {
@@ -80,15 +87,18 @@ export async function getPortfolioAllocationsForAgent(
           id: row.groupId ?? row.key,
           name: row.label,
           userDefinedName: row.userDefinedName ?? null,
-          thesis: row.thesis ?? null,
+          thesis: serializeAssetGroupThesis(
+            row.thesis,
+            row.targetAllocationPercent ?? null,
+          ),
           valueUsd: row.valueUsd,
-          weight: row.weight,
+          currentAllocationPercent: row.weight * 100,
           members: row.members.map((member) => ({
             symbol: member.symbol,
             name: member.name ?? null,
             amount: member.amount,
             valueUsd: member.valueUsd,
-            weight: member.weight,
+            currentAllocationPercent: member.weight * 100,
           })),
         };
       }),

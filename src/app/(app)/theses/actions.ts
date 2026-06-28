@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentUserId } from "@/lib/auth/session";
 import type { AssetGroup } from "@/lib/portfolio/asset-totals";
+import type { AssetGroupThesis } from "@/lib/portfolio/asset-group-thesis";
 import {
   createAssetGroup,
   getUserAssetGroups,
@@ -34,7 +35,7 @@ function revalidateGroupPaths(): void {
 export async function createGroup(input: {
   name?: string | null;
   color?: string | null;
-  thesis?: string | null;
+  thesis: AssetGroupThesis;
   targetAllocationPercent?: number | null;
   symbols: string[];
 }): Promise<AssetGroupActionResult> {
@@ -54,7 +55,7 @@ export async function updateGroup(
   input: {
     name?: string | null;
     color?: string | null;
-    thesis?: string | null;
+    thesis: AssetGroupThesis;
     targetAllocationPercent?: number | null;
     symbols: string[];
   },

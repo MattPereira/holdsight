@@ -5,11 +5,11 @@ import { getCurrentPortfolioBalanceSnapshot } from "@/lib/portfolio/balances";
 
 export default async function ThesesPage() {
   const userId = await getCurrentUserId();
-  const allSymbols = userId
+  const portfolioSummary = userId
     ? portfolioAssetSummary(
         (await getCurrentPortfolioBalanceSnapshot(userId)).portfolioResults,
-      ).totals.map((total) => total.symbol)
-    : [];
+      )
+    : { grandTotalValue: 0, totals: [] };
 
-  return <AssetGroupsEditor allSymbols={allSymbols} />;
+  return <AssetGroupsEditor portfolioSummary={portfolioSummary} />;
 }

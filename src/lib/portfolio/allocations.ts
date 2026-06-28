@@ -3,6 +3,7 @@ import {
   type AssetGroup,
   type AssetTotal,
 } from "@/lib/portfolio/asset-totals";
+import type { AssetGroupThesis } from "@/lib/portfolio/asset-group-thesis";
 
 // UI-only declutter threshold. An asset is collapsed into the "Other" bucket
 // when its value falls below 0.1% of the portfolio, but holdings above the
@@ -38,7 +39,8 @@ export type PortfolioAllocationRow = {
   isGroup: boolean;
   groupId?: string;
   userDefinedName?: string | null;
-  thesis?: string | null;
+  thesis?: AssetGroupThesis;
+  targetAllocationPercent?: number | null;
   color?: string | null;
   members: PortfolioAllocationMember[];
 };
@@ -99,7 +101,8 @@ export function buildPortfolioAllocations({
         isGroup: row.isGroup,
         groupId,
         userDefinedName: group?.name ?? null,
-        thesis: group?.thesis ?? null,
+        thesis: group?.thesis,
+        targetAllocationPercent: group?.targetAllocationPercent ?? null,
         color: row.color,
         members: row.members.map((member) => ({
           key: member.key,

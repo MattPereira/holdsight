@@ -7,7 +7,7 @@ import {
   RiDeleteBinLine,
   RiPencilLine,
 } from "@remixicon/react";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 
 import {
   createGroup,
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/command";
 import {
   Field,
+  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -37,11 +38,17 @@ import {
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import { useAssetGroups } from "@/components/portfolio/asset-groups-context";
+import { buildPortfolioAllocations } from "@/lib/portfolio/allocations";
 import {
   ASSET_CHART_COLORS,
   groupLabel,
   type AssetGroup,
+  type PortfolioAssetSummary,
 } from "@/lib/portfolio/asset-totals";
+import {
+  MAX_ASSET_GROUP_THESIS_SECTION_LENGTH,
+  type AssetGroupThesis,
+} from "@/lib/portfolio/asset-group-thesis";
 import { cn } from "@/lib/utils";
 
 type EditorState =
@@ -53,19 +60,42 @@ type EditorState =
 type GroupFormValues = {
   name: string | null;
   color: string | null;
-  thesis: string | null;
+  thesis: AssetGroupThesis;
   targetAllocationPercent: number | null;
   symbols: string[];
 };
-
-const MAX_THESIS_LENGTH = 10_000;
 
 function symbolKey(symbol: string): string {
   return symbol.trim().toUpperCase();
 }
 
-export function AssetGroupsEditor({ allSymbols }: { allSymbols: string[] }) {
+const allocationPercentFormat = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 2,
+});
+
+export function AssetGroupsEditor({
+  portfolioSummary,
+}: {
+  portfolioSummary: PortfolioAssetSummary;
+}) {
   const { groups, setGroups } = useAssetGroups();
+  const allSymbols = portfolioSummary.totals.map((total) => total.symbol);
+  const currentAllocationByGroupId = useMemo(() => {
+    const allocations = buildPortfolioAllocations({
+      grandTotalValueUsd: portfolioSummary.grandTotalValue,
+      totals: portfolioSummary.totals,
+      groups,
+      minimumAssetValueUsd: Number.NEGATIVE_INFINITY,
+    });
+
+    return new Map(
+      allocations.rows.flatMap((row) =>
+        row.isGroup && row.groupId
+          ? [[row.groupId, row.weight * 100] as const]
+          : [],
+      ),
+    );
+  }, [groups, portfolioSummary]);
   const [editor, setEditor] = useState<EditorState>(() =>
     groups[0] ? { mode: "view", groupId: groups[0].id } : { mode: "idle" },
   );
@@ -80,7 +110,7 @@ export function AssetGroupsEditor({ allSymbols }: { allSymbols: string[] }) {
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold">Theses</h1>
         <p className="text-sm text-muted-foreground">
-          Rationale for your portfolio allocation strategy
+          Rationale for persistent portfolio allocation strategy
         </p>
       </div>
       <Button
@@ -146,6 +176,9 @@ export function AssetGroupsEditor({ allSymbols }: { allSymbols: string[] }) {
       {editor.mode === "view" && selectedGroup ? (
         <GroupDetails
           group={selectedGroup}
+          currentAllocationPercent={
+            currentAllocationByGroupId.get(selectedGroup.id) ?? 0
+          }
           onEdit={() => {
             setError(null);
             setEditor({ mode: "edit", groupId: selectedGroup.id });
@@ -259,38 +292,43 @@ function GroupList({
 
 function GroupDetails({
   group,
+  currentAllocationPercent,
   onEdit,
 }: {
   group: AssetGroup;
+  currentAllocationPercent: number;
   onEdit: () => void;
 }) {
+  const thesisSections = [
+    { label: "Thesis", value: group.thesis.summary },
+    { label: "Bull Case", value: group.thesis.bullCase },
+    { label: "Bear Case", value: group.thesis.bearCase },
+    {
+      label: "Invalidation Criteria",
+      value: group.thesis.invalidationCriteria,
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-4 rounded-lg border p-4 sm:p-6">
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            {group.color ? (
-              <span
-                aria-hidden="true"
-                className="size-3 shrink-0 rounded-[3px]"
-                style={{ backgroundColor: group.color }}
-              />
-            ) : null}
-            <span className="truncate">
+        <div className="flex min-w-0 items-center gap-2">
+          <span
+            aria-hidden="true"
+            className="size-11 shrink-0 rounded-md border"
+            style={{ backgroundColor: group.color ?? "var(--muted)" }}
+          />
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <h2 className="truncate text-base font-semibold">
               {groupLabel(group.name, group.symbols)}
-            </span>
-          </h2>
-          <div className="flex flex-wrap gap-1">
-            {group.symbols.map((symbol) => (
-              <Badge key={symbol} variant="secondary">
-                {symbol}
-              </Badge>
-            ))}
-            {group.targetAllocationPercent !== null ? (
-              <Badge variant="outline">
-                Target {group.targetAllocationPercent}%
-              </Badge>
-            ) : null}
+            </h2>
+            <div className="flex flex-wrap gap-1">
+              {group.symbols.map((symbol) => (
+                <Badge key={symbol} variant="secondary">
+                  {symbol}
+                </Badge>
+              ))}
+            </div>
           </div>
         </div>
         <Button
@@ -305,14 +343,86 @@ function GroupDetails({
         </Button>
       </div>
 
-      {group.thesis ? (
-        <p className="text-sm whitespace-pre-line">{group.thesis}</p>
-      ) : (
-        <p className="text-sm text-muted-foreground italic">
-          No thesis recorded yet.
-        </p>
-      )}
+      <AllocationProgress
+        currentAllocationPercent={currentAllocationPercent}
+        targetAllocationPercent={group.targetAllocationPercent}
+      />
+
+      <div className="flex flex-col gap-5">
+        {thesisSections.map((section) => (
+          <section key={section.label} className="flex flex-col gap-1.5">
+            <h3 className="text-sm font-medium">{section.label}</h3>
+            {section.value ? (
+              <p className="text-sm whitespace-pre-line">{section.value}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                Not provided.
+              </p>
+            )}
+          </section>
+        ))}
+        <section className="flex flex-col gap-1.5">
+          <h3 className="text-sm font-medium">Allocation Strategy</h3>
+          {group.thesis.allocationStrategyNotes ? (
+            <p className="text-sm whitespace-pre-line">
+              {group.thesis.allocationStrategyNotes}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground italic">
+              Strategy notes not provided.
+            </p>
+          )}
+        </section>
+      </div>
     </div>
+  );
+}
+
+function AllocationProgress({
+  currentAllocationPercent,
+  targetAllocationPercent,
+}: {
+  currentAllocationPercent: number;
+  targetAllocationPercent: number | null;
+}) {
+  const hasTarget = targetAllocationPercent !== null && targetAllocationPercent > 0;
+  const isOverTarget =
+    hasTarget && currentAllocationPercent > targetAllocationPercent;
+  // Progress toward target: a full bar means on-target, amber means over.
+  const fillPercent = hasTarget
+    ? Math.min((currentAllocationPercent / targetAllocationPercent) * 100, 100)
+    : 0;
+
+  return (
+    <section className="flex flex-col gap-1.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="text-sm font-medium">Allocation</h3>
+        <span className="text-sm tabular-nums text-muted-foreground">
+          <span
+            className={cn(
+              "font-medium",
+              isOverTarget
+                ? "text-amber-600 dark:text-amber-500"
+                : "text-foreground",
+            )}
+          >
+            {allocationPercentFormat.format(currentAllocationPercent)}%
+          </span>
+          {hasTarget ? ` of ${targetAllocationPercent}% target` : ""}
+        </span>
+      </div>
+      {hasTarget ? (
+        <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
+          <div
+            className={cn(
+              "h-full rounded-full transition-all",
+              isOverTarget ? "bg-amber-500" : "bg-primary",
+            )}
+            style={{ width: `${fillPercent}%` }}
+          />
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -339,7 +449,14 @@ function GroupEditor({
   const [color, setColor] = useState<string | null>(
     editingGroup?.color ?? null,
   );
-  const [thesis, setThesis] = useState(editingGroup?.thesis ?? "");
+  const [thesis, setThesis] = useState<AssetGroupThesis>(() => ({
+    summary: editingGroup?.thesis.summary ?? null,
+    bullCase: editingGroup?.thesis.bullCase ?? null,
+    bearCase: editingGroup?.thesis.bearCase ?? null,
+    invalidationCriteria: editingGroup?.thesis.invalidationCriteria ?? null,
+    allocationStrategyNotes:
+      editingGroup?.thesis.allocationStrategyNotes ?? null,
+  }));
   const [targetAllocation, setTargetAllocation] = useState(
     editingGroup?.targetAllocationPercent?.toString() ?? "",
   );
@@ -377,13 +494,16 @@ function GroupEditor({
   const selectedSymbols = selectableSymbols.filter((symbol) =>
     selected.has(symbolKey(symbol)),
   );
+  function updateThesis(field: keyof AssetGroupThesis, value: string): void {
+    setThesis((current) => ({ ...current, [field]: value || null }));
+  }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSubmit({
       name: name.trim() || null,
       color,
-      thesis: thesis.trim() || null,
+      thesis,
       targetAllocationPercent:
         targetAllocation === "" ? null : Number(targetAllocation),
       symbols: selectedSymbols,
@@ -394,7 +514,7 @@ function GroupEditor({
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <FieldGroup>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field>
+          <Field data-disabled={isPending}>
             <FieldLabel htmlFor="group-name">Name</FieldLabel>
             <Input
               id="group-name"
@@ -406,7 +526,7 @@ function GroupEditor({
             />
           </Field>
 
-          <Field>
+          <Field data-disabled={isPending}>
             <FieldLabel>Color</FieldLabel>
             <div className="flex flex-wrap gap-2">
               <button
@@ -440,7 +560,7 @@ function GroupEditor({
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field data-invalid={Boolean(error)}>
+          <Field data-disabled={isPending} data-invalid={Boolean(error)}>
             <FieldLabel>Assets ({selectedSymbols.length} selected)</FieldLabel>
             <AssetMultiSelect
               selectableSymbols={selectableSymbols}
@@ -452,7 +572,7 @@ function GroupEditor({
             <FieldError>{error}</FieldError>
           </Field>
 
-          <Field>
+          <Field data-disabled={isPending}>
             <FieldLabel htmlFor="group-target-allocation">
               Target allocation (%)
             </FieldLabel>
@@ -471,15 +591,93 @@ function GroupEditor({
           </Field>
         </div>
 
-        <Field>
-          <FieldLabel htmlFor="group-thesis">Thesis</FieldLabel>
+        <h3 className="text-sm font-medium">Thesis sections</h3>
+
+        <Field data-disabled={isPending}>
+          <FieldLabel htmlFor="group-thesis-summary">Thesis</FieldLabel>
+          <FieldDescription>
+            The core reason for owning this asset group.
+          </FieldDescription>
           <Textarea
-            id="group-thesis"
-            value={thesis}
-            onChange={(event) => setThesis(event.target.value)}
-            placeholder="Why you own it, catalysts, risks, and what would invalidate the thesis"
-            maxLength={MAX_THESIS_LENGTH}
-            rows={12}
+            id="group-thesis-summary"
+            value={thesis.summary ?? ""}
+            onChange={(event) => updateThesis("summary", event.target.value)}
+            placeholder="Why you own it and how it can create value"
+            maxLength={MAX_ASSET_GROUP_THESIS_SECTION_LENGTH}
+            rows={5}
+            disabled={isPending}
+          />
+        </Field>
+
+        <Field data-disabled={isPending}>
+          <FieldLabel htmlFor="group-bull-case">Bull Case</FieldLabel>
+          <FieldDescription>
+            Developments that would make the investment outperform.
+          </FieldDescription>
+          <Textarea
+            id="group-bull-case"
+            value={thesis.bullCase ?? ""}
+            onChange={(event) => updateThesis("bullCase", event.target.value)}
+            placeholder="Growth drivers, catalysts, and upside scenarios"
+            maxLength={MAX_ASSET_GROUP_THESIS_SECTION_LENGTH}
+            rows={7}
+            disabled={isPending}
+          />
+        </Field>
+
+        <Field data-disabled={isPending}>
+          <FieldLabel htmlFor="group-bear-case">Bear Case</FieldLabel>
+          <FieldDescription>
+            Risks and scenarios that could impair the investment.
+          </FieldDescription>
+          <Textarea
+            id="group-bear-case"
+            value={thesis.bearCase ?? ""}
+            onChange={(event) => updateThesis("bearCase", event.target.value)}
+            placeholder="Competitive, market, regulatory, and execution risks"
+            maxLength={MAX_ASSET_GROUP_THESIS_SECTION_LENGTH}
+            rows={7}
+            disabled={isPending}
+          />
+        </Field>
+
+        <Field data-disabled={isPending}>
+          <FieldLabel htmlFor="group-invalidation-criteria">
+            Invalidation Criteria
+          </FieldLabel>
+          <FieldDescription>
+            Observable conditions that should trigger a reduction or exit.
+          </FieldDescription>
+          <Textarea
+            id="group-invalidation-criteria"
+            value={thesis.invalidationCriteria ?? ""}
+            onChange={(event) =>
+              updateThesis("invalidationCriteria", event.target.value)
+            }
+            placeholder="Specific evidence that would prove the thesis wrong"
+            maxLength={MAX_ASSET_GROUP_THESIS_SECTION_LENGTH}
+            rows={7}
+            disabled={isPending}
+          />
+        </Field>
+
+        <Field data-disabled={isPending}>
+          <FieldLabel htmlFor="group-allocation-strategy-notes">
+            Allocation Strategy Notes
+          </FieldLabel>
+          <FieldDescription>
+            Position sizing, concentration, and rebalancing rules. This section
+            is complete when a target allocation is also set.
+          </FieldDescription>
+          <Textarea
+            id="group-allocation-strategy-notes"
+            value={thesis.allocationStrategyNotes ?? ""}
+            onChange={(event) =>
+              updateThesis("allocationStrategyNotes", event.target.value)
+            }
+            placeholder="Sizing rationale and rules for adding or reducing"
+            maxLength={MAX_ASSET_GROUP_THESIS_SECTION_LENGTH}
+            rows={5}
             disabled={isPending}
           />
         </Field>

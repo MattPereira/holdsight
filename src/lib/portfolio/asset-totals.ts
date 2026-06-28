@@ -1,4 +1,5 @@
 import type { BalancesResult } from "@/lib/portfolio/types";
+import type { AssetGroupThesis } from "@/lib/portfolio/asset-group-thesis";
 
 export type AssetTotal = {
   key: string;
@@ -17,7 +18,7 @@ export type AssetGroup = {
   id: string;
   name: string | null;
   color: string | null;
-  thesis: string | null;
+  thesis: AssetGroupThesis;
   targetAllocationPercent: number | null;
   symbols: string[];
 };

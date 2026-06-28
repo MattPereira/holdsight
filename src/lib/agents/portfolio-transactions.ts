@@ -13,6 +13,7 @@ import {
   type TradeJournalEntryRow,
 } from "@/lib/investment-transactions/journal";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
+import { serializeAssetGroupThesis } from "@/lib/portfolio/asset-group-thesis";
 import type { AssetGroup } from "@/lib/portfolio/asset-totals";
 import { getUserAssetGroups } from "@/lib/portfolio/groups";
 import { getCurrentPortfolioTransactions } from "@/lib/portfolio/transactions";
@@ -331,8 +332,10 @@ export async function getPortfolioTransactionsForAgent(
         id: group.id,
         name: group.name,
         symbols: group.symbols,
-        thesis: group.thesis,
-        targetAllocationPercent: group.targetAllocationPercent,
+        thesis: serializeAssetGroupThesis(
+          group.thesis,
+          group.targetAllocationPercent,
+        ),
       })),
     transactions,
     page: {

@@ -232,6 +232,13 @@
       "when": 1782601326555,
       "tag": "0032_sparkling_triathlon",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1782682951559,
+      "tag": "0033_equal_captain_flint",
+      "breakpoints": true
     }
   ]
 }

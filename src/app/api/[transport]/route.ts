@@ -40,7 +40,7 @@ const authenticatedHandler = mcpHandler(
           {
             title: "Get Portfolio Allocations",
             description:
-              "Read the current Holdsight portfolio allocations without refreshing external account balances.",
+              "Read the current Holdsight portfolio allocations and structured asset-group theses without refreshing external account balances. Current allocation percentages use a 0–100 scale.",
             inputSchema: {},
           },
           async () => {
@@ -104,7 +104,7 @@ const authenticatedHandler = mcpHandler(
           {
             title: "Get Portfolio Transactions",
             description:
-              "Read stored Holdsight investment transactions with optional asset, group, date, transaction, account, value, and journal filters. All filters are optional; arrays use OR, filter categories use AND, and symbols and groups match the base asset. Results are newest first. This tool does not refresh external providers.",
+              "Read stored Holdsight investment transactions with optional asset, group, date, transaction, account, value, and journal filters, plus structured thesis metadata for relevant asset groups. All filters are optional; arrays use OR, filter categories use AND, and symbols and groups match the base asset. Results are newest first. This tool does not refresh external providers.",
             inputSchema: {
               symbols: z
                 .array(z.string().trim().min(1).max(64))
@@ -235,7 +235,7 @@ const authenticatedHandler = mcpHandler(
       {
         serverInfo: {
           name: "holdsight",
-          version: "0.1.0",
+          version: "0.2.0",
         },
       },
       {

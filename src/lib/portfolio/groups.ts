@@ -5,17 +5,20 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { assetGroupMembers, assetGroups } from "@/db/schema/asset-groups";
+import {
+  MAX_ASSET_GROUP_THESIS_SECTION_LENGTH,
+  type AssetGroupThesis,
+} from "@/lib/portfolio/asset-group-thesis";
 import { ASSET_CHART_COLORS, type AssetGroup } from "@/lib/portfolio/asset-totals";
 
 const MIN_GROUP_SYMBOLS = 1;
 const MAX_GROUP_NAME_LENGTH = 40;
-const MAX_GROUP_THESIS_LENGTH = 10_000;
 const GROUP_COLORS = new Set(ASSET_CHART_COLORS);
 
 type AssetGroupInput = {
   name?: string | null;
   color?: string | null;
-  thesis?: string | null;
+  thesis: AssetGroupThesis;
   targetAllocationPercent?: number | null;
   symbols: string[];
 };
@@ -46,18 +49,52 @@ function normalizeColor(color: string | null | undefined): string | null {
   return GROUP_COLORS.has(trimmed) ? trimmed : null;
 }
 
-function normalizeThesis(
-  thesis: string | null | undefined,
-): { thesis: string | null; error: string | null } {
-  const trimmed = thesis?.trim();
-  if (!trimmed) return { thesis: null, error: null };
-  if (trimmed.length > MAX_GROUP_THESIS_LENGTH) {
+function normalizeThesisSection(
+  value: unknown,
+  label: string,
+): { value: string | null; error: string | null } {
+  if (value !== null && value !== undefined && typeof value !== "string") {
+    return { value: null, error: `${label} must be text.` };
+  }
+  const trimmed = value?.trim();
+  if (!trimmed) return { value: null, error: null };
+  if (trimmed.length > MAX_ASSET_GROUP_THESIS_SECTION_LENGTH) {
     return {
-      thesis: null,
-      error: `Thesis must be ${MAX_GROUP_THESIS_LENGTH.toLocaleString()} characters or fewer.`,
+      value: null,
+      error: `${label} must be ${MAX_ASSET_GROUP_THESIS_SECTION_LENGTH.toLocaleString()} characters or fewer.`,
     };
   }
-  return { thesis: trimmed, error: null };
+  return { value: trimmed, error: null };
+}
+
+function normalizeThesis(
+  thesis: AssetGroupThesis | null | undefined,
+): { thesis: AssetGroupThesis; error: string | null } {
+  const sections = {
+    summary: normalizeThesisSection(thesis?.summary, "Thesis summary"),
+    bullCase: normalizeThesisSection(thesis?.bullCase, "Bull case"),
+    bearCase: normalizeThesisSection(thesis?.bearCase, "Bear case"),
+    invalidationCriteria: normalizeThesisSection(
+      thesis?.invalidationCriteria,
+      "Invalidation criteria",
+    ),
+    allocationStrategyNotes: normalizeThesisSection(
+      thesis?.allocationStrategyNotes,
+      "Allocation strategy notes",
+    ),
+  };
+  const error = Object.values(sections).find((section) => section.error)?.error;
+
+  return {
+    thesis: {
+      summary: sections.summary.value,
+      bullCase: sections.bullCase.value,
+      bearCase: sections.bearCase.value,
+      invalidationCriteria: sections.invalidationCriteria.value,
+      allocationStrategyNotes: sections.allocationStrategyNotes.value,
+    },
+    error: error ?? null,
+  };
 }
 
 function normalizeTargetAllocation(
@@ -88,7 +125,11 @@ export async function getUserAssetGroups(userId: string): Promise<AssetGroup[]> 
       id: assetGroups.id,
       name: assetGroups.name,
       color: assetGroups.color,
-      thesis: assetGroups.thesis,
+      thesisSummary: assetGroups.thesisSummary,
+      bullCase: assetGroups.bullCase,
+      bearCase: assetGroups.bearCase,
+      invalidationCriteria: assetGroups.invalidationCriteria,
+      allocationStrategyNotes: assetGroups.allocationStrategyNotes,
       targetAllocationPercent: assetGroups.targetAllocationPercent,
       createdAt: assetGroups.createdAt,
       symbol: assetGroupMembers.symbol,
@@ -109,7 +150,13 @@ export async function getUserAssetGroups(userId: string): Promise<AssetGroup[]> 
         id: row.id,
         name: row.name,
         color: row.color,
-        thesis: row.thesis,
+        thesis: {
+          summary: row.thesisSummary,
+          bullCase: row.bullCase,
+          bearCase: row.bearCase,
+          invalidationCriteria: row.invalidationCriteria,
+          allocationStrategyNotes: row.allocationStrategyNotes,
+        },
         targetAllocationPercent: row.targetAllocationPercent,
         symbols: [],
       };
@@ -164,7 +211,11 @@ export async function createAssetGroup(
     userId,
     name: normalizeName(input.name),
     color: normalizeColor(input.color),
-    thesis: thesis.thesis,
+    thesisSummary: thesis.thesis.summary,
+    bullCase: thesis.thesis.bullCase,
+    bearCase: thesis.thesis.bearCase,
+    invalidationCriteria: thesis.thesis.invalidationCriteria,
+    allocationStrategyNotes: thesis.thesis.allocationStrategyNotes,
     targetAllocationPercent: targetAllocation.targetAllocationPercent,
   });
   await db.insert(assetGroupMembers).values(
@@ -212,7 +263,11 @@ export async function updateAssetGroup(
     .set({
       name: normalizeName(input.name),
       color: normalizeColor(input.color),
-      thesis: thesis.thesis,
+      thesisSummary: thesis.thesis.summary,
+      bullCase: thesis.thesis.bullCase,
+      bearCase: thesis.thesis.bearCase,
+      invalidationCriteria: thesis.thesis.invalidationCriteria,
+      allocationStrategyNotes: thesis.thesis.allocationStrategyNotes,
       targetAllocationPercent: targetAllocation.targetAllocationPercent,
     })
     .where(and(eq(assetGroups.id, groupId), eq(assetGroups.userId, userId)));

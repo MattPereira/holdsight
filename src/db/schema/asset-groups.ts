@@ -23,7 +23,11 @@ export const assetGroups = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     name: text("name"),
     color: text("color"),
-    thesis: text("thesis"),
+    thesisSummary: text("thesis_summary"),
+    bullCase: text("bull_case"),
+    bearCase: text("bear_case"),
+    invalidationCriteria: text("invalidation_criteria"),
+    allocationStrategyNotes: text("allocation_strategy_notes"),
     targetAllocationPercent: numeric("target_allocation_percent", {
       precision: 5,
       scale: 2,
