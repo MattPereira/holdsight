@@ -72,11 +72,41 @@ export function AssetGroupsEditor({ allSymbols }: { allSymbols: string[] }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  const interactionDisabled =
+    editor.mode === "create" || editor.mode === "edit";
+
+  const header = (
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-xl font-semibold">Theses</h1>
+        <p className="text-sm text-muted-foreground">
+          Rationale for your portfolio allocation strategy
+        </p>
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        aria-label="New group"
+        onClick={() => {
+          setError(null);
+          setEditor({ mode: "create" });
+        }}
+        disabled={interactionDisabled}
+      >
+        <RiAddLine />
+      </Button>
+    </div>
+  );
+
   if (allSymbols.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-        Refresh your portfolio to start grouping assets.
-      </p>
+      <div className="flex flex-col gap-6">
+        {header}
+        <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
+          Refresh your portfolio to start grouping assets.
+        </p>
+      </div>
     );
   }
 
@@ -101,16 +131,12 @@ export function AssetGroupsEditor({ allSymbols }: { allSymbols: string[] }) {
 
   return (
     <div className="flex flex-col gap-6">
+      {header}
+
       <GroupList
         groups={groups}
         selectedGroupId={selectedGroupId}
-        interactionDisabled={
-          editor.mode === "create" || editor.mode === "edit"
-        }
-        onNew={() => {
-          setError(null);
-          setEditor({ mode: "create" });
-        }}
+        interactionDisabled={interactionDisabled}
         onSelect={(groupId) => {
           setError(null);
           setEditor({ mode: "view", groupId });
@@ -170,30 +196,15 @@ function GroupList({
   groups,
   selectedGroupId,
   interactionDisabled,
-  onNew,
   onSelect,
 }: {
   groups: AssetGroup[];
   selectedGroupId: string | undefined;
   interactionDisabled: boolean;
-  onNew: () => void;
   onSelect: (groupId: string) => void;
 }) {
   return (
     <section className="flex flex-col gap-3">
-      <div className="flex items-center justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onNew}
-          disabled={interactionDisabled}
-        >
-          <RiAddLine data-icon="inline-start" />
-          New group
-        </Button>
-      </div>
-
       {groups.length > 0 ? (
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {groups.map((group) => {
@@ -207,7 +218,7 @@ function GroupList({
                   disabled={interactionDisabled}
                   onClick={() => onSelect(group.id)}
                   className={cn(
-                    "flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors",
+                    "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors",
                     "hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                     "disabled:cursor-not-allowed disabled:opacity-60",
                     isSelected && "ring-2 ring-ring",
@@ -215,7 +226,7 @@ function GroupList({
                 >
                   <span
                     aria-hidden="true"
-                    className="size-9 shrink-0 rounded-md border"
+                    className="size-11 shrink-0 rounded-md border"
                     style={{
                       backgroundColor: group.color ?? "var(--muted)",
                     }}

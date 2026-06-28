@@ -11,15 +11,5 @@ export default async function ThesesPage() {
       ).totals.map((total) => total.symbol)
     : [];
 
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold">Theses</h1>
-        <p className="text-sm text-muted-foreground">
-          Group your assets and record the thesis behind each position.
-        </p>
-      </div>
-      <AssetGroupsEditor allSymbols={allSymbols} />
-    </div>
-  );
+  return <AssetGroupsEditor allSymbols={allSymbols} />;
 }
