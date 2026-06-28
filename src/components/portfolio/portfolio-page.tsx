@@ -174,7 +174,6 @@ export function PortfolioPage({
               grandTotalValue={summary.grandTotalValue}
               totals={summary.totals}
               groups={groups}
-              allSymbols={summary.totals.map((total) => total.symbol)}
             />
           </div>
 

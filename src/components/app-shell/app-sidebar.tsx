@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   RiExchangeFundsLine,
   RiFundsLine,
+  RiLightbulbLine,
   RiWalletLine,
 } from "@remixicon/react";
 
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const accounts = [
+  { label: "Theses", href: "/theses", icon: RiLightbulbLine },
   { label: "Wallets", href: "/wallets", icon: RiWalletLine },
   { label: "Exchanges", href: "/exchanges", icon: RiExchangeFundsLine },
   { label: "Brokerages", href: "/brokerages", icon: RiFundsLine },
