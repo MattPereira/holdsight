@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { InvestmentTransactionJournalImage } from "@/lib/investment-transactions/journal-images";
-import { cn } from "@/lib/utils";
 
 const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const ACCEPT_ATTR = ACCEPTED_TYPES.join(",");
@@ -47,7 +46,6 @@ export function JournalImagesSection({
   const [pending, setPending] = useState<PendingUpload[]>([]);
   const [limit, setLimit] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
-  const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset whenever the section targets a new transaction, mirroring the
@@ -183,43 +181,13 @@ export function JournalImagesSection({
     }
   }
 
-  function handleDrop(event: React.DragEvent) {
-    event.preventDefault();
-    setDragActive(false);
-    if (disabled || atLimit) return;
-    void upload(imagesFromDataTransfer(event.dataTransfer.items));
-  }
-
   const interactionDisabled = disabled || atLimit;
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <Label>Screenshots</Label>
-        {limit !== null ? (
-          <span className="text-xs text-muted-foreground">
-            {images.length} / {limit}
-          </span>
-        ) : null}
-      </div>
-
-      {!atLimit ? (
-        <div
-          onDragOver={(event) => {
-            event.preventDefault();
-            if (!interactionDisabled) setDragActive(true);
-          }}
-          onDragLeave={() => setDragActive(false)}
-          onDrop={handleDrop}
-          className={cn(
-            "flex flex-col items-center gap-2 rounded-md border border-dashed px-4 py-5 text-center transition-colors",
-            dragActive ? "border-primary bg-muted" : "border-border",
-            interactionDisabled && "opacity-50",
-          )}
-        >
-          <p className="text-xs text-muted-foreground">
-            Paste or drop image here
-          </p>
+        <div className="flex items-center gap-2">
           <Button
             type="button"
             variant="outline"
@@ -243,7 +211,7 @@ export function JournalImagesSection({
             }}
           />
         </div>
-      ) : null}
+      </div>
 
       {loading ? (
         <div className="flex flex-col gap-2">
