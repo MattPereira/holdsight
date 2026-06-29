@@ -80,6 +80,15 @@ export function AssetGroupsEditor({
 }) {
   const { groups, setGroups } = useAssetGroups();
   const allSymbols = portfolioSummary.totals.map((total) => total.symbol);
+  const nameBySymbol = useMemo(
+    () =>
+      new Map(
+        portfolioSummary.totals.flatMap((total) =>
+          total.name ? [[symbolKey(total.symbol), total.name] as const] : [],
+        ),
+      ),
+    [portfolioSummary],
+  );
   const currentAllocationByGroupId = useMemo(() => {
     const allocations = buildPortfolioAllocations({
       grandTotalValueUsd: portfolioSummary.grandTotalValue,
@@ -109,9 +118,6 @@ export function AssetGroupsEditor({
     <div className="flex items-start justify-between gap-3">
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold">Theses</h1>
-        <p className="text-sm text-muted-foreground">
-          Rationale for persistent portfolio allocation strategy
-        </p>
       </div>
       <Button
         type="button"
@@ -176,6 +182,7 @@ export function AssetGroupsEditor({
       {editor.mode === "view" && selectedGroup ? (
         <GroupDetails
           group={selectedGroup}
+          nameBySymbol={nameBySymbol}
           currentAllocationPercent={
             currentAllocationByGroupId.get(selectedGroup.id) ?? 0
           }
@@ -236,11 +243,17 @@ function GroupList({
   interactionDisabled: boolean;
   onSelect: (groupId: string) => void;
 }) {
+  // Highest target allocation first; groups without a target sort to the end.
+  const sortedGroups = [...groups].sort(
+    (a, b) =>
+      (b.targetAllocationPercent ?? -1) - (a.targetAllocationPercent ?? -1),
+  );
+
   return (
     <section className="flex flex-col gap-3">
-      {groups.length > 0 ? (
-        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {groups.map((group) => {
+      {sortedGroups.length > 0 ? (
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {sortedGroups.map((group) => {
             const isSelected = group.id === selectedGroupId;
             return (
               <li key={group.id}>
@@ -254,7 +267,8 @@ function GroupList({
                     "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors",
                     "hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
                     "disabled:cursor-not-allowed disabled:opacity-60",
-                    isSelected && "ring-2 ring-ring",
+                    isSelected &&
+                      "border-primary bg-primary/5 ring-1 ring-primary",
                   )}
                 >
                   <span
@@ -268,13 +282,20 @@ function GroupList({
                     <span className="truncate text-sm font-medium">
                       {groupLabel(group.name, group.symbols)}
                     </span>
-                    <div className="flex flex-wrap gap-1">
-                      {group.symbols.map((symbol) => (
-                        <Badge key={symbol} variant="secondary">
-                          {symbol}
-                        </Badge>
-                      ))}
-                    </div>
+                  </div>
+                  <div className="ml-auto flex shrink-0 flex-col items-end pl-1">
+                    {group.targetAllocationPercent !== null ? (
+                      <span className="text-sm font-semibold tabular-nums">
+                        {allocationPercentFormat.format(
+                          group.targetAllocationPercent,
+                        )}
+                        %
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        No target
+                      </span>
+                    )}
                   </div>
                 </button>
               </li>
@@ -292,87 +313,94 @@ function GroupList({
 
 function GroupDetails({
   group,
+  nameBySymbol,
   currentAllocationPercent,
   onEdit,
 }: {
   group: AssetGroup;
+  nameBySymbol: Map<string, string>;
   currentAllocationPercent: number;
   onEdit: () => void;
 }) {
+  const assetNames = group.symbols.map(
+    (symbol) => nameBySymbol.get(symbolKey(symbol)) ?? symbol,
+  );
   const thesisSections = [
     { label: "Thesis", value: group.thesis.summary },
-    { label: "Bull Case", value: group.thesis.bullCase },
-    { label: "Bear Case", value: group.thesis.bearCase },
     {
       label: "Invalidation Criteria",
       value: group.thesis.invalidationCriteria,
     },
+    { label: "Bull Case", value: group.thesis.bullCase },
+    { label: "Bear Case", value: group.thesis.bearCase },
   ];
 
   return (
-    <div className="flex flex-col gap-4 rounded-lg border p-4 sm:p-6">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <span
-            aria-hidden="true"
-            className="size-11 shrink-0 rounded-md border"
-            style={{ backgroundColor: group.color ?? "var(--muted)" }}
-          />
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <h2 className="truncate text-base font-semibold">
-              {groupLabel(group.name, group.symbols)}
-            </h2>
-            <div className="flex flex-wrap gap-1">
-              {group.symbols.map((symbol) => (
-                <Badge key={symbol} variant="secondary">
-                  {symbol}
-                </Badge>
-              ))}
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4 rounded-lg border p-4 sm:p-6">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
+        <div className="flex min-w-0 flex-col gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <span
+              aria-hidden="true"
+              className="size-11 shrink-0 rounded-md border"
+              style={{ backgroundColor: group.color ?? "var(--muted)" }}
+            />
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <h2 className="truncate text-base font-semibold">
+                {groupLabel(group.name, group.symbols)}
+              </h2>
+              <div className="flex flex-wrap gap-1">
+                {group.symbols.map((symbol) => (
+                  <Badge key={symbol} variant="secondary">
+                    {symbol}
+                  </Badge>
+                ))}
+              </div>
             </div>
           </div>
+          <p className="text-sm text-muted-foreground">
+            {assetNames.join(", ")}
+          </p>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="shrink-0"
-          aria-label={`Edit ${groupLabel(group.name, group.symbols)}`}
-          onClick={onEdit}
-        >
-          <RiPencilLine />
-        </Button>
+
+        <AllocationProgress
+          currentAllocationPercent={currentAllocationPercent}
+          targetAllocationPercent={group.targetAllocationPercent}
+        />
       </div>
 
-      <AllocationProgress
-        currentAllocationPercent={currentAllocationPercent}
-        targetAllocationPercent={group.targetAllocationPercent}
-      />
-
       <div className="flex flex-col gap-5">
-        {thesisSections.map((section) => (
-          <section key={section.label} className="flex flex-col gap-1.5">
-            <h3 className="text-sm font-medium">{section.label}</h3>
-            {section.value ? (
+        {thesisSections
+          .filter((section) => section.value)
+          .map((section) => (
+            <section key={section.label} className="flex flex-col gap-1.5">
+              <h3 className="text-sm font-medium">{section.label}</h3>
               <p className="text-sm whitespace-pre-line">{section.value}</p>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">
-                Not provided.
-              </p>
-            )}
-          </section>
-        ))}
-        <section className="flex flex-col gap-1.5">
-          <h3 className="text-sm font-medium">Allocation Strategy</h3>
-          {group.thesis.allocationStrategyNotes ? (
+            </section>
+          ))}
+        {group.thesis.allocationStrategyNotes ? (
+          <section className="flex flex-col gap-1.5">
+            <h3 className="text-sm font-medium">Allocation Strategy</h3>
             <p className="text-sm whitespace-pre-line">
               {group.thesis.allocationStrategyNotes}
             </p>
-          ) : (
-            <p className="text-sm text-muted-foreground italic">
-              Strategy notes not provided.
-            </p>
-          )}
-        </section>
+          </section>
+        ) : null}
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label={`Edit ${groupLabel(group.name, group.symbols)}`}
+          onClick={onEdit}
+        >
+          <RiPencilLine data-icon="inline-start" />
+          Edit
+        </Button>
       </div>
     </div>
   );
@@ -385,7 +413,8 @@ function AllocationProgress({
   currentAllocationPercent: number;
   targetAllocationPercent: number | null;
 }) {
-  const hasTarget = targetAllocationPercent !== null && targetAllocationPercent > 0;
+  const hasTarget =
+    targetAllocationPercent !== null && targetAllocationPercent > 0;
   const isOverTarget =
     hasTarget && currentAllocationPercent > targetAllocationPercent;
   // Progress toward target: a full bar means on-target, amber means over.
@@ -394,13 +423,13 @@ function AllocationProgress({
     : 0;
 
   return (
-    <section className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="text-sm font-medium">Allocation</h3>
-        <span className="text-sm tabular-nums text-muted-foreground">
+    <section className="flex w-full flex-col gap-2">
+      <div className="flex items-end justify-between gap-2">
+        <div className="flex flex-col">
+          <span className="text-xs text-muted-foreground">Current</span>
           <span
             className={cn(
-              "font-medium",
+              "text-xl font-semibold tabular-nums tracking-tight",
               isOverTarget
                 ? "text-amber-600 dark:text-amber-500"
                 : "text-foreground",
@@ -408,11 +437,18 @@ function AllocationProgress({
           >
             {allocationPercentFormat.format(currentAllocationPercent)}%
           </span>
-          {hasTarget ? ` of ${targetAllocationPercent}% target` : ""}
-        </span>
+        </div>
+        {hasTarget ? (
+          <div className="flex flex-col items-end">
+            <span className="text-xs text-muted-foreground">Target</span>
+            <span className="text-xl font-semibold tabular-nums tracking-tight">
+              {targetAllocationPercent}%
+            </span>
+          </div>
+        ) : null}
       </div>
       {hasTarget ? (
-        <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
+        <div className="h-4 w-full overflow-hidden rounded-full bg-muted">
           <div
             className={cn(
               "h-full rounded-full transition-all",

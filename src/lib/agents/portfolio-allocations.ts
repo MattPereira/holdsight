@@ -48,10 +48,12 @@ export async function getPortfolioAllocationsForAgent(
   userId: string,
   { refresh = false }: { refresh?: boolean } = {},
 ): Promise<PortfolioAllocationsForAgent> {
-  const data = refresh
-    ? await refreshPortfolioForUser(userId)
-    : await getCurrentPortfolioHomeData(userId);
-  const groups = await getUserAssetGroups(userId);
+  const [data, groups] = await Promise.all([
+    refresh
+      ? refreshPortfolioForUser(userId)
+      : getCurrentPortfolioHomeData(userId),
+    getUserAssetGroups(userId),
+  ]);
   // Agents receive every holding with no declutter cutoff — hiding small
   // positions is a UI concern, and a full dataset lets allocations reconcile to the
   // grand total without an "Other" remainder.
