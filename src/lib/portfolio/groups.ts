@@ -132,6 +132,7 @@ export async function getUserAssetGroups(userId: string): Promise<AssetGroup[]> 
       allocationStrategyNotes: assetGroups.allocationStrategyNotes,
       targetAllocationPercent: assetGroups.targetAllocationPercent,
       createdAt: assetGroups.createdAt,
+      updatedAt: assetGroups.updatedAt,
       symbol: assetGroupMembers.symbol,
     })
     .from(assetGroups)
@@ -158,6 +159,7 @@ export async function getUserAssetGroups(userId: string): Promise<AssetGroup[]> 
           allocationStrategyNotes: row.allocationStrategyNotes,
         },
         targetAllocationPercent: row.targetAllocationPercent,
+        updatedAt: row.updatedAt.toISOString(),
         symbols: [],
       };
       byId.set(row.id, group);

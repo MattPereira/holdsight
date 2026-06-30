@@ -52,12 +52,7 @@ function registerPortfolioAllocationTools(server: McpServer, userId: string) {
       const allocations = await getPortfolioAllocationsForAgent(userId);
 
       return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(allocations, null, 2),
-          },
-        ],
+        content: [],
         structuredContent: allocations,
       };
     },
@@ -99,12 +94,7 @@ function registerPortfolioAllocationTools(server: McpServer, userId: string) {
       });
 
       return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(allocations, null, 2),
-          },
-        ],
+        content: [],
         structuredContent: allocations,
       };
     },
@@ -117,7 +107,7 @@ function registerAssetGroupThesisTools(server: McpServer, userId: string) {
     {
       title: "List Asset Group Theses",
       description:
-        "List the authenticated user's asset-group theses with IDs, names, member symbols, summaries, completion status, and update versions. Use this tool to identify a thesis, then call get_asset_group_thesis before updating it.",
+        "List the authenticated user's asset-group theses with IDs, names, member symbols, completion status, and update versions. Use this compact index to identify a thesis, then call get_asset_group_thesis to read its contents.",
       inputSchema: {},
       annotations: {
         readOnlyHint: true,
@@ -129,7 +119,7 @@ function registerAssetGroupThesisTools(server: McpServer, userId: string) {
       const result = { theses };
 
       return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        content: [],
         structuredContent: result,
       };
     },
@@ -159,7 +149,7 @@ function registerAssetGroupThesisTools(server: McpServer, userId: string) {
         const thesis = await getAssetGroupThesisForAgent(userId, assetGroupId);
 
         return {
-          content: [{ type: "text", text: JSON.stringify(thesis, null, 2) }],
+          content: [],
           structuredContent: thesis,
         };
       } catch (error) {
@@ -215,7 +205,7 @@ function registerAssetGroupThesisTools(server: McpServer, userId: string) {
         );
 
         return {
-          content: [{ type: "text", text: JSON.stringify(thesis, null, 2) }],
+          content: [],
           structuredContent: thesis,
         };
       } catch (error) {
@@ -234,7 +224,7 @@ function registerPortfolioTransactionTools(server: McpServer, userId: string) {
     {
       title: "Get Portfolio Transactions",
       description:
-        "Read stored Holdsight investment transactions with optional asset, group, date, transaction, account, value, and journal filters, plus structured thesis metadata for relevant asset groups. All filters are optional; arrays use OR, filter categories use AND, and symbols and groups match the base asset. Results are newest first. This tool does not refresh external providers.",
+        "Read stored Holdsight investment transactions with optional asset, group, date, transaction, account, value, and journal filters, plus compact references to relevant asset groups. Call get_asset_group_thesis with a returned group ID when thesis contents are needed. All filters are optional; arrays use OR, filter categories use AND, and symbols and groups match the base asset. Results are newest first. This tool does not refresh external providers.",
       inputSchema: {
         symbols: z
           .array(z.string().trim().min(1).max(64))
@@ -344,12 +334,7 @@ function registerPortfolioTransactionTools(server: McpServer, userId: string) {
         );
 
         return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(transactions, null, 2),
-            },
-          ],
+          content: [],
           structuredContent: transactions,
         };
       } catch (error) {

@@ -20,6 +20,7 @@ export type AssetGroup = {
   color: string | null;
   thesis: AssetGroupThesis;
   targetAllocationPercent: number | null;
+  updatedAt: string;
   symbols: string[];
 };
 

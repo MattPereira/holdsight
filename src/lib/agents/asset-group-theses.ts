@@ -26,7 +26,6 @@ export type AgentAssetGroupThesisListItem = {
   id: string;
   name: string | null;
   symbols: string[];
-  summary: string | null;
   completion: ReturnType<typeof serializeAssetGroupThesis>["completion"];
   updatedAt: string;
 };
@@ -138,7 +137,6 @@ export async function listAssetGroupThesesForAgent(
       id: serialized.assetGroup.id,
       name: serialized.assetGroup.name,
       symbols: serialized.assetGroup.symbols,
-      summary: serialized.thesis.summary,
       completion: serialized.thesis.completion,
       updatedAt: serialized.updatedAt,
     };
