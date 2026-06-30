@@ -7,6 +7,7 @@ import {
   RiDeleteBinLine,
   RiPencilLine,
 } from "@remixicon/react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
 import {
@@ -51,11 +52,11 @@ import {
 } from "@/lib/portfolio/asset-group-thesis";
 import { cn } from "@/lib/utils";
 
-type EditorState =
-  | { mode: "idle" }
-  | { mode: "view"; groupId: string }
-  | { mode: "create" }
-  | { mode: "edit"; groupId: string };
+// The selected group lives in the `?group=<id>` query param so the selection
+// survives a refresh. The create/edit form is transient, so it stays local.
+type EditorMode = "view" | "create" | "edit";
+
+const SELECTED_GROUP_PARAM = "group";
 
 type GroupFormValues = {
   name: string | null;
@@ -105,14 +106,30 @@ export function AssetGroupsEditor({
       ),
     );
   }, [groups, portfolioSummary]);
-  const [editor, setEditor] = useState<EditorState>(() =>
-    groups[0] ? { mode: "view", groupId: groups[0].id } : { mode: "idle" },
-  );
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [mode, setMode] = useState<EditorMode>("view");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const interactionDisabled =
-    editor.mode === "create" || editor.mode === "edit";
+  // Fall back to the first group when the param is missing or points at a group
+  // that no longer exists (e.g. a stale bookmark or a deleted group).
+  const selectedGroup =
+    groups.find((group) => group.id === searchParams.get(SELECTED_GROUP_PARAM)) ??
+    groups[0];
+
+  function selectGroup(groupId: string | null) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (groupId) params.set(SELECTED_GROUP_PARAM, groupId);
+    else params.delete(SELECTED_GROUP_PARAM);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  }
+
+  const interactionDisabled = mode === "create" || mode === "edit";
 
   const header = (
     <div className="flex items-start justify-between gap-3">
@@ -126,7 +143,7 @@ export function AssetGroupsEditor({
         aria-label="New group"
         onClick={() => {
           setError(null);
-          setEditor({ mode: "create" });
+          setMode("create");
         }}
         disabled={interactionDisabled}
       >
@@ -152,18 +169,15 @@ export function AssetGroupsEditor({
       const result = await deleteGroup(groupId);
       setGroups(result.groups);
       if (result.error) setError(result.error);
-      else setEditor({ mode: "idle" });
+      else {
+        selectGroup(null);
+        setMode("view");
+      }
     });
   }
 
-  const selectedGroupId =
-    editor.mode === "view" || editor.mode === "edit"
-      ? editor.groupId
-      : undefined;
-  const selectedGroup = selectedGroupId
-    ? groups.find((group) => group.id === selectedGroupId)
-    : undefined;
-  const editingGroup = editor.mode === "edit" ? selectedGroup : undefined;
+  const selectedGroupId = selectedGroup?.id;
+  const editingGroup = mode === "edit" ? selectedGroup : undefined;
 
   return (
     <div className="flex flex-col gap-6">
@@ -175,11 +189,12 @@ export function AssetGroupsEditor({
         interactionDisabled={interactionDisabled}
         onSelect={(groupId) => {
           setError(null);
-          setEditor({ mode: "view", groupId });
+          selectGroup(groupId);
+          setMode("view");
         }}
       />
 
-      {editor.mode === "view" && selectedGroup ? (
+      {mode === "view" && selectedGroup ? (
         <GroupDetails
           group={selectedGroup}
           nameBySymbol={nameBySymbol}
@@ -188,12 +203,12 @@ export function AssetGroupsEditor({
           }
           onEdit={() => {
             setError(null);
-            setEditor({ mode: "edit", groupId: selectedGroup.id });
+            setMode("edit");
           }}
         />
       ) : null}
 
-      {editor.mode === "create" || editor.mode === "edit" ? (
+      {mode === "create" || mode === "edit" ? (
         <div className="rounded-lg border p-4 sm:p-6">
           <GroupEditor
             key={editingGroup ? editingGroup.id : "create"}
@@ -205,22 +220,27 @@ export function AssetGroupsEditor({
             }
             onCancel={() => {
               setError(null);
-              setEditor(
-                editingGroup
-                  ? { mode: "view", groupId: editingGroup.id }
-                  : { mode: "idle" },
-              );
+              setMode("view");
             }}
             onSubmit={(values) =>
               startTransition(async () => {
+                const previousIds = new Set(groups.map((group) => group.id));
                 const result = editingGroup
                   ? await updateGroup(editingGroup.id, values)
                   : await createGroup(values);
                 setGroups(result.groups);
-                if (result.error) setError(result.error);
-                else if (editingGroup)
-                  setEditor({ mode: "view", groupId: editingGroup.id });
-                else setEditor({ mode: "idle" });
+                if (result.error) {
+                  setError(result.error);
+                  return;
+                }
+                if (!editingGroup) {
+                  // Select the group that was just created so it opens in view.
+                  const created = result.groups.find(
+                    (group) => !previousIds.has(group.id),
+                  );
+                  selectGroup(created?.id ?? null);
+                }
+                setMode("view");
               })
             }
             isPending={isPending}
