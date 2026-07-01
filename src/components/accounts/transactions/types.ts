@@ -12,7 +12,7 @@ export type TransactionHistoryStatus = {
 export type TransactionsPanel = {
   transactions: InvestmentTransactionListItem[];
   onRefresh: () => void;
-  busy: boolean;
+  refreshPending: boolean;
   error: string | null;
   message: string | null;
   historyStatus?: TransactionHistoryStatus;

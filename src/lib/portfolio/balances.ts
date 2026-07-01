@@ -28,6 +28,11 @@ import {
   type ManualBalanceItemRow,
 } from "@/lib/manual-balance/items";
 import { mergeWalletBalanceResults } from "@/lib/wallets/balances";
+import { getUserLighterAccounts } from "@/lib/lighter/accounts";
+import {
+  getCurrentLighterBalances,
+  getCurrentLighterBalancesForEvmAccount,
+} from "@/lib/lighter/balances";
 import type { BalancesResult } from "@/lib/portfolio/types";
 
 export type CurrentPortfolioBalanceSnapshot = {
@@ -162,11 +167,12 @@ export const getCurrentPortfolioBalanceSnapshot = cache(
       userId,
       evmAccounts,
     );
+    const lighterAccounts = await getUserLighterAccounts(userId);
     const hyperCoreAccountByAddress = new Map(
       hyperCoreAccounts.map((account) => [account.address, account]),
     );
 
-    const [portfolioWalletResults, hyperCoreResults, krakenResults] =
+    const [portfolioWalletResults, hyperCoreResults, lighterResults, krakenResults] =
       await Promise.all([
         Promise.all(
           evmResults.map(async (result) => {
@@ -178,18 +184,25 @@ export const getCurrentPortfolioBalanceSnapshot = cache(
                   hyperCoreAccount.id,
                 )
               : [];
+            const evmAccount = evmAccounts.find(
+              (account) => account.address === result.address,
+            );
+            const lighterBalances = evmAccount
+              ? await getCurrentLighterBalancesForEvmAccount(userId, evmAccount.id)
+              : [];
 
             if (result.status !== "ready") return result;
 
             return {
               ...result,
-              balances: [...result.balances, ...hyperCoreSpotBalances].sort(
+              balances: [...result.balances, ...hyperCoreSpotBalances, ...lighterBalances].sort(
                 (a, b) => b.valueUsd - a.valueUsd,
               ),
             };
           }),
         ),
         getCurrentHyperCoreBalances(hyperCoreAccounts),
+        getCurrentLighterBalances(lighterAccounts),
         getCurrentKrakenBalances(krakenAccounts),
       ]);
     const brokerageResults = brokerageAccounts.map(
@@ -210,7 +223,7 @@ export const getCurrentPortfolioBalanceSnapshot = cache(
         ...(depositoryResult ? [depositoryResult] : []),
         ...(manualAssetsResult ? [manualAssetsResult] : []),
       ],
-      walletResults: mergeWalletBalanceResults(evmResults, hyperCoreResults),
+      walletResults: mergeWalletBalanceResults(evmResults, hyperCoreResults, lighterResults),
       exchangeResults: krakenResults,
       brokerageAccounts,
       depositoryAccounts,

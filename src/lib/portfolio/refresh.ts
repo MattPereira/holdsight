@@ -6,6 +6,8 @@ import { getUserEvmAccounts } from "@/lib/evm/accounts";
 import { syncEvmWalletBalances } from "@/lib/evm/balances";
 import { ensureUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
 import { syncHyperCoreAccounts } from "@/lib/hyper-core/balances";
+import { getUserLighterAccounts } from "@/lib/lighter/accounts";
+import { syncLighterAccounts } from "@/lib/lighter/balances";
 import { syncUserKrakenAccounts } from "@/lib/exchange/kraken/balances";
 import { syncUserBrokerageBalances } from "@/lib/brokerage/balances";
 import { syncUserDepositoryBalances } from "@/lib/depository/balances";
@@ -36,6 +38,8 @@ export async function refreshPortfolioForUser(
       wallets,
     );
     await syncHyperCoreAccounts(hyperCoreAccounts);
+    const lighterAccounts = await getUserLighterAccounts(userId);
+    await syncLighterAccounts(userId, lighterAccounts);
   };
 
   await Promise.all([

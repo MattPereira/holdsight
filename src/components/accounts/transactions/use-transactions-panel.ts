@@ -111,7 +111,10 @@ export function useTransactionsPanel<TTransactionResult>(
     });
   }, [config, applyResult]);
 
-  const isSyncActive = isSyncing || Boolean(historyStatus?.hasMore);
+  // An expected provider failure must return control to the user. Polling is
+  // intentionally paused while an error is displayed, so keeping `hasMore`
+  // active here would leave the refresh button disabled indefinitely.
+  const isSyncActive = !error && (isSyncing || Boolean(historyStatus?.hasMore));
 
   useEffect(() => {
     if (!config || !isSyncActive || error || isPending) {
@@ -131,6 +134,15 @@ export function useTransactionsPanel<TTransactionResult>(
             )
           : config.loadTransactions());
         if (!cancelled) applyResult(result);
+      } catch (error) {
+        if (!cancelled) {
+          setError(
+            error instanceof Error
+              ? error.message
+              : "Failed to check transaction sync status.",
+          );
+          setSyncing(false);
+        }
       } finally {
         inFlight = false;
       }
@@ -155,7 +167,11 @@ export function useTransactionsPanel<TTransactionResult>(
     return {
       transactions: currentTransactions,
       onRefresh: handleRefresh,
-      busy: isPending || isSyncActive,
+      // Background synchronization is represented by historyStatus.hasMore
+      // and must not prevent the user from submitting another lease-safe
+      // refresh request. Only the request currently crossing the network
+      // disables the control.
+      refreshPending: isPending,
       error,
       message,
       historyStatus,
@@ -165,7 +181,6 @@ export function useTransactionsPanel<TTransactionResult>(
     currentTransactions,
     handleRefresh,
     isPending,
-    isSyncActive,
     error,
     message,
     historyStatus,

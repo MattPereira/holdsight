@@ -239,6 +239,13 @@
       "when": 1782682951559,
       "tag": "0033_equal_captain_flint",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1782860465102,
+      "tag": "0034_short_famine",
+      "breakpoints": true
     }
   ]
 }

@@ -124,7 +124,7 @@ export function PortfolioPage({
     ? transactionsPanel?.onRefresh
     : handleRefresh;
   const refreshBusy = onTransactionsTab
-    ? (transactionsPanel?.busy ?? false)
+    ? (transactionsPanel?.refreshPending ?? false)
     : isPending;
 
   return (

@@ -19,6 +19,7 @@ import { account, session, user } from "./auth";
 export const investmentAccountKind = pgEnum("investment_account_kind", [
   "evm_wallet",
   "hyper_core",
+  "lighter",
   "centralized_exchange",
   "brokerage",
 ]);
@@ -141,6 +142,56 @@ export const hyperCoreAccounts = pgTable(
     index("hyper_core_accounts_address_idx").on(table.address),
     foreignKey({
       name: "hyper_core_accounts_investment_account_user_fk",
+      columns: [table.investmentAccountId, table.userId],
+      foreignColumns: [investmentAccounts.id, investmentAccounts.userId],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const lighterAccounts = pgTable(
+  "lighter_accounts",
+  {
+    investmentAccountId: uuid("investment_account_id").primaryKey(),
+    userId: uuid("user_id").notNull(),
+    evmInvestmentAccountId: uuid("evm_investment_account_id").notNull(),
+    accountIndex: integer("account_index").notNull(),
+    address: text("address").notNull(),
+  },
+  (table) => [
+    uniqueIndex("lighter_accounts_user_account_index_idx").on(
+      table.userId,
+      table.accountIndex,
+    ),
+    index("lighter_accounts_evm_account_idx").on(table.evmInvestmentAccountId),
+    foreignKey({
+      name: "lighter_accounts_investment_account_user_fk",
+      columns: [table.investmentAccountId, table.userId],
+      foreignColumns: [investmentAccounts.id, investmentAccounts.userId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "lighter_accounts_evm_account_user_fk",
+      columns: [table.evmInvestmentAccountId, table.userId],
+      foreignColumns: [investmentAccounts.id, investmentAccounts.userId],
+    }).onDelete("cascade"),
+  ],
+);
+
+export const lighterCredentials = pgTable(
+  "lighter_credentials",
+  {
+    investmentAccountId: uuid("investment_account_id").primaryKey(),
+    userId: uuid("user_id").notNull(),
+    readOnlyTokenEncrypted: text("read_only_token_encrypted").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      name: "lighter_credentials_investment_account_user_fk",
       columns: [table.investmentAccountId, table.userId],
       foreignColumns: [investmentAccounts.id, investmentAccounts.userId],
     }).onDelete("cascade"),
@@ -408,6 +459,7 @@ export const investmentAccountsRelations = relations(
     }),
     evmWalletAccount: one(evmWalletAccounts),
     hyperCoreAccount: one(hyperCoreAccounts),
+    lighterAccount: one(lighterAccounts),
     centralizedExchangeAccount: one(centralizedExchangeAccounts),
     exchangeApiCredentials: one(exchangeApiCredentials),
     brokerageAccount: one(brokerageAccounts),

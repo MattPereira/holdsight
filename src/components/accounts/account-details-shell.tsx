@@ -53,7 +53,9 @@ export function AccountDetailsShell({
   const refresh = onTransactionsTab
     ? transactions.onRefresh
     : onRefreshBalances;
-  const refreshBusy = onTransactionsTab ? transactions.busy : balancesBusy;
+  const refreshBusy = onTransactionsTab
+    ? transactions.refreshPending
+    : balancesBusy;
 
   return (
     <div className="flex flex-col gap-4">
@@ -99,8 +101,8 @@ export function AccountDetailsShell({
                 aria-label={
                   onTransactionsTab
                     ? refreshBusy
-                      ? "Syncing"
-                      : "Sync"
+                      ? "Refreshing transactions"
+                      : "Refresh transactions"
                     : refreshBusy
                       ? "Refreshing"
                       : "Refresh"

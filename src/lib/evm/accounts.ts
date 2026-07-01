@@ -8,6 +8,7 @@ import {
   evmWalletAccounts,
   hyperCoreAccounts,
   investmentAccounts,
+  lighterAccounts,
 } from "@/db/schema/investment-accounts";
 
 const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
@@ -202,6 +203,20 @@ export async function renameUserEvmAccount(
           eq(investmentAccounts.userId, userId),
         ),
       );
+  }
+
+  const lighterMatches = await db
+    .select({ id: lighterAccounts.investmentAccountId })
+    .from(lighterAccounts)
+    .where(and(
+      eq(lighterAccounts.userId, userId),
+      eq(lighterAccounts.evmInvestmentAccountId, account.id),
+    ));
+  for (const match of lighterMatches) {
+    await db.update(investmentAccounts).set({ label }).where(and(
+      eq(investmentAccounts.id, match.id),
+      eq(investmentAccounts.userId, userId),
+    ));
   }
 
   return { error: null };

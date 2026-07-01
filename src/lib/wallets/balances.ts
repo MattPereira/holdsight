@@ -4,6 +4,8 @@ import { getCurrentEvmBalances } from "@/lib/evm/balances";
 import { getUserEvmAccounts, type SavedEvmAccount } from "@/lib/evm/accounts";
 import { ensureUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
 import { getCurrentHyperCoreBalances } from "@/lib/hyper-core/balances";
+import { getUserLighterAccounts } from "@/lib/lighter/accounts";
+import { getCurrentLighterBalances } from "@/lib/lighter/balances";
 import type { BalancesResult } from "@/lib/portfolio/types";
 
 function addressKey(address: string): string {
@@ -23,16 +25,11 @@ function mergeReadyResults(
 }
 
 export function mergeWalletBalanceResults(
-  evmResults: BalancesResult[],
-  hyperCoreResults: BalancesResult[],
+  ...resultGroups: BalancesResult[][]
 ): BalancesResult[] {
   const merged = new Map<string, BalancesResult>();
 
-  for (const result of evmResults) {
-    merged.set(addressKey(result.address), result);
-  }
-
-  for (const result of hyperCoreResults) {
+  for (const result of resultGroups.flat()) {
     const key = addressKey(result.address);
     const current = merged.get(key);
 
@@ -60,10 +57,12 @@ export async function getCurrentWalletBalances(
     userId,
     evmAccounts,
   );
-  const [evmResults, hyperCoreResults] = await Promise.all([
+  const lighterAccounts = await getUserLighterAccounts(userId);
+  const [evmResults, hyperCoreResults, lighterResults] = await Promise.all([
     getCurrentEvmBalances(userId),
     getCurrentHyperCoreBalances(hyperCoreAccounts),
+    getCurrentLighterBalances(lighterAccounts),
   ]);
 
-  return mergeWalletBalanceResults(evmResults, hyperCoreResults);
+  return mergeWalletBalanceResults(evmResults, hyperCoreResults, lighterResults);
 }

@@ -11,6 +11,7 @@ import {
 } from "@/lib/exchange/kraken/transactions";
 import { getUserEvmAccounts } from "@/lib/evm/accounts";
 import { getUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
+import { getUserLighterAccounts } from "@/lib/lighter/accounts";
 import type { TransactionSyncPhase } from "@/lib/investment-transactions/ingestion";
 import { withTransactionJournalSummaries } from "@/lib/investment-transactions/journal";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
@@ -98,9 +99,10 @@ export function mergePortfolioTransactions(
 export async function getCurrentPortfolioTransactions(
   userId: string,
 ): Promise<PortfolioTransactionsSnapshot> {
-  const [wallets, hyperCoreAccounts] = await Promise.all([
+  const [wallets, hyperCoreAccounts, lighterAccounts] = await Promise.all([
     getUserEvmAccounts(userId),
     getUserHyperCoreAccounts(userId),
+    getUserLighterAccounts(userId),
   ]);
 
   const [
@@ -112,7 +114,7 @@ export async function getCurrentPortfolioTransactions(
     brokerageStatus,
   ] = await Promise.all([
     getCurrentWalletTransactions(userId),
-    getWalletTransactionHistoryStatus(userId, wallets, hyperCoreAccounts),
+    getWalletTransactionHistoryStatus(userId, wallets, hyperCoreAccounts, lighterAccounts),
     getCurrentKrakenTransactions(userId),
     getKrakenTransactionHistoryStatus(userId),
     getCurrentBrokerageTransactions(userId),

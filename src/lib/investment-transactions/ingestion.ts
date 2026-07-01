@@ -376,6 +376,7 @@ export async function failInvestmentTransactionSyncLease(input: {
   provider: string;
   leaseToken: string;
   message: string;
+  httpStatus?: number | null;
 }): Promise<void> {
   const now = new Date();
   await db
@@ -385,7 +386,7 @@ export async function failInvestmentTransactionSyncLease(input: {
       leaseToken: null,
       leaseExpiresAt: null,
       lastSyncedAt: now,
-      lastHttpStatus: null,
+      lastHttpStatus: input.httpStatus ?? null,
       lastErrorMessage: input.message,
       updatedAt: now,
     })

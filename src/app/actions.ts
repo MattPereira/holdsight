@@ -14,6 +14,7 @@ import {
   getCurrentHyperCoreBalances,
   syncHyperCoreAccounts,
 } from "@/lib/hyper-core/balances";
+import { processHyperCoreTransactionSyncPage } from "@/lib/hyper-core/transactions";
 import {
   getCurrentWalletTransactions,
   getWalletTransactionHistoryStatus,
@@ -22,6 +23,18 @@ import {
 import { mergeWalletBalanceResults } from "@/lib/wallets/balances";
 import { syncEvmTransactionHistory } from "@/workflows/evm-transaction-sync";
 import { syncHyperCoreTransactionHistory } from "@/workflows/hyper-core-transaction-sync";
+import {
+  connectLighterAccount,
+  getUserLighterAccounts,
+  removeLighterAccount,
+  type SavedLighterAccount,
+} from "@/lib/lighter/accounts";
+import {
+  getCurrentLighterBalances,
+  syncLighterAccounts,
+} from "@/lib/lighter/balances";
+import { syncLighterTransactionHistory } from "@/workflows/lighter-transaction-sync";
+import { processLighterTransactionSyncPage } from "@/lib/lighter/transactions";
 import {
   ensureUserKrakenAccount,
   getUserKrakenAccounts,
@@ -287,15 +300,18 @@ export async function loadWalletBalances(): Promise<BalancesResult[]> {
 
   const wallets = await getUserEvmAccounts(userId);
   const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
+  const lighterAccounts = await getUserLighterAccounts(userId);
   await syncEvmWalletBalances(wallets);
   await syncHyperCoreAccounts(hyperCoreAccounts);
+  await syncLighterAccounts(userId, lighterAccounts);
 
-  const [evmResults, hyperCoreResults] = await Promise.all([
+  const [evmResults, hyperCoreResults, lighterResults] = await Promise.all([
     getCurrentEvmBalances(userId),
     getCurrentHyperCoreBalances(hyperCoreAccounts),
+    getCurrentLighterBalances(lighterAccounts),
   ]);
 
-  return mergeWalletBalanceResults(evmResults, hyperCoreResults);
+  return mergeWalletBalanceResults(evmResults, hyperCoreResults, lighterResults);
 }
 
 export type WalletTransactionsActionResult = {
@@ -318,6 +334,7 @@ export async function loadWalletTransactions(): Promise<WalletTransactionsAction
 
   const wallets = await getUserEvmAccounts(userId);
   const hyperCoreAccounts = await ensureUserHyperCoreAccounts(userId, wallets);
+  const lighterAccounts = await getUserLighterAccounts(userId);
   if (wallets.length === 0) {
     return {
       transactions: [],
@@ -340,14 +357,64 @@ export async function loadWalletTransactions(): Promise<WalletTransactionsAction
       if (!claimed) continue;
 
       try {
-        await start(syncHyperCoreTransactionHistory, [userId, account.id, leaseToken]);
+        const firstPage = await processHyperCoreTransactionSyncPage({
+          userId,
+          account,
+        });
+        if (firstPage.shouldContinue) {
+          await start(syncHyperCoreTransactionHistory, [userId, account.id, leaseToken]);
+        } else {
+          await releaseInvestmentTransactionSyncLease({
+            userId,
+            investmentAccountId: account.id,
+            provider: "hyperliquid",
+            leaseToken,
+          });
+        }
         queuedHyperCoreAccountCount += 1;
       } catch (error) {
-        await releaseInvestmentTransactionSyncLease({
+        await failInvestmentTransactionSyncLease({
           userId,
           investmentAccountId: account.id,
           provider: "hyperliquid",
           leaseToken,
+          message: error instanceof Error
+            ? error.message
+            : "HyperCore transaction sync failed.",
+          httpStatus: error instanceof Error && "httpStatus" in error
+            ? Number(error.httpStatus) || null
+            : null,
+        });
+        throw error;
+      }
+    }
+
+    let queuedLighterAccountCount = 0;
+    for (const account of lighterAccounts) {
+      const leaseToken = randomUUID();
+      const claimed = await claimInvestmentTransactionSyncLease({
+        userId, investmentAccountId: account.id, provider: "lighter", leaseToken,
+      });
+      if (!claimed) continue;
+      try {
+        const firstPage = await processLighterTransactionSyncPage({ userId, account });
+        if (firstPage.shouldContinue) {
+          await start(syncLighterTransactionHistory, [userId, account.id, leaseToken]);
+        } else {
+          await releaseInvestmentTransactionSyncLease({
+            userId, investmentAccountId: account.id, provider: "lighter", leaseToken,
+          });
+        }
+        queuedLighterAccountCount += 1;
+      } catch (error) {
+        await failInvestmentTransactionSyncLease({
+          userId, investmentAccountId: account.id, provider: "lighter", leaseToken,
+          message: error instanceof Error
+            ? error.message
+            : "Lighter transaction sync failed.",
+          httpStatus: error instanceof Error && "httpStatus" in error
+            ? Number(error.httpStatus) || null
+            : null,
         });
         throw error;
       }
@@ -375,11 +442,14 @@ export async function loadWalletTransactions(): Promise<WalletTransactionsAction
     revalidatePath("/wallets");
     const [transactions, historyStatus] = await Promise.all([
       getCurrentWalletTransactions(userId),
-      getWalletTransactionHistoryStatus(userId, wallets, hyperCoreAccounts),
+      getWalletTransactionHistoryStatus(userId, wallets, hyperCoreAccounts, lighterAccounts),
     ]);
     const messages = [
       queuedHyperCoreAccountCount > 0
         ? `Queued HyperCore history for ${queuedHyperCoreAccountCount} ${queuedHyperCoreAccountCount === 1 ? "wallet" : "wallets"}.`
+        : null,
+      queuedLighterAccountCount > 0
+        ? `Queued Lighter history for ${queuedLighterAccountCount} ${queuedLighterAccountCount === 1 ? "account" : "accounts"}.`
         : null,
       evmWorkflowAccounts.length > 0
         ? `Queued EVM history for ${evmWorkflowAccounts.length} ${evmWorkflowAccounts.length === 1 ? "wallet" : "wallets"}.`
@@ -394,7 +464,7 @@ export async function loadWalletTransactions(): Promise<WalletTransactionsAction
   } catch (error) {
     const [transactions, historyStatus] = await Promise.all([
       getCurrentWalletTransactions(userId),
-      getWalletTransactionHistoryStatus(userId, wallets, hyperCoreAccounts),
+      getWalletTransactionHistoryStatus(userId, wallets, hyperCoreAccounts, lighterAccounts),
     ]);
     return {
       transactions,
@@ -424,14 +494,16 @@ export async function pollWalletTransactions(
     };
   }
 
-  const [wallets, hyperCoreAccounts] = await Promise.all([
+  const [wallets, hyperCoreAccounts, lighterAccounts] = await Promise.all([
     getUserEvmAccounts(userId),
     getUserHyperCoreAccounts(userId),
+    getUserLighterAccounts(userId),
   ]);
   const historyStatus = await getWalletTransactionHistoryStatus(
     userId,
     wallets,
     hyperCoreAccounts,
+    lighterAccounts,
   );
   const transactions =
     historyStatus.transactionCount === knownTransactionCount &&
@@ -606,6 +678,79 @@ export async function removeKrakenAccount(
   await removeUserKrakenAccount(userId, investmentAccountId);
   revalidatePath("/");
   revalidatePath("/exchange");
+  return { error: null };
+}
+
+export async function saveLighterConnection(input: {
+  evmInvestmentAccountId: string;
+  readOnlyToken: string;
+}): Promise<{ message: string; error: string | null }> {
+  const userId = await getCurrentUserId();
+  if (!userId) return { message: "", error: "You must be signed in to add credentials." };
+  if (!input.evmInvestmentAccountId || !input.readOnlyToken.trim()) {
+    return { message: "", error: "Select a wallet and enter a Lighter read-only token." };
+  }
+  try {
+    const account = await connectLighterAccount({
+      userId,
+      evmInvestmentAccountId: input.evmInvestmentAccountId,
+      token: input.readOnlyToken,
+    });
+    await syncLighterAccounts(userId, [account]);
+    const leaseToken = randomUUID();
+    const claimed = await claimInvestmentTransactionSyncLease({
+      userId,
+      investmentAccountId: account.id,
+      provider: "lighter",
+      leaseToken,
+    });
+    if (claimed) {
+      try {
+        const firstPage = await processLighterTransactionSyncPage({ userId, account });
+        if (firstPage.shouldContinue) {
+          await start(syncLighterTransactionHistory, [userId, account.id, leaseToken]);
+        } else {
+          await releaseInvestmentTransactionSyncLease({
+            userId,
+            investmentAccountId: account.id,
+            provider: "lighter",
+            leaseToken,
+          });
+        }
+      } catch (error) {
+        await failInvestmentTransactionSyncLease({
+          userId,
+          investmentAccountId: account.id,
+          provider: "lighter",
+          leaseToken,
+          message: error instanceof Error
+            ? error.message
+            : "Lighter transaction sync failed.",
+          httpStatus: error instanceof Error && "httpStatus" in error
+            ? Number(error.httpStatus) || null
+            : null,
+        });
+        throw error;
+      }
+    }
+    revalidatePath("/");
+    revalidatePath("/wallets");
+    revalidatePath("/connect");
+    return { message: "Lighter account connected.", error: null };
+  } catch (error) {
+    return { message: "", error: error instanceof Error ? error.message : "Failed to connect Lighter." };
+  }
+}
+
+export async function removeLighterConnection(
+  investmentAccountId: string,
+): Promise<{ error: string | null }> {
+  const userId = await getCurrentUserId();
+  if (!userId) return { error: "You must be signed in to remove an account." };
+  await removeLighterAccount(userId, investmentAccountId);
+  revalidatePath("/");
+  revalidatePath("/wallets");
+  revalidatePath("/connect");
   return { error: null };
 }
 
@@ -1052,7 +1197,7 @@ function combinePortfolioTransactionResults(
 
   return {
     transactions: snapshot.transactions,
-    message: messages.join(" "),
+    message: [...new Set(messages)].join(" "),
     error: errors.length > 0 ? errors.join(" ") : null,
     historyStatus: snapshot.historyStatus,
     isSyncing: snapshot.isSyncing,
@@ -1303,6 +1448,7 @@ export async function removeCreditCard(
 
 export type AccountConnectionsResult = {
   wallets: SavedEvmAccount[];
+  lighterAccounts: SavedLighterAccount[];
   krakenAccounts: SavedKrakenAccount[];
   plaidItems: SavedPlaidItem[];
   schwabConnections: SavedBrokerageConnection[];
@@ -1320,6 +1466,7 @@ export async function getAccountConnections(): Promise<AccountConnectionsResult>
   if (!userId) {
     return {
       wallets: [],
+      lighterAccounts: [],
       krakenAccounts: [],
       plaidItems: [],
       schwabConnections: [],
@@ -1331,12 +1478,14 @@ export async function getAccountConnections(): Promise<AccountConnectionsResult>
 
   const [
     wallets,
+    lighterAccounts,
     krakenAccounts,
     plaidItems,
     schwabConnections,
     manualItems,
   ] = await Promise.all([
     getUserEvmAccounts(userId),
+    getUserLighterAccounts(userId),
     getUserKrakenAccounts(userId),
     getUserPlaidItems(userId),
     getUserSchwabConnections(userId),
@@ -1345,6 +1494,7 @@ export async function getAccountConnections(): Promise<AccountConnectionsResult>
 
   return {
     wallets,
+    lighterAccounts,
     krakenAccounts,
     plaidItems,
     schwabConnections,
@@ -1479,6 +1629,8 @@ export async function loadPortfolioPageData(): Promise<PortfolioHomeData> {
       wallets,
     );
     await syncHyperCoreAccounts(hyperCoreAccounts);
+    const lighterAccounts = await getUserLighterAccounts(userId);
+    await syncLighterAccounts(userId, lighterAccounts);
   };
 
   await Promise.all([

@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 
 import type { AccountConnectionsResult } from "@/app/actions";
 import { KrakenConnectPanel } from "@/components/connections/connect-panels/kraken-connect-panel";
+import { LighterConnectPanel } from "@/components/connections/connect-panels/lighter-connect-panel";
 import { ManualConnectPanel } from "@/components/connections/connect-panels/manual-connect-panel";
 import { PlaidConnectPanel } from "@/components/connections/connect-panels/plaid-connect-panel";
 import { SchwabConnectPanel } from "@/components/connections/connect-panels/schwab-connect-panel";
@@ -29,7 +30,7 @@ import {
 } from "@/components/ui/field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
-type Provider = "plaid" | "schwab" | "wallet" | "kraken" | "manual";
+type Provider = "plaid" | "schwab" | "wallet" | "lighter" | "kraken" | "manual";
 
 const providerOptions: {
   provider: Provider;
@@ -37,6 +38,12 @@ const providerOptions: {
   description: string;
   icon: typeof RiBankLine;
 }[] = [
+  {
+    provider: "lighter",
+    label: "Lighter",
+    description: "Fold trading into an EVM wallet",
+    icon: RiExchangeFundsLine,
+  },
   {
     provider: "plaid",
     label: "Plaid connection",
@@ -83,6 +90,7 @@ export function AccountConnectView({
     connections.schwabConnections.length > 0 ||
     connections.wallets.length > 0 ||
     connections.krakenAccounts.length > 0 ||
+    connections.lighterAccounts.length > 0 ||
     connections.manualItems.length > 0;
 
   // A successful connection sends the user back to the portfolio with fresh
@@ -171,6 +179,13 @@ export function AccountConnectView({
                 initialAccounts={connections.krakenAccounts}
                 onConnected={handleConnected}
               />
+            ) : provider === "lighter" ? (
+              <LighterConnectPanel
+                view="add"
+                wallets={connections.wallets}
+                initialAccounts={connections.lighterAccounts}
+                onConnected={handleConnected}
+              />
             ) : (
               <ManualConnectPanel
                 view="add"
@@ -218,6 +233,12 @@ export function AccountConnectView({
           <KrakenConnectPanel
             view="remove"
             initialAccounts={connections.krakenAccounts}
+            onConnected={handleConnected}
+          />
+          <LighterConnectPanel
+            view="remove"
+            wallets={connections.wallets}
+            initialAccounts={connections.lighterAccounts}
             onConnected={handleConnected}
           />
           <ManualConnectPanel

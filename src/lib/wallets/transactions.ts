@@ -11,11 +11,12 @@ import {
 } from "@/db/schema/investment-transactions";
 import type { SavedEvmAccount } from "@/lib/evm/accounts";
 import type { SavedHyperCoreAccount } from "@/lib/hyper-core/accounts";
+import type { SavedLighterAccount } from "@/lib/lighter/accounts";
 import { summarizeSyncPhase, type TransactionSyncPhase } from "@/lib/investment-transactions/ingestion";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 
-const WALLET_TRANSACTION_PROVIDERS = ["hyperliquid", "zerion"] as const;
-const WALLET_VISIBLE_TRANSACTION_KINDS = ["trade", "fee"] as const;
+const WALLET_TRANSACTION_PROVIDERS = ["hyperliquid", "lighter", "zerion"] as const;
+const WALLET_VISIBLE_TRANSACTION_KINDS = ["trade"] as const;
 const HYPER_CORE_SPOT_TRANSACTION_SIDES = ["buy", "sell"] as const;
 
 export type WalletTransactionHistoryStatus = {
@@ -29,6 +30,20 @@ export type WalletTransactionHistoryStatus = {
 
 function numberOrNull(value: string | null): number | null {
   return value === null ? null : Number(value);
+}
+
+function visibleWalletProviderScope() {
+  return or(
+    eq(investmentTransactions.sourceProvider, "zerion"),
+    eq(investmentTransactions.sourceProvider, "lighter"),
+    and(
+      eq(investmentTransactions.sourceProvider, "hyperliquid"),
+      inArray(
+        investmentTransactions.side,
+        HYPER_CORE_SPOT_TRANSACTION_SIDES,
+      ),
+    ),
+  );
 }
 
 export async function getCurrentWalletTransactions(userId: string): Promise<InvestmentTransactionListItem[]> {
@@ -60,13 +75,7 @@ export async function getCurrentWalletTransactions(userId: string): Promise<Inve
       eq(investmentTransactions.userId, userId),
       inArray(investmentTransactions.sourceProvider, WALLET_TRANSACTION_PROVIDERS),
       inArray(investmentTransactions.kind, WALLET_VISIBLE_TRANSACTION_KINDS),
-      or(
-        eq(investmentTransactions.sourceProvider, "zerion"),
-        and(
-          eq(investmentTransactions.sourceProvider, "hyperliquid"),
-          inArray(investmentTransactions.side, HYPER_CORE_SPOT_TRANSACTION_SIDES),
-        ),
-      ),
+      visibleWalletProviderScope(),
     ))
     .orderBy(desc(investmentTransactions.executedAt));
 
@@ -162,22 +171,18 @@ export async function getWalletTransactionHistoryStatus(
   userId: string,
   evmAccounts: SavedEvmAccount[],
   hyperCoreAccounts: SavedHyperCoreAccount[],
+  lighterAccounts: SavedLighterAccount[] = [],
 ): Promise<WalletTransactionHistoryStatus> {
   const accountProviders = [
     ...evmAccounts.map((account) => ({ id: account.id, provider: "zerion" })),
     ...hyperCoreAccounts.map((account) => ({ id: account.id, provider: "hyperliquid" })),
+    ...lighterAccounts.map((account) => ({ id: account.id, provider: "lighter" })),
   ];
   const transactionScope = and(
     eq(investmentTransactions.userId, userId),
     inArray(investmentTransactions.sourceProvider, WALLET_TRANSACTION_PROVIDERS),
     inArray(investmentTransactions.kind, WALLET_VISIBLE_TRANSACTION_KINDS),
-    or(
-      eq(investmentTransactions.sourceProvider, "zerion"),
-      and(
-        eq(investmentTransactions.sourceProvider, "hyperliquid"),
-        inArray(investmentTransactions.side, HYPER_CORE_SPOT_TRANSACTION_SIDES),
-      ),
-    ),
+    visibleWalletProviderScope(),
   );
   const [earliest, latest, transactionCount, latestTransactionUpdate, perpEarliest, perpLatest, perpCount, perpLatestUpdate, states] = await Promise.all([
     db.select({ executedAt: investmentTransactions.executedAt }).from(investmentTransactions)
