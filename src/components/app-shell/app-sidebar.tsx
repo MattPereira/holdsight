@@ -5,6 +5,7 @@ import {
   RiExchangeFundsLine,
   RiFundsLine,
   RiLightbulbLine,
+  RiLinksLine,
   RiWalletLine,
 } from "@remixicon/react";
 
@@ -25,6 +26,7 @@ const accounts = [
   { label: "Wallets", href: "/wallets", icon: RiWalletLine },
   { label: "Exchanges", href: "/exchanges", icon: RiExchangeFundsLine },
   { label: "Brokerages", href: "/brokerages", icon: RiFundsLine },
+  { label: "Connections", href: "/connections", icon: RiLinksLine },
 ];
 
 export function AppSidebar({ name, email }: { name: string; email: string }) {

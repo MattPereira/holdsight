@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  RiLinksLine,
   RiExpandUpDownLine,
   RiLogoutBoxRLine,
   RiMoonLine,
@@ -95,10 +94,6 @@ export function NavUser({ name, email }: { name: string; email: string }) {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => router.push("/connect")}>
-              <RiLinksLine />
-              Manage accounts
-            </DropdownMenuItem>
             <DropdownMenuItem
               onSelect={(event) => {
                 // Keep the menu open so toggling theme feels immediate.

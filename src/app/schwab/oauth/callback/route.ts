@@ -12,7 +12,7 @@ import {
 const SCHWAB_OAUTH_STATE_COOKIE = "schwab_oauth_state";
 
 function connectRedirect(request: NextRequest, result: string): NextResponse {
-  const url = new URL("/connect", request.url);
+  const url = new URL("/connections", request.url);
   url.searchParams.set("schwab", result);
   return NextResponse.redirect(url);
 }
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       }
     }
     revalidatePath("/");
-    revalidatePath("/connect");
+    revalidatePath("/connections");
     revalidatePath("/brokerages");
     return clearStateCookie(connectRedirect(request, "connected"));
   } catch (exchangeError) {

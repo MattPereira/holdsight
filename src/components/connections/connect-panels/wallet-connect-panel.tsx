@@ -98,7 +98,7 @@ export function WalletConnectPanel({
 
     return (
       <div className="flex flex-col gap-3">
-        <h3 className="text-base font-medium">EVM wallets</h3>
+        <h3 className="text-base font-medium">Wallets</h3>
         {error ? <FieldError>{error}</FieldError> : null}
         <ul className="divide-y rounded-lg border">
           {wallets.map((wallet) => {

@@ -121,10 +121,7 @@ export function AccountConnectView({
             <RiArrowLeftLine data-icon="inline-start" />
             Back
           </Button>
-          <h1 className="text-xl font-medium">Add an account</h1>
-          <p className="text-sm text-muted-foreground">
-            Choose how you want to connect
-          </p>
+          <h1 className="text-xl font-medium">Add a connection</h1>
         </div>
 
         <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[20rem_1fr] lg:items-start lg:gap-12">
@@ -205,11 +202,11 @@ export function AccountConnectView({
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-col gap-0.5">
-          <h1 className="text-xl font-medium">Your accounts</h1>
+          <h1 className="text-xl font-medium">Connections</h1>
         </div>
         <Button type="button" variant="outline" onClick={() => setMode("add")}>
           <RiAddLine data-icon="inline-start" />
-          Add account
+          Connect
         </Button>
       </div>
 

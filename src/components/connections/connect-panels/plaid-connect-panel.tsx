@@ -151,7 +151,7 @@ export function PlaidConnectPanel({
 
     return (
       <div className="flex flex-col gap-3">
-        <h3 className="text-base font-medium">Plaid connections</h3>
+        <h3 className="text-base font-medium">Plaid</h3>
         <FieldError>{error}</FieldError>
         <ul className="divide-y rounded-lg border">
           {items.map((item) => {

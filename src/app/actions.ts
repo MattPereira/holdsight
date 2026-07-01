@@ -735,7 +735,7 @@ export async function saveLighterConnection(input: {
     }
     revalidatePath("/");
     revalidatePath("/wallets");
-    revalidatePath("/connect");
+    revalidatePath("/connections");
     return { message: "Lighter account connected.", error: null };
   } catch (error) {
     return { message: "", error: error instanceof Error ? error.message : "Failed to connect Lighter." };
@@ -750,7 +750,7 @@ export async function removeLighterConnection(
   await removeLighterAccount(userId, investmentAccountId);
   revalidatePath("/");
   revalidatePath("/wallets");
-  revalidatePath("/connect");
+  revalidatePath("/connections");
   return { error: null };
 }
 
@@ -1551,7 +1551,7 @@ export async function removeSchwabConnection(
 
   await removeUserSchwabConnection(userId, connectionId);
   revalidatePath("/");
-  revalidatePath("/connect");
+  revalidatePath("/connections");
   return {
     schwabConnections: await getUserSchwabConnections(userId),
     error: null,

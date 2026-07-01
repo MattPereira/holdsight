@@ -111,7 +111,7 @@ export function PortfolioAccountsList({
                     size="icon"
                     className="size-7"
                   >
-                    <Link href="/connect" aria-label="Configure accounts">
+                    <Link href="/connections" aria-label="Configure accounts">
                       <RiSettings3Line />
                     </Link>
                   </Button>
@@ -170,7 +170,7 @@ export function PortfolioAccountsList({
                     size="icon"
                     className="size-7"
                   >
-                    <Link href="/connect" aria-label="Configure accounts">
+                    <Link href="/connections" aria-label="Configure accounts">
                       <RiSettings3Line />
                     </Link>
                   </Button>

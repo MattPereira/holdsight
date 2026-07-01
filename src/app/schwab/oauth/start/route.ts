@@ -11,7 +11,7 @@ const SCHWAB_OAUTH_STATE_COOKIE = "schwab_oauth_state";
 const STATE_MAX_AGE_SECONDS = 10 * 60;
 
 function connectRedirect(request: NextRequest, error: string): NextResponse {
-  const url = new URL("/connect", request.url);
+  const url = new URL("/connections", request.url);
   url.searchParams.set("schwab", error);
   return NextResponse.redirect(url);
 }
