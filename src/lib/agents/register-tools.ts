@@ -15,6 +15,12 @@ import {
   getPortfolioTransactionsForAgent,
   MAX_AGENT_TRANSACTION_LIMIT,
 } from "@/lib/agents/portfolio-transactions";
+import {
+  assetGroupThesisListResultSchema,
+  assetGroupThesisResultSchema,
+  portfolioAllocationsResultSchema,
+  portfolioTransactionsResultSchema,
+} from "@/lib/agents/output-schemas";
 import { MAX_ASSET_GROUP_THESIS_SECTION_LENGTH } from "@/lib/portfolio/asset-group-thesis";
 
 const thesisSection = (description: string) =>
@@ -43,6 +49,7 @@ function registerPortfolioAllocationTools(server: McpServer, userId: string) {
       description:
         "Read the current Holdsight portfolio allocations and structured asset-group theses without refreshing external account balances. Current allocation percentages use a 0–100 scale.",
       inputSchema: {},
+      outputSchema: portfolioAllocationsResultSchema.shape,
       annotations: {
         readOnlyHint: true,
         openWorldHint: false,
@@ -69,6 +76,7 @@ function registerPortfolioAllocationTools(server: McpServer, userId: string) {
           .boolean()
           .describe("Must be true because this tool can call external APIs."),
       },
+      outputSchema: portfolioAllocationsResultSchema.shape,
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -107,8 +115,9 @@ function registerAssetGroupThesisTools(server: McpServer, userId: string) {
     {
       title: "List Asset Group Theses",
       description:
-        "List the authenticated user's asset-group theses with IDs, names, member symbols, completion status, and update versions. Use this compact index to identify a thesis, then call get_asset_group_thesis to read its contents.",
+        "List the authenticated user's asset-group theses with IDs, names, member symbols, completion status, and last-updated timestamps. Use this compact index to identify a thesis, then call get_asset_group_thesis to read its contents.",
       inputSchema: {},
+      outputSchema: assetGroupThesisListResultSchema.shape,
       annotations: {
         readOnlyHint: true,
         openWorldHint: false,
@@ -130,7 +139,7 @@ function registerAssetGroupThesisTools(server: McpServer, userId: string) {
     {
       title: "Get Asset Group Thesis",
       description:
-        "Read one structured asset-group thesis and its updatedAt version without refreshing external providers. Use the returned updatedAt value when updating the thesis.",
+        "Read one structured asset-group thesis and its updatedAt timestamp without refreshing external providers. Use the returned updatedAt value when updating the thesis.",
       inputSchema: {
         assetGroupId: z
           .string()
@@ -139,6 +148,7 @@ function registerAssetGroupThesisTools(server: McpServer, userId: string) {
             "Asset group ID returned by list_asset_group_theses or get_portfolio_allocations.",
           ),
       },
+      outputSchema: assetGroupThesisResultSchema.shape,
       annotations: {
         readOnlyHint: true,
         openWorldHint: false,
@@ -177,7 +187,9 @@ function registerAssetGroupThesisTools(server: McpServer, userId: string) {
         expectedUpdatedAt: z
           .string()
           .datetime({ offset: true })
-          .describe("Exact updatedAt value returned by get_asset_group_thesis."),
+          .describe(
+            "Pass the exact updatedAt value from the most recent get_asset_group_thesis response. If the update reports a conflict, fetch the thesis again, reconcile the changes, and retry.",
+          ),
         summary: thesisSection("Concise thesis summary."),
         bullCase: thesisSection("Evidence and reasoning for the bull case."),
         bearCase: thesisSection("Evidence and reasoning for the bear case."),
@@ -188,6 +200,7 @@ function registerAssetGroupThesisTools(server: McpServer, userId: string) {
           "Notes connecting the thesis to allocation strategy.",
         ),
       },
+      outputSchema: assetGroupThesisResultSchema.shape,
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -224,7 +237,7 @@ function registerPortfolioTransactionTools(server: McpServer, userId: string) {
     {
       title: "Get Portfolio Transactions",
       description:
-        "Read stored Holdsight investment transactions with optional asset, group, date, transaction, account, value, and journal filters, plus compact references to relevant asset groups. Call get_asset_group_thesis with a returned group ID when thesis contents are needed. All filters are optional; arrays use OR, filter categories use AND, and symbols and groups match the base asset. Results are newest first. This tool does not refresh external providers.",
+        "Read stored Holdsight investment transactions with optional asset, group, date, kind, side, account, value, and journal filters, plus compact references to relevant asset groups. Call get_asset_group_thesis with a returned group ID when thesis contents are needed. All filters are optional; arrays use OR, filter categories use AND, and symbols and groups match the base asset. Results are newest first. This tool does not refresh external providers.",
       inputSchema: {
         symbols: z
           .array(z.string().trim().min(1).max(64))
@@ -238,7 +251,7 @@ function registerPortfolioTransactionTools(server: McpServer, userId: string) {
           .max(50)
           .optional()
           .describe(
-            "Asset group IDs returned by get_portfolio_allocations. Symbols and groups are combined as a union.",
+            "Asset group IDs returned by get_portfolio_allocations, list_asset_group_theses, or prior transaction results. Symbols and groups are combined as a union.",
           ),
         startAt: z
           .string()
@@ -321,6 +334,7 @@ function registerPortfolioTransactionTools(server: McpServer, userId: string) {
           .optional()
           .describe("Opaque nextCursor returned by a previous call."),
       },
+      outputSchema: portfolioTransactionsResultSchema.shape,
       annotations: {
         readOnlyHint: true,
         openWorldHint: false,
