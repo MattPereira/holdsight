@@ -87,15 +87,6 @@ export function AssetGroupsEditor({
 }) {
   const { groups, setGroups } = useAssetGroups();
   const allSymbols = portfolioSummary.totals.map((total) => total.symbol);
-  const nameBySymbol = useMemo(
-    () =>
-      new Map(
-        portfolioSummary.totals.flatMap((total) =>
-          total.name ? [[symbolKey(total.symbol), total.name] as const] : [],
-        ),
-      ),
-    [portfolioSummary],
-  );
   const currentAllocationByGroupId = useMemo(() => {
     const allocations = buildPortfolioAllocations({
       grandTotalValueUsd: portfolioSummary.grandTotalValue,
@@ -203,7 +194,6 @@ export function AssetGroupsEditor({
       {mode === "view" && selectedGroup ? (
         <GroupDetails
           group={selectedGroup}
-          nameBySymbol={nameBySymbol}
           currentAllocationPercent={
             currentAllocationByGroupId.get(selectedGroup.id) ?? 0
           }
@@ -278,7 +268,7 @@ function GroupList({
   return (
     <section className="flex flex-col gap-3">
       {sortedGroups.length > 0 ? (
-        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {sortedGroups.map((group) => {
             const isSelected = group.id === selectedGroupId;
             return (
@@ -339,18 +329,13 @@ function GroupList({
 
 function GroupDetails({
   group,
-  nameBySymbol,
   currentAllocationPercent,
   onEdit,
 }: {
   group: AssetGroup;
-  nameBySymbol: Map<string, string>;
   currentAllocationPercent: number;
   onEdit: () => void;
 }) {
-  const assetNames = group.symbols.map(
-    (symbol) => nameBySymbol.get(symbolKey(symbol)) ?? symbol,
-  );
   const thesisRows: ThesisSectionProps[][] = [
     [
       {
@@ -390,12 +375,12 @@ function GroupDetails({
             <div className="flex min-w-0 items-center gap-2">
               <span
                 aria-hidden="true"
-                className="size-11 shrink-0 rounded-md border"
+                className="size-14 shrink-0 rounded-md border"
                 style={{ backgroundColor: group.color ?? "var(--muted)" }}
               />
               <div className="flex min-w-0 flex-col gap-1.5">
                 <div className="flex min-w-0 items-center gap-1">
-                  <h2 className="truncate text-base font-semibold">
+                  <h2 className="truncate text-lg font-semibold">
                     {groupLabel(group.name, group.symbols)}
                   </h2>
                   <Button
@@ -418,9 +403,6 @@ function GroupDetails({
                 </div>
               </div>
             </div>
-            <p className="truncate text-sm text-muted-foreground">
-              {assetNames.join(", ")}
-            </p>
           </div>
 
           <AllocationProgress
@@ -468,7 +450,7 @@ type ThesisSectionProps = {
 function ThesisSection({ label, value, icon: Icon, accent }: ThesisSectionProps) {
   return (
     <section className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-4">
-      <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+      <h3 className="flex items-center gap-1.5 text-sm font-medium">
         <Icon aria-hidden="true" className={cn("size-4 shrink-0", accent)} />
         {label}
       </h3>
@@ -519,33 +501,27 @@ function AllocationProgress({
   return (
     <div className="flex w-full flex-col gap-2">
       <div className="flex items-end justify-between gap-2">
-        <div className="flex flex-col">
-          <span className="text-xs text-muted-foreground">Current</span>
-          <span
-            className={cn(
-              "text-xl font-semibold tabular-nums tracking-tight",
-              isOverTarget
-                ? "text-amber-600 dark:text-amber-500"
-                : "text-foreground",
-            )}
-          >
-            {allocationPercentFormat.format(currentAllocationPercent)}%
-          </span>
-        </div>
+        <span
+          className={cn(
+            "text-xl font-semibold tabular-nums tracking-tight",
+            isOverTarget
+              ? "text-amber-600 dark:text-amber-500"
+              : "text-foreground",
+          )}
+        >
+          {allocationPercentFormat.format(currentAllocationPercent)}%
+        </span>
         {hasTarget ? (
-          <div className="flex flex-col items-end">
-            <span className="text-xs text-muted-foreground">Target</span>
-            <span className="text-xl font-semibold tabular-nums tracking-tight">
-              {targetAllocationPercent}%
-            </span>
-          </div>
+          <span className="text-xl font-semibold tabular-nums tracking-tight">
+            {targetAllocationPercent}%
+          </span>
         ) : null}
       </div>
       {hasTarget ? (
-        <div className="h-4 w-full overflow-hidden rounded-full bg-muted">
+        <div className="h-5 w-full overflow-hidden rounded-md bg-muted">
           <div
             className={cn(
-              "h-full rounded-full transition-all",
+              "h-full rounded-md transition-all",
               isOverTarget ? "bg-amber-500" : "bg-primary",
             )}
             style={{ width: `${fillPercent}%` }}
