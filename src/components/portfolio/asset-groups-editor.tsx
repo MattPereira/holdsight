@@ -2,11 +2,17 @@
 
 import {
   RiAddLine,
+  RiAlertLine,
+  RiArrowDownLine,
+  RiArrowUpLine,
   RiCheckLine,
   RiCloseLine,
   RiDeleteBinLine,
+  RiLightbulbLine,
   RiPencilLine,
+  RiScales3Line,
 } from "@remixicon/react";
+import type { RemixiconComponentType } from "@remixicon/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
@@ -345,85 +351,153 @@ function GroupDetails({
   const assetNames = group.symbols.map(
     (symbol) => nameBySymbol.get(symbolKey(symbol)) ?? symbol,
   );
-  const thesisSections = [
-    { label: "Thesis", value: group.thesis.summary },
-    {
-      label: "Invalidation Criteria",
-      value: group.thesis.invalidationCriteria,
-    },
-    { label: "Bull Case", value: group.thesis.bullCase },
-    { label: "Bear Case", value: group.thesis.bearCase },
+  const thesisRows: ThesisSectionProps[][] = [
+    [
+      {
+        label: "Thesis",
+        value: group.thesis.summary,
+        icon: RiLightbulbLine,
+        accent: "text-primary",
+      },
+      {
+        label: "Invalidation Criteria",
+        value: group.thesis.invalidationCriteria,
+        icon: RiAlertLine,
+        accent: "text-amber-600 dark:text-amber-500",
+      },
+    ],
+    [
+      {
+        label: "Bull Case",
+        value: group.thesis.bullCase,
+        icon: RiArrowUpLine,
+        accent: "text-emerald-600 dark:text-emerald-500",
+      },
+      {
+        label: "Bear Case",
+        value: group.thesis.bearCase,
+        icon: RiArrowDownLine,
+        accent: "text-red-600 dark:text-red-500",
+      },
+    ],
   ];
 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-4 rounded-lg border p-4 sm:p-6">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
-        <div className="flex min-w-0 flex-col gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <span
-              aria-hidden="true"
-              className="size-11 shrink-0 rounded-md border"
-              style={{ backgroundColor: group.color ?? "var(--muted)" }}
-            />
-            <div className="flex min-w-0 flex-col gap-1.5">
-              <h2 className="truncate text-base font-semibold">
-                {groupLabel(group.name, group.symbols)}
-              </h2>
-              <div className="flex flex-wrap gap-1">
-                {group.symbols.map((symbol) => (
-                  <Badge key={symbol} variant="secondary">
-                    {symbol}
-                  </Badge>
-                ))}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="flex min-w-0 flex-col gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <span
+                aria-hidden="true"
+                className="size-11 shrink-0 rounded-md border"
+                style={{ backgroundColor: group.color ?? "var(--muted)" }}
+              />
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <div className="flex min-w-0 items-center gap-1">
+                  <h2 className="truncate text-base font-semibold">
+                    {groupLabel(group.name, group.symbols)}
+                  </h2>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0 text-muted-foreground"
+                    aria-label={`Edit ${groupLabel(group.name, group.symbols)}`}
+                    onClick={onEdit}
+                  >
+                    <RiPencilLine />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {group.symbols.map((symbol) => (
+                    <Badge key={symbol} variant="secondary">
+                      {symbol}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {assetNames.join(", ")}
-          </p>
-        </div>
-
-        <AllocationProgress
-          currentAllocationPercent={currentAllocationPercent}
-          targetAllocationPercent={group.targetAllocationPercent}
-        />
-      </div>
-
-      <div className="flex flex-col gap-5">
-        {thesisSections
-          .filter((section) => section.value)
-          .map((section) => (
-            <section key={section.label} className="flex flex-col gap-1.5">
-              <h3 className="text-sm font-medium">{section.label}</h3>
-              <p className="text-sm whitespace-pre-line">{section.value}</p>
-            </section>
-          ))}
-        {group.thesis.allocationStrategyNotes ? (
-          <section className="flex flex-col gap-1.5">
-            <h3 className="text-sm font-medium">Allocation Strategy</h3>
-            <p className="text-sm whitespace-pre-line">
-              {group.thesis.allocationStrategyNotes}
+            <p className="truncate text-sm text-muted-foreground">
+              {assetNames.join(", ")}
             </p>
-          </section>
-        ) : null}
-        </div>
-      </div>
+          </div>
 
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-label={`Edit ${groupLabel(group.name, group.symbols)}`}
-          onClick={onEdit}
-        >
-          <RiPencilLine data-icon="inline-start" />
-          Edit
-        </Button>
+          <AllocationProgress
+            currentAllocationPercent={currentAllocationPercent}
+            targetAllocationPercent={group.targetAllocationPercent}
+          />
+        </div>
+
+        <div className="flex flex-col gap-4">
+          {thesisRows.map((row) => {
+            const sections = row.filter((section) => section.value);
+            if (sections.length === 0) return null;
+            return (
+              <div
+                key={row.map((section) => section.label).join("|")}
+                className="grid gap-4 md:grid-cols-2"
+              >
+                {sections.map((section) => (
+                  <ThesisSection key={section.label} {...section} />
+                ))}
+              </div>
+            );
+          })}
+          {group.thesis.allocationStrategyNotes ? (
+            <ThesisSection
+              label="Allocation Strategy"
+              value={group.thesis.allocationStrategyNotes}
+              icon={RiScales3Line}
+              accent="text-primary"
+            />
+          ) : null}
+        </div>
       </div>
     </div>
   );
+}
+
+type ThesisSectionProps = {
+  label: string;
+  value: string | null;
+  icon: RemixiconComponentType;
+  accent: string;
+};
+
+function ThesisSection({ label, value, icon: Icon, accent }: ThesisSectionProps) {
+  return (
+    <section className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-4">
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+        <Icon aria-hidden="true" className={cn("size-4 shrink-0", accent)} />
+        {label}
+      </h3>
+      <ThesisBody value={value ?? ""} />
+    </section>
+  );
+}
+
+// Author-entered sections are commonly written as "- " bullet lists; render
+// those as a real list, and fall back to preserved-whitespace prose otherwise.
+function ThesisBody({ value }: { value: string }) {
+  const lines = value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const isBulletList =
+    lines.length > 0 && lines.every((line) => /^[-*]\s+/.test(line));
+
+  if (isBulletList) {
+    return (
+      <ul className="flex list-disc flex-col gap-1 pl-5 text-sm marker:text-muted-foreground">
+        {lines.map((line, index) => (
+          <li key={index}>{line.replace(/^[-*]\s+/, "")}</li>
+        ))}
+      </ul>
+    );
+  }
+
+  return <p className="text-sm whitespace-pre-line">{value}</p>;
 }
 
 function AllocationProgress({
@@ -443,7 +517,7 @@ function AllocationProgress({
     : 0;
 
   return (
-    <section className="flex w-full flex-col gap-2">
+    <div className="flex w-full flex-col gap-2">
       <div className="flex items-end justify-between gap-2">
         <div className="flex flex-col">
           <span className="text-xs text-muted-foreground">Current</span>
@@ -478,7 +552,7 @@ function AllocationProgress({
           />
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }
 
@@ -647,75 +721,77 @@ function GroupEditor({
           </Field>
         </div>
 
-        <h3 className="text-sm font-medium">Thesis sections</h3>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field data-disabled={isPending}>
+            <FieldLabel htmlFor="group-thesis-summary">Thesis</FieldLabel>
+            <FieldDescription>
+              The core reason for owning this asset group.
+            </FieldDescription>
+            <Textarea
+              id="group-thesis-summary"
+              value={thesis.summary ?? ""}
+              onChange={(event) => updateThesis("summary", event.target.value)}
+              placeholder="Why you own it and how it can create value"
+              maxLength={MAX_ASSET_GROUP_THESIS_SECTION_LENGTH}
+              rows={7}
+              disabled={isPending}
+            />
+          </Field>
 
-        <Field data-disabled={isPending}>
-          <FieldLabel htmlFor="group-thesis-summary">Thesis</FieldLabel>
-          <FieldDescription>
-            The core reason for owning this asset group.
-          </FieldDescription>
-          <Textarea
-            id="group-thesis-summary"
-            value={thesis.summary ?? ""}
-            onChange={(event) => updateThesis("summary", event.target.value)}
-            placeholder="Why you own it and how it can create value"
-            maxLength={MAX_ASSET_GROUP_THESIS_SECTION_LENGTH}
-            rows={5}
-            disabled={isPending}
-          />
-        </Field>
+          <Field data-disabled={isPending}>
+            <FieldLabel htmlFor="group-invalidation-criteria">
+              Invalidation Criteria
+            </FieldLabel>
+            <FieldDescription>
+              Observable conditions that should trigger a reduction or exit.
+            </FieldDescription>
+            <Textarea
+              id="group-invalidation-criteria"
+              value={thesis.invalidationCriteria ?? ""}
+              onChange={(event) =>
+                updateThesis("invalidationCriteria", event.target.value)
+              }
+              placeholder="Specific evidence that would prove the thesis wrong"
+              maxLength={MAX_ASSET_GROUP_THESIS_SECTION_LENGTH}
+              rows={7}
+              disabled={isPending}
+            />
+          </Field>
+        </div>
 
-        <Field data-disabled={isPending}>
-          <FieldLabel htmlFor="group-bull-case">Bull Case</FieldLabel>
-          <FieldDescription>
-            Developments that would make the investment outperform.
-          </FieldDescription>
-          <Textarea
-            id="group-bull-case"
-            value={thesis.bullCase ?? ""}
-            onChange={(event) => updateThesis("bullCase", event.target.value)}
-            placeholder="Growth drivers, catalysts, and upside scenarios"
-            maxLength={MAX_ASSET_GROUP_THESIS_SECTION_LENGTH}
-            rows={7}
-            disabled={isPending}
-          />
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field data-disabled={isPending}>
+            <FieldLabel htmlFor="group-bull-case">Bull Case</FieldLabel>
+            <FieldDescription>
+              Developments that would make the investment outperform.
+            </FieldDescription>
+            <Textarea
+              id="group-bull-case"
+              value={thesis.bullCase ?? ""}
+              onChange={(event) => updateThesis("bullCase", event.target.value)}
+              placeholder="Growth drivers, catalysts, and upside scenarios"
+              maxLength={MAX_ASSET_GROUP_THESIS_SECTION_LENGTH}
+              rows={7}
+              disabled={isPending}
+            />
+          </Field>
 
-        <Field data-disabled={isPending}>
-          <FieldLabel htmlFor="group-bear-case">Bear Case</FieldLabel>
-          <FieldDescription>
-            Risks and scenarios that could impair the investment.
-          </FieldDescription>
-          <Textarea
-            id="group-bear-case"
-            value={thesis.bearCase ?? ""}
-            onChange={(event) => updateThesis("bearCase", event.target.value)}
-            placeholder="Competitive, market, regulatory, and execution risks"
-            maxLength={MAX_ASSET_GROUP_THESIS_SECTION_LENGTH}
-            rows={7}
-            disabled={isPending}
-          />
-        </Field>
-
-        <Field data-disabled={isPending}>
-          <FieldLabel htmlFor="group-invalidation-criteria">
-            Invalidation Criteria
-          </FieldLabel>
-          <FieldDescription>
-            Observable conditions that should trigger a reduction or exit.
-          </FieldDescription>
-          <Textarea
-            id="group-invalidation-criteria"
-            value={thesis.invalidationCriteria ?? ""}
-            onChange={(event) =>
-              updateThesis("invalidationCriteria", event.target.value)
-            }
-            placeholder="Specific evidence that would prove the thesis wrong"
-            maxLength={MAX_ASSET_GROUP_THESIS_SECTION_LENGTH}
-            rows={7}
-            disabled={isPending}
-          />
-        </Field>
+          <Field data-disabled={isPending}>
+            <FieldLabel htmlFor="group-bear-case">Bear Case</FieldLabel>
+            <FieldDescription>
+              Risks and scenarios that could impair the investment.
+            </FieldDescription>
+            <Textarea
+              id="group-bear-case"
+              value={thesis.bearCase ?? ""}
+              onChange={(event) => updateThesis("bearCase", event.target.value)}
+              placeholder="Competitive, market, regulatory, and execution risks"
+              maxLength={MAX_ASSET_GROUP_THESIS_SECTION_LENGTH}
+              rows={7}
+              disabled={isPending}
+            />
+          </Field>
+        </div>
 
         <Field data-disabled={isPending}>
           <FieldLabel htmlFor="group-allocation-strategy-notes">
