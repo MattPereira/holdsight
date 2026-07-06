@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   RiExchangeFundsLine,
   RiFundsLine,
+  RiBookOpenLine,
   RiLightbulbLine,
   RiLinksLine,
   RiWalletLine,
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/sidebar";
 
 const accounts = [
+  { label: "Journal", href: "/journal", icon: RiBookOpenLine },
   { label: "Theses", href: "/theses", icon: RiLightbulbLine },
   { label: "Wallets", href: "/wallets", icon: RiWalletLine },
   { label: "Exchanges", href: "/exchanges", icon: RiExchangeFundsLine },
