@@ -6,40 +6,19 @@ import {
   MAX_JOURNAL_IMAGE_COUNT,
   MAX_JOURNAL_IMAGE_SIZE_BYTES,
   uploadUserInvestmentTransactionJournalImage,
-  type JournalImageUploadError,
 } from "@/lib/investment-transactions/journal-images";
+import { journalImageUploadErrorResponse } from "@/lib/journal-images/responses";
 
 const transactionIdSchema = z.string().uuid();
 const MAX_MULTIPART_BODY_BYTES = MAX_JOURNAL_IMAGE_SIZE_BYTES + 64 * 1024;
 
-function uploadErrorResponse(error: JournalImageUploadError): Response {
-  switch (error) {
-    case "invalid_file":
-      return Response.json({ error: "Select an image to upload." }, { status: 400 });
-    case "invalid_image_type":
-      return Response.json(
-        { error: "Upload a PNG, JPEG, or WebP image." },
-        { status: 415 },
-      );
-    case "image_too_large":
-      return Response.json(
-        { error: "Images must be 4 MiB or smaller." },
-        { status: 413 },
-      );
-    case "image_limit_reached":
-      return Response.json(
-        { error: `A journal entry can have up to ${MAX_JOURNAL_IMAGE_COUNT} images.` },
-        { status: 409 },
-      );
-    case "transaction_not_found":
-      return Response.json({ error: "Transaction not found." }, { status: 404 });
-    case "upload_failed":
-      return Response.json(
-        { error: "The image could not be uploaded." },
-        { status: 502 },
-      );
-  }
-}
+const uploadErrorResponse = (
+  error: Parameters<typeof journalImageUploadErrorResponse>[0],
+) =>
+  journalImageUploadErrorResponse(error, {
+    limitOwner: "A Transaction Journal Entry",
+    notFoundMessage: "Transaction not found.",
+  });
 
 async function requestContext(
   params: Promise<{ transactionId: string }>,

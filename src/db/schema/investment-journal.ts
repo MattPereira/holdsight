@@ -2,7 +2,9 @@ import { relations, sql } from "drizzle-orm";
 import {
   check,
   date,
+  foreignKey,
   index,
+  integer,
   pgEnum,
   pgTable,
   text,
@@ -80,6 +82,61 @@ export const investmentJournalEntries = pgTable(
   ],
 );
 
+// A database trigger installed by the migration copies Blob pathnames into the
+// durable deletion queue before direct or cascaded deletes remove image rows.
+export const investmentJournalEntryImages = pgTable(
+  "investment_journal_entry_images",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id").notNull(),
+    journalEntryId: uuid("journal_entry_id").notNull(),
+    blobPathname: text("blob_pathname").notNull(),
+    blobUrl: text("blob_url").notNull(),
+    originalFilename: text("original_filename").notNull(),
+    contentType: text("content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("investment_journal_entry_images_blob_pathname_unique").on(
+      table.blobPathname,
+    ),
+    uniqueIndex("investment_journal_entry_images_blob_url_unique").on(
+      table.blobUrl,
+    ),
+    index("investment_journal_entry_images_entry_sort_order_idx").on(
+      table.journalEntryId,
+      table.sortOrder,
+    ),
+    foreignKey({
+      name: "investment_journal_entry_images_entry_user_fk",
+      columns: [table.journalEntryId, table.userId],
+      foreignColumns: [
+        investmentJournalEntries.id,
+        investmentJournalEntries.userId,
+      ],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "investment_journal_entry_images_user_fk",
+      columns: [table.userId],
+      foreignColumns: [user.id],
+    }).onDelete("cascade"),
+    check(
+      "investment_journal_entry_images_size_bytes_check",
+      sql`${table.sizeBytes} > 0`,
+    ),
+    check(
+      "investment_journal_entry_images_sort_order_check",
+      sql`${table.sortOrder} >= 0`,
+    ),
+  ],
+);
+
 export const userPreferencesRelations = relations(
   userPreferences,
   ({ one }) => ({
@@ -92,9 +149,24 @@ export const userPreferencesRelations = relations(
 
 export const investmentJournalEntryRelations = relations(
   investmentJournalEntries,
-  ({ one }) => ({
+  ({ many, one }) => ({
     user: one(user, {
       fields: [investmentJournalEntries.userId],
+      references: [user.id],
+    }),
+    images: many(investmentJournalEntryImages),
+  }),
+);
+
+export const investmentJournalEntryImageRelations = relations(
+  investmentJournalEntryImages,
+  ({ one }) => ({
+    entry: one(investmentJournalEntries, {
+      fields: [investmentJournalEntryImages.journalEntryId],
+      references: [investmentJournalEntries.id],
+    }),
+    user: one(user, {
+      fields: [investmentJournalEntryImages.userId],
       references: [user.id],
     }),
   }),

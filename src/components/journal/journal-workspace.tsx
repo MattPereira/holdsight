@@ -16,6 +16,7 @@ import {
   deleteJournalEntry,
   saveJournalEntry,
 } from "@/app/(app)/journal/actions";
+import { JournalImagesSection } from "@/components/journal/journal-images-section";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -147,6 +148,8 @@ export function JournalWorkspace({
   const [serverConflict, setServerConflict] =
     useState<InvestmentJournalEntry | null>(null);
   const [retryVersion, setRetryVersion] = useState(0);
+  const [imageMutationPending, setImageMutationPending] = useState(false);
+  const [imageRevision, setImageRevision] = useState(0);
   const [deleting, startDeleting] = useTransition();
   const enqueuedFingerprintsRef = useRef(new Set<string>());
   const saveQueueRef = useRef(Promise.resolve());
@@ -156,7 +159,12 @@ export function JournalWorkspace({
   const dirty = !sameDraft(draft, persistedDraft);
   const timezoneLocked = initialWorkspace.timezoneLocked || entry !== null;
   const warnBeforeLeaving =
-    dirty || status === "saving" || status === "error" || status === "conflict";
+    dirty ||
+    imageMutationPending ||
+    status === "saving" ||
+    status === "error" ||
+    status === "conflict";
+  const imageEndpoint = `/api/investment-journal/images?type=${periodType}&date=${selectedDate}`;
 
   useEffect(() => {
     if (initialWorkspace.homeTimezone || homeTimezone) return;
@@ -222,13 +230,13 @@ export function JournalWorkspace({
   }, [warnBeforeLeaving]);
 
   const runSave = useCallback(
-    (snapshot: Draft, overwrite = false) => {
+    (snapshot: Draft, overwrite = false): Promise<boolean> => {
       const fingerprint = JSON.stringify(snapshot);
       enqueuedFingerprintsRef.current.add(fingerprint);
       setStatus("saving");
       setSaveError(null);
 
-      saveQueueRef.current = saveQueueRef.current.then(async () => {
+      const operation = saveQueueRef.current.then(async () => {
         setStatus("saving");
         let result;
         try {
@@ -253,7 +261,7 @@ export function JournalWorkspace({
           enqueuedFingerprintsRef.current.delete(fingerprint);
           setServerConflict(result.entry);
           setStatus("conflict");
-          return;
+          return false;
         }
         if (result.status === "error") {
           setSaveError(result.message);
@@ -262,7 +270,7 @@ export function JournalWorkspace({
             enqueuedFingerprintsRef.current.delete(fingerprint);
             setRetryVersion((version) => version + 1);
           }, 3_000);
-          return;
+          return false;
         }
 
         setEntry(result.entry);
@@ -272,7 +280,10 @@ export function JournalWorkspace({
         setStatus(
           sameDraft(currentDraftRef.current, snapshot) ? "saved" : "idle",
         );
+        return true;
       });
+      saveQueueRef.current = operation.then(() => undefined);
+      return operation;
     },
     [periodType, selectedDate],
   );
@@ -281,7 +292,7 @@ export function JournalWorkspace({
     if (!timezoneConfirmed || status === "conflict" || !dirty) return;
     const fingerprint = JSON.stringify(draft);
     if (enqueuedFingerprintsRef.current.has(fingerprint)) return;
-    const timer = window.setTimeout(() => runSave(draft), 750);
+    const timer = window.setTimeout(() => void runSave(draft), 750);
     return () => window.clearTimeout(timer);
   }, [dirty, draft, retryVersion, runSave, status, timezoneConfirmed]);
 
@@ -330,7 +341,7 @@ export function JournalWorkspace({
     setEntry(serverConflict);
     entryRef.current = serverConflict;
     setServerConflict(null);
-    runSave(draft, true);
+    void runSave(draft, true);
   }
 
   function removeEntry() {
@@ -348,8 +359,41 @@ export function JournalWorkspace({
       setPersistedDraft(empty);
       setStatus("idle");
       setSaveError(null);
+      setImageRevision((revision) => revision + 1);
     });
   }
+
+  const syncEntryVersion = useCallback(
+    (updatedAt: string, entryId?: string) => {
+      const currentEntry = entryRef.current;
+      let nextEntry: InvestmentJournalEntry;
+      if (currentEntry) {
+        nextEntry = { ...currentEntry, updatedAt };
+      } else {
+        if (!entryId) return;
+        nextEntry = {
+          id: entryId,
+          periodType,
+          periodStart: selectedDate,
+          plan: persistedDraft.plan,
+          reflection: persistedDraft.reflection,
+          updatedAt,
+        };
+      }
+      setEntry(nextEntry);
+      entryRef.current = nextEntry;
+    },
+    [periodType, persistedDraft, selectedDate],
+  );
+
+  const prepareForImageMutation = useCallback(async () => {
+    if (status === "conflict" || status === "error") return false;
+    if (dirty || status === "saving") {
+      return runSave(currentDraftRef.current);
+    }
+    await saveQueueRef.current;
+    return true;
+  }, [dirty, runSave, status]);
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -564,6 +608,31 @@ export function JournalWorkspace({
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Screenshots</CardTitle>
+              <CardDescription>
+                Paste images while editing or browse for PNG, JPEG, and WebP
+                files up to 4 MiB each.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <JournalImagesSection
+                key={`${periodType}:${selectedDate}:${imageRevision}`}
+                endpoint={imageEndpoint}
+                open
+                disabled={
+                  deleting ||
+                  status === "error" ||
+                  status === "conflict"
+                }
+                beforeMutation={prepareForImageMutation}
+                onEntryVersionChanged={syncEntryVersion}
+                onPendingChange={setImageMutationPending}
+              />
+            </CardContent>
+          </Card>
 
           {status === "error" ? (
             <Card>

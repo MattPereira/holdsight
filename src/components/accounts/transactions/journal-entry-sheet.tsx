@@ -29,7 +29,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { JournalImagesSection } from "@/components/accounts/transactions/journal-images-section";
+import { JournalImagesSection } from "@/components/journal/journal-images-section";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import type {
   TradeJournalEmotion,
@@ -369,7 +369,11 @@ export function JournalEntrySheet({
           </div>
 
           <JournalImagesSection
-            transactionId={transactionId}
+            endpoint={
+              transactionId
+                ? `/api/investment-transactions/${transactionId}/journal-images`
+                : null
+            }
             open={open}
             disabled={busy}
             onEntryMaterialized={() => setHasEntry(true)}

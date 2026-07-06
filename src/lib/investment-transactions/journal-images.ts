@@ -1,6 +1,5 @@
 import "server-only";
 
-import { del, put } from "@vercel/blob";
 import { and, count, eq, inArray, max, sql } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -10,17 +9,19 @@ import {
   investmentTransactions,
 } from "@/db/schema/investment-transactions";
 import { enqueueBlobDeletion } from "@/lib/blob/deletion-jobs";
+import {
+  MAX_JOURNAL_IMAGE_COUNT,
+  rollbackJournalImageUpload,
+  uploadJournalImageBlob,
+  validateJournalImage,
+  type JournalImageContentType,
+  type JournalImageUploadError as SharedJournalImageUploadError,
+} from "@/lib/journal-images/upload";
 
-export const MAX_JOURNAL_IMAGE_COUNT = 5;
-export const MAX_JOURNAL_IMAGE_SIZE_BYTES = 4 * 1024 * 1024;
-
-const IMAGE_TYPES = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-} as const;
-
-type JournalImageContentType = keyof typeof IMAGE_TYPES;
+export {
+  MAX_JOURNAL_IMAGE_COUNT,
+  MAX_JOURNAL_IMAGE_SIZE_BYTES,
+} from "@/lib/journal-images/upload";
 
 export type InvestmentTransactionJournalImage = {
   id: string;
@@ -35,12 +36,8 @@ export type InvestmentTransactionJournalImage = {
 };
 
 export type JournalImageUploadError =
-  | "invalid_file"
-  | "invalid_image_type"
-  | "image_too_large"
-  | "image_limit_reached"
-  | "transaction_not_found"
-  | "upload_failed";
+  | Exclude<SharedJournalImageUploadError, "entry_not_found">
+  | "transaction_not_found";
 
 export type JournalImageUploadResult =
   | { image: InvestmentTransactionJournalImage; error: null }
@@ -103,60 +100,6 @@ async function imageCount(userId: string, transactionId: string): Promise<number
     );
 
   return result?.value ?? 0;
-}
-
-function matchesSignature(
-  contentType: JournalImageContentType,
-  bytes: Uint8Array,
-): boolean {
-  if (contentType === "image/jpeg") {
-    return bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-  }
-
-  if (contentType === "image/png") {
-    const signature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-    return signature.every((value, index) => bytes[index] === value);
-  }
-
-  return (
-    bytes[0] === 0x52 &&
-    bytes[1] === 0x49 &&
-    bytes[2] === 0x46 &&
-    bytes[3] === 0x46 &&
-    bytes[8] === 0x57 &&
-    bytes[9] === 0x45 &&
-    bytes[10] === 0x42 &&
-    bytes[11] === 0x50
-  );
-}
-
-async function validateFile(
-  file: File,
-): Promise<
-  | { contentType: JournalImageContentType; extension: string }
-  | { error: JournalImageUploadError }
-> {
-  if (file.size === 0) return { error: "invalid_file" };
-  if (file.size > MAX_JOURNAL_IMAGE_SIZE_BYTES) {
-    return { error: "image_too_large" };
-  }
-  if (!(file.type in IMAGE_TYPES)) return { error: "invalid_image_type" };
-
-  const contentType = file.type as JournalImageContentType;
-  const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
-  if (!matchesSignature(contentType, bytes)) {
-    return { error: "invalid_image_type" };
-  }
-
-  return { contentType, extension: IMAGE_TYPES[contentType] };
-}
-
-function originalFilename(file: File, extension: string): string {
-  const normalized = file.name
-    .replace(/[\u0000-\u001f\u007f]/g, "")
-    .trim()
-    .slice(0, 255);
-  return normalized || `chart.${extension}`;
 }
 
 async function persistUploadedImage(input: {
@@ -235,25 +178,12 @@ async function persistUploadedImage(input: {
   });
 }
 
-async function rollbackUpload(blobPathname: string): Promise<void> {
-  try {
-    await del(blobPathname);
-  } catch (deleteError) {
-    console.error("Failed to roll back journal image Blob upload", deleteError);
-    try {
-      await enqueueBlobDeletion(blobPathname);
-    } catch (enqueueError) {
-      console.error("Failed to enqueue journal image Blob cleanup", enqueueError);
-    }
-  }
-}
-
 export async function uploadUserInvestmentTransactionJournalImage(
   userId: string,
   transactionId: string,
   file: File,
 ): Promise<JournalImageUploadResult> {
-  const validation = await validateFile(file);
+  const validation = await validateJournalImage(file);
   if ("error" in validation) return { image: null, error: validation.error };
 
   const [ownsTransaction, currentImageCount] = await Promise.all([
@@ -266,17 +196,12 @@ export async function uploadUserInvestmentTransactionJournalImage(
   }
 
   const pathname = `trade-journals/${userId}/${transactionId}/${crypto.randomUUID()}.${validation.extension}`;
-  let blob: Awaited<ReturnType<typeof put>>;
-
-  try {
-    blob = await put(pathname, file, {
-      access: "public",
-      contentType: validation.contentType,
-    });
-  } catch (uploadError) {
-    console.error("Failed to upload trade journal image", uploadError);
-    return { image: null, error: "upload_failed" };
-  }
+  const blob = await uploadJournalImageBlob(
+    pathname,
+    file,
+    validation.contentType,
+  );
+  if (!blob) return { image: null, error: "upload_failed" };
 
   try {
     const result = await persistUploadedImage({
@@ -284,16 +209,16 @@ export async function uploadUserInvestmentTransactionJournalImage(
       transactionId,
       blobPathname: blob.pathname,
       blobUrl: blob.url,
-      originalFilename: originalFilename(file, validation.extension),
+      originalFilename: validation.originalFilename,
       contentType: validation.contentType,
       sizeBytes: file.size,
     });
 
-    if (result.error) await rollbackUpload(blob.pathname);
+    if (result.error) await rollbackJournalImageUpload(blob.pathname);
     return result;
   } catch (persistError) {
     console.error("Failed to persist trade journal image", persistError);
-    await rollbackUpload(blob.pathname);
+    await rollbackJournalImageUpload(blob.pathname);
     return { image: null, error: "upload_failed" };
   }
 }

@@ -16,6 +16,20 @@ export function isCalendarDate(value: string): boolean {
   );
 }
 
+export function parseCanonicalJournalPeriod(
+  periodType: string,
+  periodStart: string,
+): { periodType: JournalPeriodType; periodStart: string } | null {
+  if (
+    !isJournalPeriodType(periodType) ||
+    !isCalendarDate(periodStart) ||
+    canonicalPeriodStart(periodType, periodStart) !== periodStart
+  ) {
+    return null;
+  }
+  return { periodType, periodStart };
+}
+
 function toUtcDate(calendarDate: string): Date {
   return new Date(`${calendarDate}T12:00:00Z`);
 }
