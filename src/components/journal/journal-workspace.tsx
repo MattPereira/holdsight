@@ -45,22 +45,28 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   InvestmentJournalEntry,
   JournalWorkspace as JournalWorkspaceData,
 } from "@/lib/investment-journal/journal";
+import {
+  canonicalPeriodStart,
+  moveJournalPeriod,
+  type JournalPeriodType,
+} from "@/lib/investment-journal/periods";
 
 type Draft = { plan: string; reflection: string };
 type SaveStatus = "idle" | "saving" | "saved" | "error" | "conflict";
 
 const MAX_LENGTH = 10_000;
 
-function addDays(calendarDate: string, amount: number): string {
-  const date = new Date(`${calendarDate}T12:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + amount);
-  return date.toISOString().slice(0, 10);
-}
+const PERIOD_UNIT: Record<JournalPeriodType, string> = {
+  daily: "day",
+  weekly: "week",
+  monthly: "month",
+};
 
 function todayInTimezone(timeZone?: string): string {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -69,7 +75,9 @@ function todayInTimezone(timeZone?: string): string {
     month: "2-digit",
     day: "2-digit",
   }).formatToParts(new Date());
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
   return `${values.year}-${values.month}-${values.day}`;
 }
 
@@ -108,10 +116,12 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
 }
 
 export function JournalWorkspace({
+  periodType,
   selectedDate,
   initialWorkspace,
   dateWasRequested,
 }: {
+  periodType: JournalPeriodType;
   selectedDate: string;
   initialWorkspace: JournalWorkspaceData;
   dateWasRequested: boolean;
@@ -126,7 +136,9 @@ export function JournalWorkspace({
   const [timezoneError, setTimezoneError] = useState<string | null>(null);
   const [confirmingTimezone, startConfirmingTimezone] = useTransition();
   const [entry, setEntry] = useState(initialWorkspace.entry);
-  const [draft, setDraft] = useState(() => draftFromEntry(initialWorkspace.entry));
+  const [draft, setDraft] = useState(() =>
+    draftFromEntry(initialWorkspace.entry),
+  );
   const [persistedDraft, setPersistedDraft] = useState(() =>
     draftFromEntry(initialWorkspace.entry),
   );
@@ -163,12 +175,21 @@ export function JournalWorkspace({
   }, [entry]);
 
   useEffect(() => {
-    if (dateWasRequested || initialWorkspace.homeTimezone) return;
-    const browserToday = todayInTimezone();
-    if (browserToday !== selectedDate) {
-      router.replace(`/journal?date=${browserToday}`);
+    const browserDate = initialWorkspace.homeTimezone
+      ? selectedDate
+      : canonicalPeriodStart(periodType, todayInTimezone());
+    const canonicalUrl = `/journal?type=${periodType}&date=${browserDate}`;
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+    if (!dateWasRequested || currentUrl !== canonicalUrl) {
+      router.replace(canonicalUrl);
     }
-  }, [dateWasRequested, initialWorkspace.homeTimezone, router, selectedDate]);
+  }, [
+    dateWasRequested,
+    initialWorkspace.homeTimezone,
+    periodType,
+    router,
+    selectedDate,
+  ]);
 
   useEffect(() => {
     if (!warnBeforeLeaving) return;
@@ -179,10 +200,15 @@ export function JournalWorkspace({
       const target = event.target;
       if (!(target instanceof Element)) return;
       const link = target.closest("a[href]");
-      if (!(link instanceof HTMLAnchorElement) || link.target === "_blank") return;
+      if (!(link instanceof HTMLAnchorElement) || link.target === "_blank")
+        return;
       const destination = new URL(link.href, window.location.href);
       if (destination.href === window.location.href) return;
-      if (!window.confirm("Your latest journal changes have not been saved. Leave anyway?")) {
+      if (
+        !window.confirm(
+          "Your latest journal changes have not been saved. Leave anyway?",
+        )
+      ) {
         event.preventDefault();
         event.stopPropagation();
       }
@@ -208,6 +234,7 @@ export function JournalWorkspace({
         try {
           const currentEntry = entryRef.current;
           result = await saveJournalEntry({
+            periodType,
             periodStart: selectedDate,
             plan: snapshot.plan,
             reflection: snapshot.reflection,
@@ -242,10 +269,12 @@ export function JournalWorkspace({
         entryRef.current = result.entry;
         setPersistedDraft(snapshot);
         enqueuedFingerprintsRef.current.delete(fingerprint);
-        setStatus(sameDraft(currentDraftRef.current, snapshot) ? "saved" : "idle");
+        setStatus(
+          sameDraft(currentDraftRef.current, snapshot) ? "saved" : "idle",
+        );
       });
     },
-    [selectedDate],
+    [periodType, selectedDate],
   );
 
   useEffect(() => {
@@ -269,14 +298,18 @@ export function JournalWorkspace({
     });
   }
 
-  function navigateTo(date: string) {
+  function navigateTo(type: JournalPeriodType, date: string) {
     if (
       warnBeforeLeaving &&
-      !window.confirm("Your latest journal changes have not been saved. Leave anyway?")
+      !window.confirm(
+        "Your latest journal changes have not been saved. Leave anyway?",
+      )
     ) {
       return;
     }
-    router.push(`/journal?date=${date}`);
+    router.push(
+      `/journal?type=${type}&date=${canonicalPeriodStart(type, date)}`,
+    );
   }
 
   function reloadServerVersion() {
@@ -303,7 +336,7 @@ export function JournalWorkspace({
   function removeEntry() {
     if (!entry) return;
     startDeleting(async () => {
-      const result = await deleteJournalEntry(entry.id);
+      const result = await deleteJournalEntry(entry.id, periodType);
       if (result.error) {
         setSaveError(result.error);
         setStatus("error");
@@ -323,7 +356,7 @@ export function JournalWorkspace({
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-semibold tracking-tight">Journal</h1>
         <p className="text-muted-foreground">
-          Plan and reflect on your investment decisions for each day.
+          Your investment decisions over time.
         </p>
       </div>
 
@@ -332,8 +365,8 @@ export function JournalWorkspace({
           <CardHeader>
             <CardTitle>Confirm your home timezone</CardTitle>
             <CardDescription>
-              Journal days stay anchored to this timezone. You can correct it now,
-              but it locks after your first Investment Journal Entry.
+              Journal days stay anchored to this timezone. You can correct it
+              now, but it locks after your first Investment Journal Entry.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -347,7 +380,8 @@ export function JournalWorkspace({
                 onChange={(event) => setHomeTimezone(event.target.value)}
               />
               <FieldDescription>
-                Detected from this browser. Change it if this is not your home timezone.
+                Detected from this browser. Change it if this is not your home
+                timezone.
               </FieldDescription>
               <FieldError>{timezoneError}</FieldError>
             </Field>
@@ -367,42 +401,90 @@ export function JournalWorkspace({
             <CardHeader className="gap-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <CardTitle>Daily Journal Period</CardTitle>
+                  <CardTitle>Journal Period</CardTitle>
                   <CardDescription>
-                    {homeTimezone} · {timezoneLocked ? "Timezone locked" : "Timezone locks after your first entry"}
+                    {homeTimezone} ·{" "}
+                    {timezoneLocked
+                      ? "Timezone locked"
+                      : "Timezone locks after your first entry"}
                   </CardDescription>
                 </div>
                 <SaveIndicator status={status} />
               </div>
+              <Tabs
+                value={periodType}
+                onValueChange={(value) =>
+                  navigateTo(value as JournalPeriodType, selectedDate)
+                }
+              >
+                <TabsList aria-label="Journal Period type">
+                  <TabsTrigger value="daily">Daily</TabsTrigger>
+                  <TabsTrigger value="weekly">Weekly</TabsTrigger>
+                  <TabsTrigger value="monthly">Monthly</TabsTrigger>
+                </TabsList>
+              </Tabs>
               <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant="outline"
                   size="icon"
-                  aria-label="Previous day"
-                  onClick={() => navigateTo(addDays(selectedDate, -1))}
+                  aria-label={`Previous ${PERIOD_UNIT[periodType]}`}
+                  onClick={() =>
+                    navigateTo(
+                      periodType,
+                      moveJournalPeriod(periodType, selectedDate, -1),
+                    )
+                  }
                 >
                   <RiArrowLeftSLine />
                 </Button>
                 <Input
                   className="w-auto"
-                  type="date"
-                  value={selectedDate}
-                  aria-label="Journal date"
-                  onChange={(event) => navigateTo(event.target.value)}
+                  type={periodType === "monthly" ? "month" : "date"}
+                  value={
+                    periodType === "monthly"
+                      ? selectedDate.slice(0, 7)
+                      : selectedDate
+                  }
+                  aria-label={`${periodType} Journal Period`}
+                  onChange={(event) =>
+                    navigateTo(
+                      periodType,
+                      periodType === "monthly"
+                        ? `${event.target.value}-01`
+                        : event.target.value,
+                    )
+                  }
                 />
                 <Button
                   variant="outline"
                   size="icon"
-                  aria-label="Next day"
-                  onClick={() => navigateTo(addDays(selectedDate, 1))}
+                  aria-label={`Next ${PERIOD_UNIT[periodType]}`}
+                  onClick={() =>
+                    navigateTo(
+                      periodType,
+                      moveJournalPeriod(periodType, selectedDate, 1),
+                    )
+                  }
                 >
                   <RiArrowRightSLine />
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => navigateTo(todayInTimezone(homeTimezone))}
+                  onClick={() =>
+                    navigateTo(
+                      periodType,
+                      canonicalPeriodStart(
+                        periodType,
+                        todayInTimezone(homeTimezone),
+                      ),
+                    )
+                  }
                 >
-                  Today
+                  {periodType === "daily"
+                    ? "Today"
+                    : periodType === "weekly"
+                      ? "This week"
+                      : "This month"}
                 </Button>
               </div>
             </CardHeader>
@@ -413,7 +495,7 @@ export function JournalWorkspace({
               <CardHeader>
                 <CardTitle>Plan</CardTitle>
                 <CardDescription>
-                  Expectations, intended actions, risks, and rules for this day.
+                  Expectations, actions, risks, and rules.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -427,13 +509,18 @@ export function JournalWorkspace({
                       className="min-h-72 resize-y"
                       maxLength={MAX_LENGTH}
                       value={draft.plan}
-                      placeholder="What is your plan for this day?"
+                      placeholder="What is your plan for this period?"
                       onChange={(event) => {
                         setStatus(status === "conflict" ? "conflict" : "idle");
-                        setDraft((current) => ({ ...current, plan: event.target.value }));
+                        setDraft((current) => ({
+                          ...current,
+                          plan: event.target.value,
+                        }));
                       }}
                     />
-                    <FieldDescription>{draft.plan.length.toLocaleString()} / 10,000</FieldDescription>
+                    <FieldDescription>
+                      {draft.plan.length.toLocaleString()} / 10,000
+                    </FieldDescription>
                   </Field>
                 </FieldGroup>
               </CardContent>
@@ -449,7 +536,10 @@ export function JournalWorkspace({
               <CardContent>
                 <FieldGroup>
                   <Field>
-                    <FieldLabel className="sr-only" htmlFor="journal-reflection">
+                    <FieldLabel
+                      className="sr-only"
+                      htmlFor="journal-reflection"
+                    >
                       Reflection
                     </FieldLabel>
                     <Textarea
@@ -480,7 +570,8 @@ export function JournalWorkspace({
               <CardHeader>
                 <CardTitle>Save failed</CardTitle>
                 <CardDescription>
-                  {saveError} Your visible edits are preserved and the save will retry while this page remains open.
+                  {saveError} Your visible edits are preserved and the save will
+                  retry while this page remains open.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -491,7 +582,8 @@ export function JournalWorkspace({
               <CardHeader>
                 <CardTitle>This entry changed elsewhere</CardTitle>
                 <CardDescription>
-                  Autosave is paused. Your local edits remain visible until you choose a version.
+                  Autosave is paused. Your local edits remain visible until you
+                  choose a version.
                 </CardDescription>
               </CardHeader>
               <CardFooter className="flex-wrap">
@@ -499,7 +591,9 @@ export function JournalWorkspace({
                   <RiRefreshLine data-icon="inline-start" />
                   Reload server version
                 </Button>
-                <Button onClick={overwriteServerVersion}>Overwrite with my edits</Button>
+                <Button onClick={overwriteServerVersion}>
+                  Overwrite with my edits
+                </Button>
               </CardFooter>
             </Card>
           ) : null}
@@ -518,14 +612,20 @@ export function JournalWorkspace({
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete this Investment Journal Entry?</AlertDialogTitle>
+                    <AlertDialogTitle>
+                      Delete this Investment Journal Entry?
+                    </AlertDialogTitle>
                     <AlertDialogDescription>
-                      This explicitly removes the entry for {selectedDate}. This action cannot be undone.
+                      This explicitly removes the entry for {selectedDate}. This
+                      action cannot be undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction variant="destructive" onClick={removeEntry}>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={removeEntry}
+                    >
                       Delete entry
                     </AlertDialogAction>
                   </AlertDialogFooter>

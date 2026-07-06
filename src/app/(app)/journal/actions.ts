@@ -2,11 +2,12 @@
 
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
-  deleteDailyJournalEntry,
-  saveDailyJournalEntry,
+  deleteJournalEntry as deleteInvestmentJournalEntry,
+  saveJournalEntry as persistJournalEntry,
   setHomeTimezone,
   type SaveJournalResult,
 } from "@/lib/investment-journal/journal";
+import type { JournalPeriodType } from "@/lib/investment-journal/periods";
 
 export async function confirmHomeTimezone(homeTimezone: string) {
   const userId = await getCurrentUserId();
@@ -15,6 +16,7 @@ export async function confirmHomeTimezone(homeTimezone: string) {
 }
 
 export async function saveJournalEntry(input: {
+  periodType: JournalPeriodType;
   periodStart: string;
   plan: string;
   reflection: string;
@@ -24,14 +26,17 @@ export async function saveJournalEntry(input: {
 }): Promise<SaveJournalResult> {
   const userId = await getCurrentUserId();
   if (!userId) return { status: "error", message: "You must be signed in." };
-  return saveDailyJournalEntry(userId, {
+  return persistJournalEntry(userId, {
     ...input,
     overwrite: input.overwrite === true,
   });
 }
 
-export async function deleteJournalEntry(entryId: string) {
+export async function deleteJournalEntry(
+  entryId: string,
+  periodType: JournalPeriodType,
+) {
   const userId = await getCurrentUserId();
   if (!userId) return { error: "You must be signed in." };
-  return deleteDailyJournalEntry(userId, entryId);
+  return deleteInvestmentJournalEntry(userId, entryId, periodType);
 }

@@ -7,11 +7,18 @@ import {
   investmentJournalEntries,
   userPreferences,
 } from "@/db/schema/investment-journal";
+import {
+  canonicalPeriodStart,
+  isCalendarDate,
+  isJournalPeriodType,
+  type JournalPeriodType,
+} from "@/lib/investment-journal/periods";
 
 export const MAX_JOURNAL_TEXT_LENGTH = 10_000;
 
 export type InvestmentJournalEntry = {
   id: string;
+  periodType: JournalPeriodType;
   periodStart: string;
   plan: string;
   reflection: string;
@@ -29,24 +36,17 @@ export type SaveJournalResult =
   | { status: "conflict"; entry: InvestmentJournalEntry }
   | { status: "error"; message: string };
 
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
 function serializeEntry(
   entry: typeof investmentJournalEntries.$inferSelect,
 ): InvestmentJournalEntry {
   return {
     id: entry.id,
+    periodType: entry.periodType,
     periodStart: entry.periodStart,
     plan: entry.plan ?? "",
     reflection: entry.reflection ?? "",
     updatedAt: entry.updatedAt.toISOString(),
   };
-}
-
-export function isCalendarDate(value: string): boolean {
-  if (!DATE_PATTERN.test(value)) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
 }
 
 export function isIanaTimezone(value: string): boolean {
@@ -71,6 +71,7 @@ export function todayInTimezone(timeZone: string): string {
 
 export async function getJournalWorkspace(
   userId: string,
+  periodType: JournalPeriodType,
   periodStart: string,
 ): Promise<JournalWorkspace> {
   const [preferences, entry, firstEntry] = await Promise.all([
@@ -81,7 +82,7 @@ export async function getJournalWorkspace(
     db.query.investmentJournalEntries.findFirst({
       where: and(
         eq(investmentJournalEntries.userId, userId),
-        eq(investmentJournalEntries.periodType, "daily"),
+        eq(investmentJournalEntries.periodType, periodType),
         eq(investmentJournalEntries.periodStart, periodStart),
       ),
     }),
@@ -135,9 +136,10 @@ export async function setHomeTimezone(
   });
 }
 
-export async function saveDailyJournalEntry(
+export async function saveJournalEntry(
   userId: string,
   input: {
+    periodType: JournalPeriodType;
     periodStart: string;
     plan: string;
     reflection: string;
@@ -146,8 +148,18 @@ export async function saveDailyJournalEntry(
     overwrite: boolean;
   },
 ): Promise<SaveJournalResult> {
-  if (!isCalendarDate(input.periodStart)) {
-    return { status: "error", message: "Choose a valid calendar date." };
+  if (!isJournalPeriodType(input.periodType)) {
+    return {
+      status: "error",
+      message: "Choose a valid Journal Period type.",
+    };
+  }
+  if (
+    !isCalendarDate(input.periodStart) ||
+    canonicalPeriodStart(input.periodType, input.periodStart) !==
+      input.periodStart
+  ) {
+    return { status: "error", message: "Choose a valid Journal Period." };
   }
   if (
     input.plan.length > MAX_JOURNAL_TEXT_LENGTH ||
@@ -177,7 +189,7 @@ export async function saveDailyJournalEntry(
       .insert(investmentJournalEntries)
       .values({
         userId,
-        periodType: "daily",
+        periodType: input.periodType,
         periodStart: input.periodStart,
         ...values,
       })
@@ -188,7 +200,7 @@ export async function saveDailyJournalEntry(
     const conditions = [
       eq(investmentJournalEntries.id, input.entryId),
       eq(investmentJournalEntries.userId, userId),
-      eq(investmentJournalEntries.periodType, "daily"),
+      eq(investmentJournalEntries.periodType, input.periodType),
       eq(investmentJournalEntries.periodStart, input.periodStart),
     ];
     if (!input.overwrite) {
@@ -210,7 +222,7 @@ export async function saveDailyJournalEntry(
   const current = await db.query.investmentJournalEntries.findFirst({
     where: and(
       eq(investmentJournalEntries.userId, userId),
-      eq(investmentJournalEntries.periodType, "daily"),
+      eq(investmentJournalEntries.periodType, input.periodType),
       eq(investmentJournalEntries.periodStart, input.periodStart),
     ),
   });
@@ -219,17 +231,21 @@ export async function saveDailyJournalEntry(
     : { status: "error", message: "The journal entry no longer exists." };
 }
 
-export async function deleteDailyJournalEntry(
+export async function deleteJournalEntry(
   userId: string,
   entryId: string,
+  periodType: JournalPeriodType,
 ): Promise<{ error: string | null }> {
+  if (!isJournalPeriodType(periodType)) {
+    return { error: "Choose a valid Journal Period type." };
+  }
   await db
     .delete(investmentJournalEntries)
     .where(
       and(
         eq(investmentJournalEntries.id, entryId),
         eq(investmentJournalEntries.userId, userId),
-        eq(investmentJournalEntries.periodType, "daily"),
+        eq(investmentJournalEntries.periodType, periodType),
       ),
     );
   return { error: null };
