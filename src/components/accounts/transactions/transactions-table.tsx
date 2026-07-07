@@ -15,26 +15,6 @@ const amountFormat = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 6,
 });
 
-const transactionDateFormat = new Intl.DateTimeFormat("en-US", {
-  year: "numeric",
-  month: "long",
-  day: "numeric",
-});
-
-const transactionTimeFormat = new Intl.DateTimeFormat("en-US", {
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: true,
-});
-
-function formatTransactionDate(date: Date): string {
-  return transactionDateFormat.format(date);
-}
-
-function formatTransactionTime(date: Date): string {
-  return transactionTimeFormat.format(date);
-}
-
 type LegDirection = "in" | "out" | "neutral";
 
 type TransactionLeg = {
@@ -277,17 +257,34 @@ function reasonLabelFor(
 export function TransactionsTable({
   transactions,
   onEditJournal,
+  emptyMessage = "No transactions yet. Refresh to load.",
+  timeZone,
 }: {
   transactions: InvestmentTransactionListItem[];
   onEditJournal: (transaction: InvestmentTransactionListItem) => void;
+  emptyMessage?: string;
+  timeZone?: string;
 }) {
   if (transactions.length === 0) {
     return (
       <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-        No transactions yet. Refresh to load.
+        {emptyMessage}
       </p>
     );
   }
+
+  const transactionDateFormat = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const transactionTimeFormat = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 
   return (
     <ul className="divide-y">
@@ -304,11 +301,11 @@ export function TransactionsTable({
               </span>
               <span className="text-sm text-muted-foreground">
                 {transaction.displayType === "perp_event"
-                  ? `${transaction.accountLabel ?? "—"} · ${formatTransactionDate(executedAt)}`
-                  : formatTransactionDate(executedAt)}
+                  ? `${transaction.accountLabel ?? "—"} · ${transactionDateFormat.format(executedAt)}`
+                  : transactionDateFormat.format(executedAt)}
               </span>
               <span className="text-sm text-muted-foreground">
-                {formatTransactionTime(executedAt)}
+                {transactionTimeFormat.format(executedAt)}
               </span>
               {transaction.displayType === "perp_event" ? (
                 <span className="text-xs text-muted-foreground">

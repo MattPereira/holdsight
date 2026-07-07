@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
 
 import { db } from "@/db";
 import { investmentAccounts } from "@/db/schema/investment-accounts";
@@ -14,7 +14,10 @@ import {
   type NormalizedInvestmentTransaction,
   type TransactionSyncPhase,
 } from "@/lib/investment-transactions/ingestion";
-import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
+import type {
+  InvestmentTransactionListItem,
+  TransactionExecutedAtRange,
+} from "@/lib/investment-transactions/list-item";
 
 import {
   getUserKrakenAccounts,
@@ -313,6 +316,7 @@ export async function processKrakenTransactionSyncPage(input: {
 
 export async function getCurrentKrakenTransactions(
   userId: string,
+  range?: TransactionExecutedAtRange,
 ): Promise<CurrentKrakenTransaction[]> {
   const rows = await db
     .select({
@@ -338,7 +342,12 @@ export async function getCurrentKrakenTransactions(
     })
     .from(investmentTransactions)
     .innerJoin(investmentAccounts, eq(investmentAccounts.id, investmentTransactions.investmentAccountId))
-    .where(and(eq(investmentTransactions.userId, userId), eq(investmentTransactions.sourceProvider, KRAKEN_PROVIDER)))
+    .where(and(
+      eq(investmentTransactions.userId, userId),
+      eq(investmentTransactions.sourceProvider, KRAKEN_PROVIDER),
+      range ? gte(investmentTransactions.executedAt, range.start) : undefined,
+      range ? lt(investmentTransactions.executedAt, range.end) : undefined,
+    ))
     .orderBy(desc(investmentTransactions.executedAt));
 
   return rows.map((row) => ({

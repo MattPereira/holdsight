@@ -11,8 +11,11 @@ import {
   canonicalPeriodStart,
   isCalendarDate,
   isJournalPeriodType,
+  journalPeriodUtcRange,
   type JournalPeriodType,
 } from "@/lib/investment-journal/periods";
+import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
+import { getPortfolioTransactionsInRange } from "@/lib/portfolio/transactions";
 
 export const MAX_JOURNAL_TEXT_LENGTH = 10_000;
 
@@ -29,6 +32,7 @@ export type JournalWorkspace = {
   homeTimezone: string | null;
   timezoneLocked: boolean;
   entry: InvestmentJournalEntry | null;
+  transactions: InvestmentTransactionListItem[];
 };
 
 export type SaveJournalResult =
@@ -96,6 +100,16 @@ export async function getJournalWorkspace(
     homeTimezone: preferences?.homeTimezone ?? null,
     timezoneLocked: Boolean(firstEntry),
     entry: entry ? serializeEntry(entry) : null,
+    transactions: preferences?.homeTimezone
+      ? await getPortfolioTransactionsInRange(
+          userId,
+          journalPeriodUtcRange(
+            periodType,
+            periodStart,
+            preferences.homeTimezone,
+          ),
+        )
+      : [],
   };
 }
 

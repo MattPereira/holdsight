@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, inArray, max, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lt, max, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { investmentAccounts } from "@/db/schema/investment-accounts";
@@ -13,7 +13,10 @@ import type { SavedEvmAccount } from "@/lib/evm/accounts";
 import type { SavedHyperCoreAccount } from "@/lib/hyper-core/accounts";
 import type { SavedLighterAccount } from "@/lib/lighter/accounts";
 import { summarizeSyncPhase, type TransactionSyncPhase } from "@/lib/investment-transactions/ingestion";
-import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
+import type {
+  InvestmentTransactionListItem,
+  TransactionExecutedAtRange,
+} from "@/lib/investment-transactions/list-item";
 
 const WALLET_TRANSACTION_PROVIDERS = ["hyperliquid", "lighter", "zerion"] as const;
 const WALLET_VISIBLE_TRANSACTION_KINDS = ["trade"] as const;
@@ -46,7 +49,10 @@ function visibleWalletProviderScope() {
   );
 }
 
-export async function getCurrentWalletTransactions(userId: string): Promise<InvestmentTransactionListItem[]> {
+export async function getCurrentWalletTransactions(
+  userId: string,
+  range?: TransactionExecutedAtRange,
+): Promise<InvestmentTransactionListItem[]> {
   const rawRows = await db
     .select({
       id: investmentTransactions.id,
@@ -76,6 +82,8 @@ export async function getCurrentWalletTransactions(userId: string): Promise<Inve
       inArray(investmentTransactions.sourceProvider, WALLET_TRANSACTION_PROVIDERS),
       inArray(investmentTransactions.kind, WALLET_VISIBLE_TRANSACTION_KINDS),
       visibleWalletProviderScope(),
+      range ? gte(investmentTransactions.executedAt, range.start) : undefined,
+      range ? lt(investmentTransactions.executedAt, range.end) : undefined,
     ))
     .orderBy(desc(investmentTransactions.executedAt));
 
@@ -104,7 +112,11 @@ export async function getCurrentWalletTransactions(userId: string): Promise<Inve
       investmentAccounts,
       eq(investmentAccounts.id, hyperCorePerpEvents.investmentAccountId),
     )
-    .where(eq(hyperCorePerpEvents.userId, userId))
+    .where(and(
+      eq(hyperCorePerpEvents.userId, userId),
+      range ? gte(hyperCorePerpEvents.executedAt, range.start) : undefined,
+      range ? lt(hyperCorePerpEvents.executedAt, range.end) : undefined,
+    ))
     .orderBy(desc(hyperCorePerpEvents.executedAt));
 
   const rawTransactions: InvestmentTransactionListItem[] = rawRows.map((row) => ({

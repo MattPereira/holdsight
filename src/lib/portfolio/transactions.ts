@@ -14,7 +14,10 @@ import { getUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
 import { getUserLighterAccounts } from "@/lib/lighter/accounts";
 import type { TransactionSyncPhase } from "@/lib/investment-transactions/ingestion";
 import { withTransactionJournalSummaries } from "@/lib/investment-transactions/journal";
-import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
+import type {
+  InvestmentTransactionListItem,
+  TransactionExecutedAtRange,
+} from "@/lib/investment-transactions/list-item";
 import {
   getCurrentWalletTransactions,
   getWalletTransactionHistoryStatus,
@@ -140,6 +143,22 @@ export async function getCurrentPortfolioTransactions(
       snapshot.transactions,
     ),
   };
+}
+
+/** Uses the Portfolio feed's source and visibility rules within one UTC range. */
+export async function getPortfolioTransactionsInRange(
+  userId: string,
+  range: TransactionExecutedAtRange,
+): Promise<InvestmentTransactionListItem[]> {
+  const lists = await Promise.all([
+    getCurrentWalletTransactions(userId, range),
+    getCurrentKrakenTransactions(userId, range),
+    getCurrentBrokerageTransactions(userId, range),
+  ]);
+  const transactions = lists
+    .flat()
+    .sort((a, b) => b.executedAt.localeCompare(a.executedAt));
+  return withTransactionJournalSummaries(userId, transactions);
 }
 
 export function emptyPortfolioTransactionsSnapshot(): PortfolioTransactionsSnapshot {

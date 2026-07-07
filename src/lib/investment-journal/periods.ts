@@ -70,3 +70,56 @@ export function moveJournalPeriod(
   }
   return formatCalendarDate(date);
 }
+
+function zonedDateTimeParts(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  return Object.fromEntries(parts.map((part) => [part.type, part.value]));
+}
+
+/** Converts local midnight in an IANA timezone to an absolute UTC instant. */
+function localMidnightUtc(calendarDate: string, timeZone: string): Date {
+  const [year, month, day] = calendarDate.split("-").map(Number);
+  const desiredAsUtc = Date.UTC(year, month - 1, day);
+  let candidate = new Date(desiredAsUtc);
+
+  // Refine the timezone offset rather than relying on the process timezone.
+  // A second pass handles offset changes crossed by the first adjustment.
+  for (let pass = 0; pass < 3; pass += 1) {
+    const parts = zonedDateTimeParts(candidate, timeZone);
+    const representedAsUtc = Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      Number(parts.hour),
+      Number(parts.minute),
+      Number(parts.second),
+    );
+    const adjustment = desiredAsUtc - representedAsUtc;
+    if (adjustment === 0) return candidate;
+    candidate = new Date(candidate.getTime() + adjustment);
+  }
+
+  return candidate;
+}
+
+export function journalPeriodUtcRange(
+  periodType: JournalPeriodType,
+  periodStart: string,
+  timeZone: string,
+): { start: Date; end: Date } {
+  const canonicalStart = canonicalPeriodStart(periodType, periodStart);
+  const nextStart = moveJournalPeriod(periodType, canonicalStart, 1);
+  return {
+    start: localMidnightUtc(canonicalStart, timeZone),
+    end: localMidnightUtc(nextStart, timeZone),
+  };
+}

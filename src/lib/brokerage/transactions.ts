@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import type { InvestmentTransaction, Security } from "plaid";
 
 import { db } from "@/db";
@@ -30,6 +30,7 @@ import {
 } from "@/lib/investment-transactions/ingestion";
 import { decrypt } from "@/lib/plaid/crypto";
 import { getUserBrokeragePlaidItems } from "@/lib/plaid/items";
+import type { TransactionExecutedAtRange } from "@/lib/investment-transactions/list-item";
 
 const PLAID_PROVIDER = "plaid";
 const PLAID_HISTORY_LOOKBACK_DAYS = 730;
@@ -384,6 +385,7 @@ export async function processBrokerageTransactionSyncPage(input: {
 
 export async function getCurrentBrokerageTransactions(
   userId: string,
+  range?: TransactionExecutedAtRange,
 ): Promise<CurrentBrokerageTransaction[]> {
   const rows = await db
     .select({
@@ -415,7 +417,12 @@ export async function getCurrentBrokerageTransactions(
     .from(investmentTransactions)
     .innerJoin(brokerageTransactionDetails, eq(brokerageTransactionDetails.transactionId, investmentTransactions.id))
     .innerJoin(investmentAccounts, eq(investmentAccounts.id, investmentTransactions.investmentAccountId))
-    .where(and(eq(investmentTransactions.userId, userId), eq(investmentTransactions.sourceProvider, PLAID_PROVIDER)))
+    .where(and(
+      eq(investmentTransactions.userId, userId),
+      eq(investmentTransactions.sourceProvider, PLAID_PROVIDER),
+      range ? gte(investmentTransactions.executedAt, range.start) : undefined,
+      range ? lt(investmentTransactions.executedAt, range.end) : undefined,
+    ))
     .orderBy(desc(investmentTransactions.executedAt));
 
   return rows.map((row) => ({

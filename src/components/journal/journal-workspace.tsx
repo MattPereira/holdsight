@@ -17,6 +17,7 @@ import {
   saveJournalEntry,
 } from "@/app/(app)/journal/actions";
 import { JournalImagesSection } from "@/components/journal/journal-images-section";
+import { JournalTransactionContext } from "@/components/journal/journal-transaction-context";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -306,6 +307,7 @@ export function JournalWorkspace({
       setHomeTimezone(result.homeTimezone ?? homeTimezone);
       setTimezoneConfirmed(true);
       setTimezoneError(null);
+      router.refresh();
     });
   }
 
@@ -534,8 +536,10 @@ export function JournalWorkspace({
             </CardHeader>
           </Card>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
+          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
+            <div className="flex min-w-0 flex-col gap-6">
+              <div className="grid gap-6 xl:grid-cols-2">
+                <Card>
               <CardHeader>
                 <CardTitle>Plan</CardTitle>
                 <CardDescription>
@@ -568,9 +572,9 @@ export function JournalWorkspace({
                   </Field>
                 </FieldGroup>
               </CardContent>
-            </Card>
+                </Card>
 
-            <Card>
+                <Card>
               <CardHeader>
                 <CardTitle>Reflection</CardTitle>
                 <CardDescription>
@@ -606,35 +610,35 @@ export function JournalWorkspace({
                   </Field>
                 </FieldGroup>
               </CardContent>
-            </Card>
-          </div>
+                </Card>
+              </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Screenshots</CardTitle>
-              <CardDescription>
-                Paste images while editing or browse for PNG, JPEG, and WebP
-                files up to 4 MiB each.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <JournalImagesSection
-                key={`${periodType}:${selectedDate}:${imageRevision}`}
-                endpoint={imageEndpoint}
-                open
-                disabled={
-                  deleting ||
-                  status === "error" ||
-                  status === "conflict"
-                }
-                beforeMutation={prepareForImageMutation}
-                onEntryVersionChanged={syncEntryVersion}
-                onPendingChange={setImageMutationPending}
-              />
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Screenshots</CardTitle>
+                  <CardDescription>
+                    Paste images while editing or browse for PNG, JPEG, and
+                    WebP files up to 4 MiB each.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <JournalImagesSection
+                    key={`${periodType}:${selectedDate}:${imageRevision}`}
+                    endpoint={imageEndpoint}
+                    open
+                    disabled={
+                      deleting ||
+                      status === "error" ||
+                      status === "conflict"
+                    }
+                    beforeMutation={prepareForImageMutation}
+                    onEntryVersionChanged={syncEntryVersion}
+                    onPendingChange={setImageMutationPending}
+                  />
+                </CardContent>
+              </Card>
 
-          {status === "error" ? (
+              {status === "error" ? (
             <Card>
               <CardHeader>
                 <CardTitle>Save failed</CardTitle>
@@ -644,9 +648,9 @@ export function JournalWorkspace({
                 </CardDescription>
               </CardHeader>
             </Card>
-          ) : null}
+              ) : null}
 
-          {status === "conflict" ? (
+              {status === "conflict" ? (
             <Card>
               <CardHeader>
                 <CardTitle>This entry changed elsewhere</CardTitle>
@@ -665,10 +669,10 @@ export function JournalWorkspace({
                 </Button>
               </CardFooter>
             </Card>
-          ) : null}
+              ) : null}
 
-          {entry ? (
-            <div className="flex justify-end">
+              {entry ? (
+                <div className="flex justify-end">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -700,8 +704,15 @@ export function JournalWorkspace({
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+                </div>
+              ) : null}
             </div>
-          ) : null}
+
+            <JournalTransactionContext
+              transactions={initialWorkspace.transactions}
+              homeTimezone={homeTimezone}
+            />
+          </div>
         </>
       )}
     </main>

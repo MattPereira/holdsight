@@ -11,6 +11,11 @@ export type TradeJournalSummary = {
   marketBias: number | null;
 };
 
+export type TransactionExecutedAtRange = {
+  start: Date;
+  end: Date;
+};
+
 /** Transaction fields consumed by the shared account transaction UI. */
 export type InvestmentTransactionListItem = {
   id: string;
