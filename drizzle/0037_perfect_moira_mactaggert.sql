@@ -1,0 +1,2 @@
+DROP INDEX "investment_journal_entries_recent_idx";--> statement-breakpoint
+CREATE INDEX "investment_journal_entries_recent_idx" ON "investment_journal_entries" USING btree ("user_id","period_type","updated_at" DESC NULLS LAST,"id" DESC NULLS LAST);

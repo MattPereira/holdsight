@@ -69,7 +69,8 @@ export const investmentJournalEntries = pgTable(
     index("investment_journal_entries_recent_idx").on(
       table.userId,
       table.periodType,
-      table.updatedAt,
+      table.updatedAt.desc(),
+      table.id.desc(),
     ),
     check(
       "investment_journal_entries_plan_length_check",

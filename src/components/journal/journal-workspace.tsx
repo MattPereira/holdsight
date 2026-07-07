@@ -17,6 +17,7 @@ import {
   saveJournalEntry,
 } from "@/app/(app)/journal/actions";
 import { JournalImagesSection } from "@/components/journal/journal-images-section";
+import { RecentJournalEntries } from "@/components/journal/recent-journal-entries";
 import { JournalTransactionContext } from "@/components/journal/journal-transaction-context";
 import {
   AlertDialog,
@@ -151,6 +152,7 @@ export function JournalWorkspace({
   const [retryVersion, setRetryVersion] = useState(0);
   const [imageMutationPending, setImageMutationPending] = useState(false);
   const [imageRevision, setImageRevision] = useState(0);
+  const [historyRevision, setHistoryRevision] = useState(0);
   const [deleting, startDeleting] = useTransition();
   const enqueuedFingerprintsRef = useRef(new Set<string>());
   const saveQueueRef = useRef(Promise.resolve());
@@ -281,6 +283,7 @@ export function JournalWorkspace({
         setStatus(
           sameDraft(currentDraftRef.current, snapshot) ? "saved" : "idle",
         );
+        setHistoryRevision((revision) => revision + 1);
         return true;
       });
       saveQueueRef.current = operation.then(() => undefined);
@@ -362,6 +365,7 @@ export function JournalWorkspace({
       setStatus("idle");
       setSaveError(null);
       setImageRevision((revision) => revision + 1);
+      setHistoryRevision((revision) => revision + 1);
     });
   }
 
@@ -384,6 +388,7 @@ export function JournalWorkspace({
       }
       setEntry(nextEntry);
       entryRef.current = nextEntry;
+      setHistoryRevision((revision) => revision + 1);
     },
     [periodType, persistedDraft, selectedDate],
   );
@@ -708,10 +713,17 @@ export function JournalWorkspace({
               ) : null}
             </div>
 
-            <JournalTransactionContext
-              transactions={initialWorkspace.transactions}
-              homeTimezone={homeTimezone}
-            />
+            <div className="flex min-w-0 flex-col gap-6">
+              <RecentJournalEntries
+                periodType={periodType}
+                revision={historyRevision}
+                onSelect={(periodStart) => navigateTo(periodType, periodStart)}
+              />
+              <JournalTransactionContext
+                transactions={initialWorkspace.transactions}
+                homeTimezone={homeTimezone}
+              />
+            </div>
           </div>
         </>
       )}

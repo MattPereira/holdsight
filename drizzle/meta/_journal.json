@@ -260,6 +260,13 @@
       "when": 1783381131709,
       "tag": "0036_kind_rictor",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1783382952433,
+      "tag": "0037_perfect_moira_mactaggert",
+      "breakpoints": true
     }
   ]
 }

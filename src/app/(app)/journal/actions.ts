@@ -3,8 +3,10 @@
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
   deleteJournalEntry as deleteInvestmentJournalEntry,
+  getRecentJournalEntries as getRecentInvestmentJournalEntries,
   saveJournalEntry as persistJournalEntry,
   setHomeTimezone,
+  type RecentJournalEntriesCursor,
   type SaveJournalResult,
 } from "@/lib/investment-journal/journal";
 import type { JournalPeriodType } from "@/lib/investment-journal/periods";
@@ -39,4 +41,13 @@ export async function deleteJournalEntry(
   const userId = await getCurrentUserId();
   if (!userId) return { error: "You must be signed in." };
   return deleteInvestmentJournalEntry(userId, entryId, periodType);
+}
+
+export async function getRecentJournalEntries(
+  periodType: JournalPeriodType,
+  cursor?: RecentJournalEntriesCursor | null,
+) {
+  const userId = await getCurrentUserId();
+  if (!userId) return { entries: [], nextCursor: null };
+  return getRecentInvestmentJournalEntries(userId, periodType, cursor);
 }
