@@ -6,7 +6,6 @@ import { RiImageAddLine, RiLoader4Line, RiCloseLine } from "@remixicon/react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   JOURNAL_IMAGE_CONTENT_TYPES,
@@ -242,7 +241,7 @@ export function JournalImagesSection({
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <Label>Screenshots</Label>
+        <h2 className="font-medium">Screenshots</h2>
         <div className="flex items-center gap-2">
           <Button
             type="button"

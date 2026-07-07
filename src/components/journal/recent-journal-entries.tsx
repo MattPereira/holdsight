@@ -6,50 +6,12 @@ import { RiImageLine } from "@remixicon/react";
 import { getRecentJournalEntries } from "@/app/(app)/journal/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import type {
   RecentJournalEntriesCursor,
   RecentJournalEntry,
 } from "@/lib/investment-journal/journal";
-import {
-  moveJournalPeriod,
-  type JournalPeriodType,
-} from "@/lib/investment-journal/periods";
-
-function formatDate(calendarDate: string, options: Intl.DateTimeFormatOptions) {
-  return new Intl.DateTimeFormat("en-US", { timeZone: "UTC", ...options }).format(
-    new Date(`${calendarDate}T12:00:00Z`),
-  );
-}
-
-function periodLabel(periodType: JournalPeriodType, periodStart: string) {
-  if (periodType === "monthly") {
-    return formatDate(periodStart, { month: "long", year: "numeric" });
-  }
-  if (periodType === "weekly") {
-    const periodEnd = moveJournalPeriod("daily", periodStart, 6);
-    const start = formatDate(periodStart, { month: "short", day: "numeric" });
-    const end = formatDate(periodEnd, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-    return `${start}–${end}`;
-  }
-  return formatDate(periodStart, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+import { periodLabel } from "@/lib/investment-journal/period-label";
+import type { JournalPeriodType } from "@/lib/investment-journal/periods";
 
 export function RecentJournalEntries({
   periodType,
@@ -106,64 +68,62 @@ export function RecentJournalEntries({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Recent entries</CardTitle>
-        <CardDescription>
-          Your most recently updated {periodType} Journal Periods.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {entries.length ? (
-          <div className="flex flex-col gap-2">
-            {entries.map((entry) => (
-              <button
-                key={entry.id}
-                type="button"
-                className="hover:bg-muted focus-visible:border-ring focus-visible:ring-ring/50 flex w-full flex-col gap-2 rounded-lg border p-3 text-left outline-none transition-colors focus-visible:ring-3"
-                onClick={() => onSelect(entry.periodStart)}
-              >
-                <span className="font-medium">
-                  {periodLabel(periodType, entry.periodStart)}
-                </span>
-                <span className="flex flex-wrap gap-1.5">
-                  {entry.hasPlan ? <Badge variant="secondary">Plan</Badge> : null}
-                  {entry.hasReflection ? (
-                    <Badge variant="secondary">Reflection</Badge>
-                  ) : null}
-                  {entry.hasImages ? (
-                    <Badge variant="secondary">
-                      <RiImageLine data-icon="inline-start" />
-                      Images
-                    </Badge>
-                  ) : null}
-                  {!entry.hasPlan && !entry.hasReflection && !entry.hasImages ? (
-                    <Badge variant="outline">Empty entry</Badge>
-                  ) : null}
-                </span>
-              </button>
-            ))}
-          </div>
-        ) : loading ? (
-          <p className="text-muted-foreground text-sm">Loading entries…</p>
-        ) : error ? (
-          <p className="text-destructive text-sm">Recent entries could not be loaded.</p>
-        ) : (
-          <p className="text-muted-foreground text-sm">No {periodType} entries yet.</p>
-        )}
-      </CardContent>
+    <div className="flex flex-col gap-4">
+      {entries.length ? (
+        <div className="flex flex-col gap-2">
+          {entries.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              className="hover:bg-muted focus-visible:border-ring focus-visible:ring-ring/50 flex w-full flex-col gap-2 rounded-lg border p-3 text-left outline-none transition-colors focus-visible:ring-3"
+              onClick={() => onSelect(entry.periodStart)}
+            >
+              <span className="font-medium">
+                {periodLabel(periodType, entry.periodStart)}
+              </span>
+              <span className="flex flex-wrap gap-1.5">
+                {entry.hasPlan ? <Badge variant="secondary">Plan</Badge> : null}
+                {entry.hasReflection ? (
+                  <Badge variant="secondary">Reflection</Badge>
+                ) : null}
+                {entry.hasImages ? (
+                  <Badge variant="secondary">
+                    <RiImageLine data-icon="inline-start" />
+                    Images
+                  </Badge>
+                ) : null}
+                {!entry.hasPlan && !entry.hasReflection && !entry.hasImages ? (
+                  <Badge variant="outline">Empty entry</Badge>
+                ) : null}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : loading ? (
+        <p className="text-muted-foreground text-sm">Loading entries…</p>
+      ) : error ? (
+        <p className="text-destructive text-sm">
+          Recent entries could not be loaded.
+        </p>
+      ) : (
+        <p className="text-muted-foreground text-sm">
+          No {periodType} entries yet.
+        </p>
+      )}
       {cursor || error ? (
-        <CardFooter>
-          <Button
-            variant="outline"
-            className="w-full"
-            disabled={loading}
-            onClick={error && !entries.length ? loadFirstPage : loadMore}
-          >
-            {loading ? "Loading…" : error && !entries.length ? "Try again" : "View more"}
-          </Button>
-        </CardFooter>
+        <Button
+          variant="outline"
+          className="w-full"
+          disabled={loading}
+          onClick={error && !entries.length ? loadFirstPage : loadMore}
+        >
+          {loading
+            ? "Loading…"
+            : error && !entries.length
+              ? "Try again"
+              : "View more"}
+        </Button>
       ) : null}
-    </Card>
+    </div>
   );
 }

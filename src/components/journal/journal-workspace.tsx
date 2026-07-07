@@ -44,7 +44,6 @@ import {
   Field,
   FieldDescription,
   FieldError,
-  FieldGroup,
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -54,14 +53,17 @@ import type {
   InvestmentJournalEntry,
   JournalWorkspace as JournalWorkspaceData,
 } from "@/lib/investment-journal/journal";
+import { periodLabel } from "@/lib/investment-journal/period-label";
 import {
   canonicalPeriodStart,
   moveJournalPeriod,
   type JournalPeriodType,
 } from "@/lib/investment-journal/periods";
+import { cn } from "@/lib/utils";
 
 type Draft = { plan: string; reflection: string };
 type SaveStatus = "idle" | "saving" | "saved" | "error" | "conflict";
+type JournalView = "write" | "history" | "transactions";
 
 const MAX_LENGTH = 10_000;
 
@@ -154,13 +156,13 @@ export function JournalWorkspace({
   const [imageRevision, setImageRevision] = useState(0);
   const [historyRevision, setHistoryRevision] = useState(0);
   const [deleting, startDeleting] = useTransition();
+  const [view, setView] = useState<JournalView>("write");
   const enqueuedFingerprintsRef = useRef(new Set<string>());
   const saveQueueRef = useRef(Promise.resolve());
   const currentDraftRef = useRef(draft);
   const entryRef = useRef(entry);
 
   const dirty = !sameDraft(draft, persistedDraft);
-  const timezoneLocked = initialWorkspace.timezoneLocked || entry !== null;
   const warnBeforeLeaving =
     dirty ||
     imageMutationPending ||
@@ -404,11 +406,22 @@ export function JournalWorkspace({
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-semibold tracking-tight">Journal</h1>
-        <p className="text-muted-foreground">
-          Your investment decisions over time.
-        </p>
+      <div className="flex flex-wrap items-center gap-4">
+        <h1 className="text-2xl font-semibold tracking-tight">Journal</h1>
+        {timezoneConfirmed ? (
+          <Tabs
+            value={periodType}
+            onValueChange={(value) =>
+              navigateTo(value as JournalPeriodType, selectedDate)
+            }
+          >
+            <TabsList aria-label="Journal Period type">
+              <TabsTrigger value="daily">Daily</TabsTrigger>
+              <TabsTrigger value="weekly">Weekly</TabsTrigger>
+              <TabsTrigger value="monthly">Monthly</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        ) : null}
       </div>
 
       {!timezoneConfirmed ? (
@@ -448,33 +461,12 @@ export function JournalWorkspace({
         </Card>
       ) : (
         <>
-          <Card>
-            <CardHeader className="gap-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <CardTitle>Journal Period</CardTitle>
-                  <CardDescription>
-                    {homeTimezone} ·{" "}
-                    {timezoneLocked
-                      ? "Timezone locked"
-                      : "Timezone locks after your first entry"}
-                  </CardDescription>
-                </div>
-                <SaveIndicator status={status} />
-              </div>
-              <Tabs
-                value={periodType}
-                onValueChange={(value) =>
-                  navigateTo(value as JournalPeriodType, selectedDate)
-                }
-              >
-                <TabsList aria-label="Journal Period type">
-                  <TabsTrigger value="daily">Daily</TabsTrigger>
-                  <TabsTrigger value="weekly">Weekly</TabsTrigger>
-                  <TabsTrigger value="monthly">Monthly</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <div className="flex flex-wrap items-center gap-2">
+          <div
+                  className={cn(
+                    "flex flex-wrap items-center gap-2",
+                    view === "history" && "hidden",
+                  )}
+                >
                 <Button
                   variant="outline"
                   size="icon"
@@ -537,22 +529,47 @@ export function JournalWorkspace({
                       ? "This week"
                       : "This month"}
                 </Button>
-              </div>
-            </CardHeader>
-          </Card>
+                </div>
 
-          <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)]">
-            <div className="flex min-w-0 flex-col gap-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Tabs
+              value={view}
+              onValueChange={(value) => setView(value as JournalView)}
+            >
+              <TabsList aria-label="Journal view">
+                <TabsTrigger value="write">Record</TabsTrigger>
+                <TabsTrigger value="history">History</TabsTrigger>
+                <TabsTrigger value="transactions">Trades</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {view === "write" ? <SaveIndicator status={status} /> : null}
+            {view === "history" ? (
+              <span className="text-muted-foreground text-sm">
+                Recent {periodType} journal entries
+              </span>
+            ) : null}
+            {view === "transactions" ? (
+              <span className="text-muted-foreground text-sm">
+                Trades for {periodLabel(periodType, selectedDate)}
+              </span>
+            ) : null}
+          </div>
+
+          <div className="flex flex-col gap-6">
+            <div
+              className={cn(
+                "flex min-w-0 flex-col gap-6",
+                view !== "write" && "hidden",
+              )}
+            >
               <div className="grid gap-6 xl:grid-cols-2">
-                <Card>
-              <CardHeader>
-                <CardTitle>Plan</CardTitle>
-                <CardDescription>
-                  Expectations, actions, risks, and rules.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FieldGroup>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-medium">Plan</h2>
+                    <span className="text-muted-foreground text-sm">
+                      {draft.plan.length.toLocaleString()} / 10,000
+                    </span>
+                  </div>
                   <Field>
                     <FieldLabel className="sr-only" htmlFor="journal-plan">
                       Plan
@@ -571,28 +588,18 @@ export function JournalWorkspace({
                         }));
                       }}
                     />
-                    <FieldDescription>
-                      {draft.plan.length.toLocaleString()} / 10,000
-                    </FieldDescription>
                   </Field>
-                </FieldGroup>
-              </CardContent>
-                </Card>
+                </div>
 
-                <Card>
-              <CardHeader>
-                <CardTitle>Reflection</CardTitle>
-                <CardDescription>
-                  What happened, what you learned, and what should change.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <FieldGroup>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-medium">Reflection</h2>
+                    <span className="text-muted-foreground text-sm">
+                      {draft.reflection.length.toLocaleString()} / 10,000
+                    </span>
+                  </div>
                   <Field>
-                    <FieldLabel
-                      className="sr-only"
-                      htmlFor="journal-reflection"
-                    >
+                    <FieldLabel className="sr-only" htmlFor="journal-reflection">
                       Reflection
                     </FieldLabel>
                     <Textarea
@@ -609,39 +616,21 @@ export function JournalWorkspace({
                         }));
                       }}
                     />
-                    <FieldDescription>
-                      {draft.reflection.length.toLocaleString()} / 10,000
-                    </FieldDescription>
                   </Field>
-                </FieldGroup>
-              </CardContent>
-                </Card>
+                </div>
               </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Screenshots</CardTitle>
-                  <CardDescription>
-                    Paste images while editing or browse for PNG, JPEG, and
-                    WebP files up to 4 MiB each.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <JournalImagesSection
-                    key={`${periodType}:${selectedDate}:${imageRevision}`}
-                    endpoint={imageEndpoint}
-                    open
-                    disabled={
-                      deleting ||
-                      status === "error" ||
-                      status === "conflict"
-                    }
-                    beforeMutation={prepareForImageMutation}
-                    onEntryVersionChanged={syncEntryVersion}
-                    onPendingChange={setImageMutationPending}
-                  />
-                </CardContent>
-              </Card>
+              <JournalImagesSection
+                key={`${periodType}:${selectedDate}:${imageRevision}`}
+                endpoint={imageEndpoint}
+                open
+                disabled={
+                  deleting || status === "error" || status === "conflict"
+                }
+                beforeMutation={prepareForImageMutation}
+                onEntryVersionChanged={syncEntryVersion}
+                onPendingChange={setImageMutationPending}
+              />
 
               {status === "error" ? (
             <Card>
@@ -713,17 +702,23 @@ export function JournalWorkspace({
               ) : null}
             </div>
 
-            <div className="flex min-w-0 flex-col gap-6">
+            {view === "history" ? (
               <RecentJournalEntries
                 periodType={periodType}
                 revision={historyRevision}
-                onSelect={(periodStart) => navigateTo(periodType, periodStart)}
+                onSelect={(periodStart) => {
+                  setView("write");
+                  navigateTo(periodType, periodStart);
+                }}
               />
+            ) : null}
+
+            {view === "transactions" ? (
               <JournalTransactionContext
                 transactions={initialWorkspace.transactions}
                 homeTimezone={homeTimezone}
               />
-            </div>
+            ) : null}
           </div>
         </>
       )}

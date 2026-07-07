@@ -6,10 +6,6 @@
         "shadcn@latest",
         "mcp"
       ]
-    },
-    "zerion-api": {
-      "type": "http",
-      "url": "https://developers.zerion.io/mcp"
     }
   }
 }
