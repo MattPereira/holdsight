@@ -40,6 +40,11 @@ export type TradeJournalEntryInput = {
   marketBias?: number | null;
 };
 
+export type SaveTradeJournalEntryResult =
+  | { status: "saved"; entry: TradeJournalEntryRow | null }
+  | { status: "conflict"; entry: TradeJournalEntryRow }
+  | { status: "error"; message: string };
+
 export type TradeJournalEntryRow = {
   id: string;
   transactionId: string;
@@ -253,31 +258,73 @@ export async function saveUserInvestmentTransactionJournalEntry(
   userId: string,
   transactionId: string,
   input: TradeJournalEntryInput,
-): Promise<{ entry: TradeJournalEntryRow | null; error: string | null }> {
+  expectedUpdatedAt: string | null,
+  overwrite: boolean,
+): Promise<SaveTradeJournalEntryResult> {
   const result = validateJournalEntryInput(input);
-  if ("error" in result) return { entry: null, error: result.error };
+  if ("error" in result) return { status: "error", message: result.error };
 
   if (!(await userOwnsTransaction(userId, transactionId))) {
-    return { entry: null, error: "Transaction not found." };
+    return { status: "error", message: "Transaction not found." };
   }
 
-  const [entry] = await db
-    .insert(investmentTransactionJournalEntries)
-    .values({
-      userId,
-      transactionId,
-      ...result.values,
-    })
-    .onConflictDoUpdate({
-      target: investmentTransactionJournalEntries.transactionId,
-      set: {
-        ...result.values,
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
+  const current = await getUserInvestmentTransactionJournalEntry(
+    userId,
+    transactionId,
+  );
+  const hasMeaningfulContent =
+    result.values.note !== null ||
+    result.values.tradeReason !== null ||
+    result.values.emotions.length > 0 ||
+    result.values.marketBias !== null;
 
-  return { entry: entry ? toJournalEntryRow(entry) : null, error: null };
+  if (!current) {
+    if (!hasMeaningfulContent) return { status: "saved", entry: null };
+    const [created] = await db
+      .insert(investmentTransactionJournalEntries)
+      .values({ userId, transactionId, ...result.values })
+      .onConflictDoNothing({
+        target: investmentTransactionJournalEntries.transactionId,
+      })
+      .returning();
+    if (created) {
+      return { status: "saved", entry: toJournalEntryRow(created) };
+    }
+  } else {
+    const conditions = [
+      eq(investmentTransactionJournalEntries.id, current.id),
+      eq(investmentTransactionJournalEntries.userId, userId),
+      eq(investmentTransactionJournalEntries.transactionId, transactionId),
+    ];
+    if (!overwrite) {
+      if (!expectedUpdatedAt) {
+        return { status: "error", message: "The journal version is missing." };
+      }
+      const expectedDate = new Date(expectedUpdatedAt);
+      if (Number.isNaN(expectedDate.valueOf())) {
+        return { status: "error", message: "The journal version is invalid." };
+      }
+      conditions.push(
+        eq(investmentTransactionJournalEntries.updatedAt, expectedDate),
+      );
+    }
+    const [updated] = await db
+      .update(investmentTransactionJournalEntries)
+      .set({ ...result.values, updatedAt: new Date() })
+      .where(and(...conditions))
+      .returning();
+    if (updated) {
+      return { status: "saved", entry: toJournalEntryRow(updated) };
+    }
+  }
+
+  const conflict = await getUserInvestmentTransactionJournalEntry(
+    userId,
+    transactionId,
+  );
+  return conflict
+    ? { status: "conflict", entry: conflict }
+    : { status: "error", message: "The journal entry no longer exists." };
 }
 
 export async function removeUserInvestmentTransactionJournalEntry(

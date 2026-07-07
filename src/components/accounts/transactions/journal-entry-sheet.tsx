@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
-import { RiDeleteBinLine, RiLoader4Line } from "@remixicon/react";
+import {
+  RiDeleteBinLine,
+  RiErrorWarningLine,
+  RiLoader4Line,
+  RiSaveLine,
+} from "@remixicon/react";
 import { toast } from "sonner";
 
 import {
@@ -11,6 +17,17 @@ import {
   saveTransactionJournalEntry,
 } from "@/app/actions";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -32,6 +49,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { JournalImagesSection } from "@/components/journal/journal-images-section";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import type {
+  TradeJournalEntryRow,
   TradeJournalEmotion,
   TradeJournalReason,
 } from "@/lib/investment-transactions/journal";
@@ -104,6 +122,51 @@ const EMPTY_FORM: FormState = {
   marketBias: null,
 };
 
+type SaveStatus = "idle" | "saving" | "saved" | "error" | "conflict";
+
+function sameForm(left: FormState, right: FormState): boolean {
+  return (
+    left.note === right.note &&
+    left.tradeReason === right.tradeReason &&
+    left.marketBias === right.marketBias &&
+    left.emotions.length === right.emotions.length &&
+    left.emotions.every((emotion, index) => emotion === right.emotions[index])
+  );
+}
+
+function formFromEntry(entry: TradeJournalEntryRow | null): FormState {
+  return {
+    note: entry?.note ?? "",
+    tradeReason: entry?.tradeReason ?? null,
+    emotions: entry?.emotions ?? [],
+    marketBias: entry?.marketBias ?? null,
+  };
+}
+
+function SaveIndicator({ status }: { status: SaveStatus }) {
+  if (status === "saving") return <Badge variant="secondary">Saving…</Badge>;
+  if (status === "saved") {
+    return (
+      <Badge variant="secondary">
+        <RiSaveLine data-icon="inline-start" />
+        Saved
+      </Badge>
+    );
+  }
+  if (status === "error") {
+    return (
+      <Badge variant="destructive">
+        <RiErrorWarningLine data-icon="inline-start" />
+        Save failed
+      </Badge>
+    );
+  }
+  if (status === "conflict") {
+    return <Badge variant="destructive">Edit conflict</Badge>;
+  }
+  return <Badge variant="outline">Not saved yet</Badge>;
+}
+
 function transactionDescription(
   transaction: InvestmentTransactionListItem,
 ): { dateTime: string; trade: string | null } {
@@ -143,11 +206,23 @@ export function JournalEntrySheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const router = useRouter();
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [hasEntry, setHasEntry] = useState(false);
+  const [persistedForm, setPersistedForm] = useState<FormState>(EMPTY_FORM);
+  const [entry, setEntry] = useState<TradeJournalEntryRow | null>(null);
   const [loading, setLoading] = useState(false);
-  const [saving, startSaving] = useTransition();
+  const [status, setStatus] = useState<SaveStatus>("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [serverConflict, setServerConflict] =
+    useState<TradeJournalEntryRow | null>(null);
+  const [retryVersion, setRetryVersion] = useState(0);
+  const [imageMutationPending, setImageMutationPending] = useState(false);
   const [removing, startRemoving] = useTransition();
+  const saveQueueRef = useRef(Promise.resolve());
+  const enqueuedFingerprintsRef = useRef(new Set<string>());
+  const currentFormRef = useRef(form);
+  const entryRef = useRef(entry);
+  const activeIdRef = useRef<string | null>(null);
 
   const transactionId = transaction?.id ?? null;
   const activeId = open ? transactionId : null;
@@ -159,9 +234,26 @@ export function JournalEntrySheet({
   if (syncedId !== activeId) {
     setSyncedId(activeId);
     setForm(EMPTY_FORM);
-    setHasEntry(false);
+    setPersistedForm(EMPTY_FORM);
+    setEntry(null);
+    setStatus("idle");
+    setSaveError(null);
+    setServerConflict(null);
     setLoading(activeId !== null);
   }
+
+  useEffect(() => {
+    activeIdRef.current = activeId;
+    enqueuedFingerprintsRef.current.clear();
+    saveQueueRef.current = Promise.resolve();
+  }, [activeId]);
+
+  useEffect(() => {
+    currentFormRef.current = form;
+  }, [form]);
+  useEffect(() => {
+    entryRef.current = entry;
+  }, [entry]);
 
   // Hydrate the form from the existing entry. Only the lightweight summary
   // ships with the list, so the full entry (note + emotions) is fetched here.
@@ -177,13 +269,12 @@ export function JournalEntrySheet({
           return;
         }
         if (result.entry) {
-          setHasEntry(true);
-          setForm({
-            note: result.entry.note ?? "",
-            tradeReason: result.entry.tradeReason,
-            emotions: result.entry.emotions,
-            marketBias: result.entry.marketBias,
-          });
+          const nextForm = formFromEntry(result.entry);
+          setEntry(result.entry);
+          entryRef.current = result.entry;
+          setForm(nextForm);
+          setPersistedForm(nextForm);
+          setStatus("saved");
         }
       })
       .finally(() => {
@@ -195,35 +286,119 @@ export function JournalEntrySheet({
     };
   }, [open, transactionId]);
 
-  function toggleEmotion(emotion: TradeJournalEmotion) {
-    setForm((prev) => ({
-      ...prev,
-      emotions: prev.emotions.includes(emotion)
-        ? prev.emotions.filter((value) => value !== emotion)
-        : [...prev.emotions, emotion],
-    }));
-  }
+  const dirty = !sameForm(form, persistedForm);
+  const warnBeforeLeaving =
+    dirty ||
+    imageMutationPending ||
+    status === "saving" ||
+    status === "error" ||
+    status === "conflict";
 
-  function handleSave() {
-    if (!transactionId) return;
-    if (form.tradeReason === null || form.marketBias === null) {
-      toast.error("Choose a trade reason and market bias.");
-      return;
-    }
-    startSaving(async () => {
-      const result = await saveTransactionJournalEntry(transactionId, {
-        note: form.note,
-        tradeReason: form.tradeReason,
-        emotions: form.emotions,
-        marketBias: form.marketBias,
-      });
-      if (result.error) {
-        toast.error(result.error);
+  useEffect(() => {
+    if (!open || !warnBeforeLeaving) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) =>
+      event.preventDefault();
+    const handleLinkClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const link = target.closest("a[href]");
+      if (!(link instanceof HTMLAnchorElement) || link.target === "_blank") {
         return;
       }
-      toast.success(hasEntry ? "Journal entry updated" : "Journal entry saved");
-      onOpenChange(false);
-    });
+      if (
+        !window.confirm(
+          "Your latest Transaction Journal Entry changes have not been saved. Leave anyway?",
+        )
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("click", handleLinkClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("click", handleLinkClick, true);
+    };
+  }, [open, warnBeforeLeaving]);
+
+  const runSave = useCallback(
+    (snapshot: FormState, overwrite = false): Promise<boolean> => {
+      if (!transactionId) return Promise.resolve(false);
+      const savingTransactionId = transactionId;
+      const fingerprint = JSON.stringify(snapshot);
+      enqueuedFingerprintsRef.current.add(fingerprint);
+      setStatus("saving");
+      setSaveError(null);
+      const operation = saveQueueRef.current.then(async () => {
+        let result;
+        try {
+          result = await saveTransactionJournalEntry(
+            transactionId,
+            snapshot,
+            entryRef.current?.updatedAt.toISOString() ?? null,
+            overwrite,
+          );
+        } catch {
+          result = {
+            status: "error" as const,
+            message: "The server could not be reached.",
+          };
+        }
+        if (activeIdRef.current !== savingTransactionId) return false;
+        enqueuedFingerprintsRef.current.delete(fingerprint);
+        if (result.status === "conflict") {
+          setServerConflict(result.entry);
+          setStatus("conflict");
+          return false;
+        }
+        if (result.status === "error") {
+          setSaveError(result.message);
+          setStatus("error");
+          window.setTimeout(
+            () => setRetryVersion((version) => version + 1),
+            3_000,
+          );
+          return false;
+        }
+        const materialized = entryRef.current === null && result.entry !== null;
+        setEntry(result.entry);
+        entryRef.current = result.entry;
+        setPersistedForm(snapshot);
+        setStatus(
+          sameForm(currentFormRef.current, snapshot) ? "saved" : "idle",
+        );
+        if (materialized) router.refresh();
+        return true;
+      });
+      saveQueueRef.current = operation.then(() => undefined);
+      return operation;
+    },
+    [router, transactionId],
+  );
+
+  useEffect(() => {
+    if (!open || loading || status === "conflict" || !dirty) return;
+    const fingerprint = JSON.stringify(form);
+    if (enqueuedFingerprintsRef.current.has(fingerprint)) return;
+    const timer = window.setTimeout(() => void runSave(form), 750);
+    return () => window.clearTimeout(timer);
+  }, [dirty, form, loading, open, retryVersion, runSave, status]);
+
+  function updateImmediately(update: (current: FormState) => FormState) {
+    const next = update(currentFormRef.current);
+    currentFormRef.current = next;
+    setForm(next);
+    void runSave(next);
+  }
+
+  function toggleEmotion(emotion: TradeJournalEmotion) {
+    updateImmediately((current) => ({
+      ...current,
+      emotions: current.emotions.includes(emotion)
+        ? current.emotions.filter((value) => value !== emotion)
+        : [...current.emotions, emotion],
+    }));
   }
 
   function handleRemove() {
@@ -235,21 +410,93 @@ export function JournalEntrySheet({
         return;
       }
       toast.success("Journal entry removed");
+      setEntry(null);
+      entryRef.current = null;
+      setForm(EMPTY_FORM);
+      setPersistedForm(EMPTY_FORM);
+      router.refresh();
       onOpenChange(false);
     });
   }
 
-  const busy = saving || removing;
-  const canSave = form.tradeReason !== null && form.marketBias !== null;
+  function requestOpenChange(nextOpen: boolean) {
+    if (
+      !nextOpen &&
+      warnBeforeLeaving &&
+      !window.confirm(
+        "Your latest Transaction Journal Entry changes have not been saved. Close anyway?",
+      )
+    ) {
+      return;
+    }
+    onOpenChange(nextOpen);
+  }
+
+  function reloadServerVersion() {
+    if (!serverConflict) return;
+    const nextForm = formFromEntry(serverConflict);
+    setEntry(serverConflict);
+    entryRef.current = serverConflict;
+    setForm(nextForm);
+    setPersistedForm(nextForm);
+    setServerConflict(null);
+    setSaveError(null);
+    setStatus("saved");
+    enqueuedFingerprintsRef.current.clear();
+  }
+
+  function overwriteServerVersion() {
+    if (!serverConflict) return;
+    setEntry(serverConflict);
+    entryRef.current = serverConflict;
+    setServerConflict(null);
+    void runSave(currentFormRef.current, true);
+  }
+
+  const syncEntryVersion = useCallback((updatedAt: string, entryId?: string) => {
+    const current = entryRef.current;
+    if (current) {
+      const next = { ...current, updatedAt: new Date(updatedAt) };
+      setEntry(next);
+      entryRef.current = next;
+      setStatus("saved");
+    } else if (entryId && transactionId) {
+      const next: TradeJournalEntryRow = {
+        id: entryId,
+        transactionId,
+        ...currentFormRef.current,
+        note: currentFormRef.current.note || null,
+        createdAt: new Date(updatedAt),
+        updatedAt: new Date(updatedAt),
+      };
+      setEntry(next);
+      entryRef.current = next;
+      setPersistedForm(currentFormRef.current);
+      setStatus("saved");
+      router.refresh();
+    }
+  }, [router, transactionId]);
+
+  const prepareForImageMutation = useCallback(async () => {
+    if (status === "conflict" || status === "error") return false;
+    if (dirty || status === "saving") return runSave(currentFormRef.current);
+    await saveQueueRef.current;
+    return true;
+  }, [dirty, runSave, status]);
+
+  const busy = removing;
   const description = transaction
     ? transactionDescription(transaction)
     : null;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={requestOpenChange}>
       <SheetContent className="overflow-y-auto data-[side=right]:sm:max-w-lg data-[side=right]:lg:max-w-2xl data-[side=right]:xl:max-w-[60vw]">
         <SheetHeader>
-          <SheetTitle>{hasEntry ? "Edit journal entry" : "Add journal entry"}</SheetTitle>
+          <div className="flex items-center justify-between gap-3 pr-8">
+            <SheetTitle>{entry ? "Edit journal entry" : "Add journal entry"}</SheetTitle>
+            <SaveIndicator status={status} />
+          </div>
           {description ? (
             <SheetDescription className="flex flex-col">
               <span>{description.dateTime}</span>
@@ -265,7 +512,7 @@ export function JournalEntrySheet({
               value={form.tradeReason ?? NONE_VALUE}
               disabled={loading || busy}
               onValueChange={(value) =>
-                setForm((prev) => ({
+                updateImmediately((prev) => ({
                   ...prev,
                   tradeReason:
                     value === NONE_VALUE
@@ -302,7 +549,7 @@ export function JournalEntrySheet({
               }
               disabled={loading || busy}
               onValueChange={(value) =>
-                setForm((prev) => ({
+                updateImmediately((prev) => ({
                   ...prev,
                   marketBias: value === NONE_VALUE ? null : Number(value),
                 }))
@@ -376,22 +623,23 @@ export function JournalEntrySheet({
             }
             open={open}
             disabled={busy}
-            onEntryMaterialized={() => setHasEntry(true)}
+            onEntryVersionChanged={syncEntryVersion}
+            onPendingChange={setImageMutationPending}
+            beforeMutation={prepareForImageMutation}
           />
+          {saveError ? (
+            <p role="alert" className="text-sm text-destructive">
+              {saveError} Changes will retry while this sheet remains open.
+            </p>
+          ) : null}
         </div>
 
         <SheetFooter>
-          <Button onClick={handleSave} disabled={loading || busy || !canSave}>
-            {saving ? (
-              <RiLoader4Line className="animate-spin" />
-            ) : null}
-            {hasEntry ? "Save changes" : "Save entry"}
-          </Button>
-          {hasEntry ? (
+          {entry ? (
             <Button
               variant="destructive"
               onClick={handleRemove}
-              disabled={loading || busy}
+              disabled={loading || busy || warnBeforeLeaving}
             >
               {removing ? (
                 <RiLoader4Line className="animate-spin" />
@@ -403,6 +651,27 @@ export function JournalEntrySheet({
           ) : null}
         </SheetFooter>
       </SheetContent>
+      <AlertDialog open={status === "conflict"}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              This Transaction Journal Entry changed elsewhere
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Your local edits are still visible. Reload the server version or
+              deliberately overwrite it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={reloadServerVersion}>
+              Reload server version
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={overwriteServerVersion}>
+              Overwrite
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }

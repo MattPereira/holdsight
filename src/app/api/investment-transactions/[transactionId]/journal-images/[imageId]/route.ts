@@ -27,14 +27,14 @@ export async function DELETE(
     return Response.json({ error: "Invalid image ID." }, { status: 400 });
   }
 
-  const deleted = await removeUserInvestmentTransactionJournalImage(
+  const result = await removeUserInvestmentTransactionJournalImage(
     userId,
     transactionId.data,
     imageId.data,
   );
-  if (!deleted) {
+  if (!result.deleted) {
     return Response.json({ error: "Image not found." }, { status: 404 });
   }
 
-  return new Response(null, { status: 204 });
+  return Response.json({ entryUpdatedAt: result.entryUpdatedAt });
 }

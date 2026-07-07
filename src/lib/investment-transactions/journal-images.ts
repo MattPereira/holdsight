@@ -40,7 +40,12 @@ export type JournalImageUploadError =
   | "transaction_not_found";
 
 export type JournalImageUploadResult =
-  | { image: InvestmentTransactionJournalImage; error: null }
+  | {
+      image: InvestmentTransactionJournalImage;
+      entryId: string;
+      entryUpdatedAt: string;
+      error: null;
+    }
   | { image: null; error: JournalImageUploadError };
 
 function toJournalImage(
@@ -111,7 +116,12 @@ async function persistUploadedImage(input: {
   contentType: JournalImageContentType;
   sizeBytes: number;
 }): Promise<
-  | { image: InvestmentTransactionJournalImage; error: null }
+  | {
+      image: InvestmentTransactionJournalImage;
+      entryId: string;
+      entryUpdatedAt: string;
+      error: null;
+    }
   | {
       image: null;
       error: "image_limit_reached" | "transaction_not_found";
@@ -126,7 +136,9 @@ async function persistUploadedImage(input: {
       });
 
     const [entry] = await tx
-      .select({ id: investmentTransactionJournalEntries.id })
+      .select({
+        id: investmentTransactionJournalEntries.id,
+      })
       .from(investmentTransactionJournalEntries)
       .where(
         and(
@@ -174,7 +186,29 @@ async function persistUploadedImage(input: {
       .returning();
 
     if (!image) throw new Error("Failed to persist uploaded journal image.");
-    return { image: toJournalImage(image, input.transactionId), error: null };
+    const now = new Date();
+    const [updatedEntry] = await tx
+      .update(investmentTransactionJournalEntries)
+      .set({ updatedAt: now })
+      .where(
+        and(
+          eq(investmentTransactionJournalEntries.id, entry.id),
+          eq(investmentTransactionJournalEntries.userId, input.userId),
+        ),
+      )
+      .returning({
+        id: investmentTransactionJournalEntries.id,
+        updatedAt: investmentTransactionJournalEntries.updatedAt,
+      });
+    if (!updatedEntry) {
+      throw new Error("Failed to version journal image upload.");
+    }
+    return {
+      image: toJournalImage(image, input.transactionId),
+      entryId: updatedEntry.id,
+      entryUpdatedAt: updatedEntry.updatedAt.toISOString(),
+      error: null,
+    };
   });
 }
 
@@ -304,7 +338,7 @@ export async function removeUserInvestmentTransactionJournalImage(
   userId: string,
   transactionId: string,
   imageId: string,
-): Promise<boolean> {
+): Promise<{ deleted: boolean; entryUpdatedAt?: string }> {
   const [image] = await db
     .select({
       id: investmentTransactionJournalEntryImages.id,
@@ -331,23 +365,37 @@ export async function removeUserInvestmentTransactionJournalImage(
     )
     .limit(1);
 
-  if (!image) return false;
+  if (!image) return { deleted: false };
 
-  const deleted = await db
-    .delete(investmentTransactionJournalEntryImages)
-    .where(
-      and(
-        eq(investmentTransactionJournalEntryImages.id, image.id),
-        eq(investmentTransactionJournalEntryImages.userId, userId),
-        eq(
-          investmentTransactionJournalEntryImages.journalEntryId,
-          image.journalEntryId,
+  const mutation = await db.transaction(async (tx) => {
+    const deleted = await tx
+      .delete(investmentTransactionJournalEntryImages)
+      .where(
+        and(
+          eq(investmentTransactionJournalEntryImages.id, image.id),
+          eq(investmentTransactionJournalEntryImages.userId, userId),
+          eq(
+            investmentTransactionJournalEntryImages.journalEntryId,
+            image.journalEntryId,
+          ),
         ),
-      ),
-    )
-    .returning({ id: investmentTransactionJournalEntryImages.id });
+      )
+      .returning({ id: investmentTransactionJournalEntryImages.id });
+    if (deleted.length === 0) return null;
+    const [entry] = await tx
+      .update(investmentTransactionJournalEntries)
+      .set({ updatedAt: new Date() })
+      .where(
+        and(
+          eq(investmentTransactionJournalEntries.id, image.journalEntryId),
+          eq(investmentTransactionJournalEntries.userId, userId),
+        ),
+      )
+      .returning({ updatedAt: investmentTransactionJournalEntries.updatedAt });
+    return entry?.updatedAt.toISOString() ?? null;
+  });
 
-  if (deleted.length === 0) return false;
+  if (!mutation) return { deleted: false };
 
   // The row is gone; hand the Blob off to the deletion queue so the cron can
   // reclaim it. Enqueue failures must not fail the user's delete, so swallow.
@@ -357,5 +405,5 @@ export async function removeUserInvestmentTransactionJournalImage(
     console.error("Failed to enqueue journal image Blob cleanup", enqueueError);
   }
 
-  return true;
+  return { deleted: true, entryUpdatedAt: mutation };
 }

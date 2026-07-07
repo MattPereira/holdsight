@@ -103,5 +103,12 @@ export async function POST(
   );
   if (result.error) return uploadErrorResponse(result.error);
 
-  return Response.json({ image: result.image }, { status: 201 });
+  return Response.json(
+    {
+      image: result.image,
+      entryId: result.entryId,
+      entryUpdatedAt: result.entryUpdatedAt,
+    },
+    { status: 201 },
+  );
 }

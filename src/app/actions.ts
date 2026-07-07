@@ -1284,12 +1284,14 @@ export async function getTransactionJournalEntry(
 export async function saveTransactionJournalEntry(
   transactionId: string,
   input: TradeJournalEntryInput,
-): Promise<TransactionJournalActionResult> {
+  expectedUpdatedAt: string | null,
+  overwrite = false,
+) {
   const userId = await getCurrentUserId();
   if (!userId) {
     return {
-      entry: null,
-      error: "You must be signed in to manage journal entries.",
+      status: "error" as const,
+      message: "You must be signed in to manage journal entries.",
     };
   }
 
@@ -1297,8 +1299,10 @@ export async function saveTransactionJournalEntry(
     userId,
     transactionId,
     input,
+    expectedUpdatedAt,
+    overwrite,
   );
-  if (!result.error) revalidateTransactionJournalPaths();
+  if (result.status === "saved") revalidateTransactionJournalPaths();
 
   return result;
 }
