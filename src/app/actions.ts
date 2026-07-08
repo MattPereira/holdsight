@@ -63,9 +63,10 @@ import {
   getUserInvestmentTransactionJournalEntry,
   removeUserInvestmentTransactionJournalEntry,
   saveUserInvestmentTransactionJournalEntry,
+  serializeTradeJournalEntry,
   withTransactionJournalSummaries,
   type TradeJournalEntryInput,
-  type TradeJournalEntryRow,
+  type TransactionJournalEntry,
 } from "@/lib/investment-transactions/journal";
 import {
   addUserEvmAccount,
@@ -1250,9 +1251,14 @@ export async function pollPortfolioTransactions(): Promise<PortfolioTransactions
 /* ------------------------ transaction journal ------------------------ */
 
 export type TransactionJournalActionResult = {
-  entry: TradeJournalEntryRow | null;
+  entry: TransactionJournalEntry | null;
   error: string | null;
 };
+
+export type SaveTransactionJournalActionResult =
+  | { status: "saved"; entry: TransactionJournalEntry | null }
+  | { status: "conflict"; entry: TransactionJournalEntry }
+  | { status: "error"; message: string };
 
 function revalidateTransactionJournalPaths(): void {
   revalidatePath("/");
@@ -1272,13 +1278,11 @@ export async function getTransactionJournalEntry(
     };
   }
 
-  return {
-    entry: await getUserInvestmentTransactionJournalEntry(
-      userId,
-      transactionId,
-    ),
-    error: null,
-  };
+  const entry = await getUserInvestmentTransactionJournalEntry(
+    userId,
+    transactionId,
+  );
+  return { entry: entry ? serializeTradeJournalEntry(entry) : null, error: null };
 }
 
 export async function saveTransactionJournalEntry(
@@ -1286,7 +1290,7 @@ export async function saveTransactionJournalEntry(
   input: TradeJournalEntryInput,
   expectedUpdatedAt: string | null,
   overwrite = false,
-) {
+): Promise<SaveTransactionJournalActionResult> {
   const userId = await getCurrentUserId();
   if (!userId) {
     return {
@@ -1304,7 +1308,14 @@ export async function saveTransactionJournalEntry(
   );
   if (result.status === "saved") revalidateTransactionJournalPaths();
 
-  return result;
+  if (result.status === "error") return result;
+  if (result.status === "conflict") {
+    return { status: "conflict", entry: serializeTradeJournalEntry(result.entry) };
+  }
+  return {
+    status: "saved",
+    entry: result.entry ? serializeTradeJournalEntry(result.entry) : null,
+  };
 }
 
 export async function removeTransactionJournalEntry(

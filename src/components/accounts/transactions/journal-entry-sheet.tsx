@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -49,7 +49,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { JournalImagesSection } from "@/components/journal/journal-images-section";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import type {
-  TradeJournalEntryRow,
+  TransactionJournalEntry,
   TradeJournalEmotion,
   TradeJournalReason,
 } from "@/lib/investment-transactions/journal";
@@ -57,6 +57,11 @@ import {
   TRADE_JOURNAL_EMOTION_OPTIONS,
   TRADE_JOURNAL_REASON_OPTIONS,
 } from "@/lib/investment-transactions/journal-labels";
+import {
+  useAutosaveEntry,
+  type SaveStatus,
+} from "@/lib/journal-autosave/use-autosave-entry";
+import { useUnsavedChangesGuard } from "@/lib/journal-autosave/use-unsaved-changes-guard";
 import { cn } from "@/lib/utils";
 
 // Radix Select can't hold an empty string value, so an explicit sentinel maps
@@ -115,14 +120,8 @@ type FormState = {
   marketBias: number | null;
 };
 
-const EMPTY_FORM: FormState = {
-  note: "",
-  tradeReason: null,
-  emotions: [],
-  marketBias: null,
-};
-
-type SaveStatus = "idle" | "saving" | "saved" | "error" | "conflict";
+const UNSAVED_CHANGES_MESSAGE =
+  "Your latest Transaction Journal Entry changes have not been saved. Leave anyway?";
 
 function sameForm(left: FormState, right: FormState): boolean {
   return (
@@ -134,7 +133,7 @@ function sameForm(left: FormState, right: FormState): boolean {
   );
 }
 
-function formFromEntry(entry: TradeJournalEntryRow | null): FormState {
+function formFromEntry(entry: TransactionJournalEntry | null): FormState {
   return {
     note: entry?.note ?? "",
     tradeReason: entry?.tradeReason ?? null,
@@ -207,53 +206,52 @@ export function JournalEntrySheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [persistedForm, setPersistedForm] = useState<FormState>(EMPTY_FORM);
-  const [entry, setEntry] = useState<TradeJournalEntryRow | null>(null);
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<SaveStatus>("idle");
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [serverConflict, setServerConflict] =
-    useState<TradeJournalEntryRow | null>(null);
-  const [retryVersion, setRetryVersion] = useState(0);
   const [imageMutationPending, setImageMutationPending] = useState(false);
   const [removing, startRemoving] = useTransition();
-  const saveQueueRef = useRef(Promise.resolve());
-  const enqueuedFingerprintsRef = useRef(new Set<string>());
-  const currentFormRef = useRef(form);
-  const entryRef = useRef(entry);
-  const activeIdRef = useRef<string | null>(null);
 
   const transactionId = transaction?.id ?? null;
   const activeId = open ? transactionId : null;
 
-  // Reset the form during render whenever the sheet targets a new transaction,
-  // so the async fetch below never has to clear stale state from inside the
-  // effect body. Mirrors the render-phase sync used by useTransactionsPanel.
+  // Reset `loading` during render whenever the sheet targets a new
+  // transaction, so the async fetch below never has to clear stale state
+  // from inside the effect body. Mirrors the render-phase sync used by
+  // useTransactionsPanel. The draft/entry/status reset is handled by
+  // useAutosaveEntry itself, keyed on the same identity.
   const [syncedId, setSyncedId] = useState<string | null>(null);
   if (syncedId !== activeId) {
     setSyncedId(activeId);
-    setForm(EMPTY_FORM);
-    setPersistedForm(EMPTY_FORM);
-    setEntry(null);
-    setStatus("idle");
-    setSaveError(null);
-    setServerConflict(null);
     setLoading(activeId !== null);
   }
 
-  useEffect(() => {
-    activeIdRef.current = activeId;
-    enqueuedFingerprintsRef.current.clear();
-    saveQueueRef.current = Promise.resolve();
-  }, [activeId]);
-
-  useEffect(() => {
-    currentFormRef.current = form;
-  }, [form]);
-  useEffect(() => {
-    entryRef.current = entry;
-  }, [entry]);
+  const autosave = useAutosaveEntry<FormState, TransactionJournalEntry>({
+    key: activeId ?? "closed",
+    initialEntry: null,
+    enabled: open && !loading,
+    draftFromEntry: formFromEntry,
+    sameDraft: sameForm,
+    save: (snapshot, currentEntry, overwrite) => {
+      if (!transactionId) {
+        return Promise.resolve({
+          status: "error",
+          message: "No transaction selected.",
+        });
+      }
+      return saveTransactionJournalEntry(
+        transactionId,
+        snapshot,
+        currentEntry?.updatedAt ?? null,
+        overwrite,
+      );
+    },
+    // Refresh the surrounding transaction list only when the entry's
+    // existence toggles (materialized or removed) — a plain content update
+    // doesn't need to invalidate the list's own "has journal entry" badge.
+    onEntryChange: (nextEntry, previousEntry) => {
+      if (Boolean(previousEntry) !== Boolean(nextEntry)) router.refresh();
+    },
+  });
+  const { draft: form, entry, status, saveError } = autosave;
 
   // Hydrate the form from the existing entry. Only the lightweight summary
   // ships with the list, so the full entry (note + emotions) is fetched here.
@@ -268,14 +266,7 @@ export function JournalEntrySheet({
           toast.error(result.error);
           return;
         }
-        if (result.entry) {
-          const nextForm = formFromEntry(result.entry);
-          setEntry(result.entry);
-          entryRef.current = result.entry;
-          setForm(nextForm);
-          setPersistedForm(nextForm);
-          setStatus("saved");
-        }
+        if (result.entry) autosave.hydrate(result.entry);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -284,112 +275,26 @@ export function JournalEntrySheet({
     return () => {
       cancelled = true;
     };
+    // `autosave` is a fresh object every render, so it can't be a dep
+    // without re-running this effect on every keystroke; `autosave.hydrate`
+    // itself is stable (empty-deps useCallback).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, transactionId]);
 
-  const dirty = !sameForm(form, persistedForm);
   const warnBeforeLeaving =
-    dirty ||
+    autosave.dirty ||
     imageMutationPending ||
     status === "saving" ||
     status === "error" ||
     status === "conflict";
-
-  useEffect(() => {
-    if (!open || !warnBeforeLeaving) return;
-    const handleBeforeUnload = (event: BeforeUnloadEvent) =>
-      event.preventDefault();
-    const handleLinkClick = (event: MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const link = target.closest("a[href]");
-      if (!(link instanceof HTMLAnchorElement) || link.target === "_blank") {
-        return;
-      }
-      if (
-        !window.confirm(
-          "Your latest Transaction Journal Entry changes have not been saved. Leave anyway?",
-        )
-      ) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    document.addEventListener("click", handleLinkClick, true);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      document.removeEventListener("click", handleLinkClick, true);
-    };
-  }, [open, warnBeforeLeaving]);
-
-  const runSave = useCallback(
-    (snapshot: FormState, overwrite = false): Promise<boolean> => {
-      if (!transactionId) return Promise.resolve(false);
-      const savingTransactionId = transactionId;
-      const fingerprint = JSON.stringify(snapshot);
-      enqueuedFingerprintsRef.current.add(fingerprint);
-      setStatus("saving");
-      setSaveError(null);
-      const operation = saveQueueRef.current.then(async () => {
-        let result;
-        try {
-          result = await saveTransactionJournalEntry(
-            transactionId,
-            snapshot,
-            entryRef.current?.updatedAt.toISOString() ?? null,
-            overwrite,
-          );
-        } catch {
-          result = {
-            status: "error" as const,
-            message: "The server could not be reached.",
-          };
-        }
-        if (activeIdRef.current !== savingTransactionId) return false;
-        enqueuedFingerprintsRef.current.delete(fingerprint);
-        if (result.status === "conflict") {
-          setServerConflict(result.entry);
-          setStatus("conflict");
-          return false;
-        }
-        if (result.status === "error") {
-          setSaveError(result.message);
-          setStatus("error");
-          window.setTimeout(
-            () => setRetryVersion((version) => version + 1),
-            3_000,
-          );
-          return false;
-        }
-        const materialized = entryRef.current === null && result.entry !== null;
-        setEntry(result.entry);
-        entryRef.current = result.entry;
-        setPersistedForm(snapshot);
-        setStatus(
-          sameForm(currentFormRef.current, snapshot) ? "saved" : "idle",
-        );
-        if (materialized) router.refresh();
-        return true;
-      });
-      saveQueueRef.current = operation.then(() => undefined);
-      return operation;
-    },
-    [router, transactionId],
+  const { confirmLeave } = useUnsavedChangesGuard(
+    open && warnBeforeLeaving,
+    UNSAVED_CHANGES_MESSAGE,
   );
 
-  useEffect(() => {
-    if (!open || loading || status === "conflict" || !dirty) return;
-    const fingerprint = JSON.stringify(form);
-    if (enqueuedFingerprintsRef.current.has(fingerprint)) return;
-    const timer = window.setTimeout(() => void runSave(form), 750);
-    return () => window.clearTimeout(timer);
-  }, [dirty, form, loading, open, retryVersion, runSave, status]);
-
   function updateImmediately(update: (current: FormState) => FormState) {
-    const next = update(currentFormRef.current);
-    currentFormRef.current = next;
-    setForm(next);
-    void runSave(next);
+    autosave.setDraft(update);
+    autosave.commitNow();
   }
 
   function toggleEmotion(emotion: TradeJournalEmotion) {
@@ -410,79 +315,27 @@ export function JournalEntrySheet({
         return;
       }
       toast.success("Journal entry removed");
-      setEntry(null);
-      entryRef.current = null;
-      setForm(EMPTY_FORM);
-      setPersistedForm(EMPTY_FORM);
-      router.refresh();
+      autosave.applyServerEntry(null);
       onOpenChange(false);
     });
   }
 
   function requestOpenChange(nextOpen: boolean) {
-    if (
-      !nextOpen &&
-      warnBeforeLeaving &&
-      !window.confirm(
-        "Your latest Transaction Journal Entry changes have not been saved. Close anyway?",
-      )
-    ) {
-      return;
-    }
+    if (!nextOpen && !confirmLeave()) return;
     onOpenChange(nextOpen);
   }
 
-  function reloadServerVersion() {
-    if (!serverConflict) return;
-    const nextForm = formFromEntry(serverConflict);
-    setEntry(serverConflict);
-    entryRef.current = serverConflict;
-    setForm(nextForm);
-    setPersistedForm(nextForm);
-    setServerConflict(null);
-    setSaveError(null);
-    setStatus("saved");
-    enqueuedFingerprintsRef.current.clear();
+  function handleEntryVersionChanged(updatedAt: string, entryId?: string) {
+    if (!transactionId) return;
+    autosave.syncEntryVersion(updatedAt, entryId, (draft, id) => ({
+      id,
+      transactionId,
+      ...draft,
+      note: draft.note || null,
+      createdAt: updatedAt,
+      updatedAt,
+    }));
   }
-
-  function overwriteServerVersion() {
-    if (!serverConflict) return;
-    setEntry(serverConflict);
-    entryRef.current = serverConflict;
-    setServerConflict(null);
-    void runSave(currentFormRef.current, true);
-  }
-
-  const syncEntryVersion = useCallback((updatedAt: string, entryId?: string) => {
-    const current = entryRef.current;
-    if (current) {
-      const next = { ...current, updatedAt: new Date(updatedAt) };
-      setEntry(next);
-      entryRef.current = next;
-      setStatus("saved");
-    } else if (entryId && transactionId) {
-      const next: TradeJournalEntryRow = {
-        id: entryId,
-        transactionId,
-        ...currentFormRef.current,
-        note: currentFormRef.current.note || null,
-        createdAt: new Date(updatedAt),
-        updatedAt: new Date(updatedAt),
-      };
-      setEntry(next);
-      entryRef.current = next;
-      setPersistedForm(currentFormRef.current);
-      setStatus("saved");
-      router.refresh();
-    }
-  }, [router, transactionId]);
-
-  const prepareForImageMutation = useCallback(async () => {
-    if (status === "conflict" || status === "error") return false;
-    if (dirty || status === "saving") return runSave(currentFormRef.current);
-    await saveQueueRef.current;
-    return true;
-  }, [dirty, runSave, status]);
 
   const busy = removing;
   const description = transaction
@@ -610,7 +463,10 @@ export function JournalEntrySheet({
               value={form.note}
               disabled={loading || busy}
               onChange={(event) =>
-                setForm((prev) => ({ ...prev, note: event.target.value }))
+                autosave.setDraft((prev) => ({
+                  ...prev,
+                  note: event.target.value,
+                }))
               }
             />
           </div>
@@ -623,9 +479,9 @@ export function JournalEntrySheet({
             }
             open={open}
             disabled={busy}
-            onEntryVersionChanged={syncEntryVersion}
+            onEntryVersionChanged={handleEntryVersionChanged}
             onPendingChange={setImageMutationPending}
-            beforeMutation={prepareForImageMutation}
+            beforeMutation={autosave.flushBeforeMutation}
           />
           {saveError ? (
             <p role="alert" className="text-sm text-destructive">
@@ -663,10 +519,10 @@ export function JournalEntrySheet({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={reloadServerVersion}>
+            <AlertDialogCancel onClick={autosave.reloadServerVersion}>
               Reload server version
             </AlertDialogCancel>
-            <AlertDialogAction onClick={overwriteServerVersion}>
+            <AlertDialogAction onClick={autosave.overwriteServerVersion}>
               Overwrite
             </AlertDialogAction>
           </AlertDialogFooter>

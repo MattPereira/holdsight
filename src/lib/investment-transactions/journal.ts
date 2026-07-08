@@ -56,6 +56,29 @@ export type TradeJournalEntryRow = {
   updatedAt: Date;
 };
 
+/** Client-safe form of {@link TradeJournalEntryRow} — dates serialized to
+ * strings at the action boundary, mirroring InvestmentJournalEntry. */
+export type TransactionJournalEntry = {
+  id: string;
+  transactionId: string;
+  note: string | null;
+  tradeReason: TradeJournalReason | null;
+  emotions: TradeJournalEmotion[];
+  marketBias: number | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export function serializeTradeJournalEntry(
+  row: TradeJournalEntryRow,
+): TransactionJournalEntry {
+  return {
+    ...row,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
 const TRADE_JOURNAL_REASON_SET = new Set<string>(TRADE_JOURNAL_REASONS);
 const TRADE_JOURNAL_EMOTION_SET = new Set<string>(TRADE_JOURNAL_EMOTIONS);
 

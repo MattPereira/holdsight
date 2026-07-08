@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   RiArrowLeftSLine,
@@ -10,6 +10,7 @@ import {
   RiRefreshLine,
   RiSaveLine,
 } from "@remixicon/react";
+import { toast } from "sonner";
 
 import {
   confirmHomeTimezone,
@@ -59,13 +60,19 @@ import {
   moveJournalPeriod,
   type JournalPeriodType,
 } from "@/lib/investment-journal/periods";
+import {
+  useAutosaveEntry,
+  type SaveStatus,
+} from "@/lib/journal-autosave/use-autosave-entry";
+import { useUnsavedChangesGuard } from "@/lib/journal-autosave/use-unsaved-changes-guard";
 import { cn } from "@/lib/utils";
 
 type Draft = { plan: string; reflection: string };
-type SaveStatus = "idle" | "saving" | "saved" | "error" | "conflict";
 type JournalView = "write" | "history" | "transactions";
 
 const MAX_LENGTH = 10_000;
+const UNSAVED_CHANGES_MESSAGE =
+  "Your latest journal changes have not been saved. Leave anyway?";
 
 const PERIOD_UNIT: Record<JournalPeriodType, string> = {
   daily: "day",
@@ -140,36 +147,43 @@ export function JournalWorkspace({
   );
   const [timezoneError, setTimezoneError] = useState<string | null>(null);
   const [confirmingTimezone, startConfirmingTimezone] = useTransition();
-  const [entry, setEntry] = useState(initialWorkspace.entry);
-  const [draft, setDraft] = useState(() =>
-    draftFromEntry(initialWorkspace.entry),
-  );
-  const [persistedDraft, setPersistedDraft] = useState(() =>
-    draftFromEntry(initialWorkspace.entry),
-  );
-  const [status, setStatus] = useState<SaveStatus>("idle");
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [serverConflict, setServerConflict] =
-    useState<InvestmentJournalEntry | null>(null);
-  const [retryVersion, setRetryVersion] = useState(0);
   const [imageMutationPending, setImageMutationPending] = useState(false);
   const [imageRevision, setImageRevision] = useState(0);
   const [historyRevision, setHistoryRevision] = useState(0);
   const [deleting, startDeleting] = useTransition();
   const [view, setView] = useState<JournalView>("write");
-  const enqueuedFingerprintsRef = useRef(new Set<string>());
-  const saveQueueRef = useRef(Promise.resolve());
-  const currentDraftRef = useRef(draft);
-  const entryRef = useRef(entry);
+  const imageEndpoint = `/api/investment-journal/images?type=${periodType}&date=${selectedDate}`;
 
-  const dirty = !sameDraft(draft, persistedDraft);
+  const autosave = useAutosaveEntry<Draft, InvestmentJournalEntry>({
+    key: `${periodType}:${selectedDate}`,
+    initialEntry: initialWorkspace.entry,
+    enabled: timezoneConfirmed,
+    draftFromEntry,
+    sameDraft,
+    save: (snapshot, currentEntry, overwrite) =>
+      saveJournalEntry({
+        periodType,
+        periodStart: selectedDate,
+        plan: snapshot.plan,
+        reflection: snapshot.reflection,
+        entryId: currentEntry?.id ?? null,
+        expectedUpdatedAt: currentEntry?.updatedAt ?? null,
+        overwrite,
+      }),
+    onEntryChange: () => setHistoryRevision((revision) => revision + 1),
+  });
+  const { draft, entry, status, saveError } = autosave;
+
   const warnBeforeLeaving =
-    dirty ||
+    autosave.dirty ||
     imageMutationPending ||
     status === "saving" ||
     status === "error" ||
     status === "conflict";
-  const imageEndpoint = `/api/investment-journal/images?type=${periodType}&date=${selectedDate}`;
+  const { confirmLeave } = useUnsavedChangesGuard(
+    warnBeforeLeaving,
+    UNSAVED_CHANGES_MESSAGE,
+  );
 
   useEffect(() => {
     if (initialWorkspace.homeTimezone || homeTimezone) return;
@@ -178,14 +192,6 @@ export function JournalWorkspace({
     }, 0);
     return () => window.clearTimeout(timer);
   }, [homeTimezone, initialWorkspace.homeTimezone]);
-
-  useEffect(() => {
-    currentDraftRef.current = draft;
-  }, [draft]);
-
-  useEffect(() => {
-    entryRef.current = entry;
-  }, [entry]);
 
   useEffect(() => {
     const browserDate = initialWorkspace.homeTimezone
@@ -204,104 +210,6 @@ export function JournalWorkspace({
     selectedDate,
   ]);
 
-  useEffect(() => {
-    if (!warnBeforeLeaving) return;
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-    };
-    const handleLinkClick = (event: MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const link = target.closest("a[href]");
-      if (!(link instanceof HTMLAnchorElement) || link.target === "_blank")
-        return;
-      const destination = new URL(link.href, window.location.href);
-      if (destination.href === window.location.href) return;
-      if (
-        !window.confirm(
-          "Your latest journal changes have not been saved. Leave anyway?",
-        )
-      ) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    document.addEventListener("click", handleLinkClick, true);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-      document.removeEventListener("click", handleLinkClick, true);
-    };
-  }, [warnBeforeLeaving]);
-
-  const runSave = useCallback(
-    (snapshot: Draft, overwrite = false): Promise<boolean> => {
-      const fingerprint = JSON.stringify(snapshot);
-      enqueuedFingerprintsRef.current.add(fingerprint);
-      setStatus("saving");
-      setSaveError(null);
-
-      const operation = saveQueueRef.current.then(async () => {
-        setStatus("saving");
-        let result;
-        try {
-          const currentEntry = entryRef.current;
-          result = await saveJournalEntry({
-            periodType,
-            periodStart: selectedDate,
-            plan: snapshot.plan,
-            reflection: snapshot.reflection,
-            entryId: currentEntry?.id ?? null,
-            expectedUpdatedAt: currentEntry?.updatedAt ?? null,
-            overwrite,
-          });
-        } catch {
-          result = {
-            status: "error" as const,
-            message: "The server could not be reached.",
-          };
-        }
-
-        if (result.status === "conflict") {
-          enqueuedFingerprintsRef.current.delete(fingerprint);
-          setServerConflict(result.entry);
-          setStatus("conflict");
-          return false;
-        }
-        if (result.status === "error") {
-          setSaveError(result.message);
-          setStatus("error");
-          window.setTimeout(() => {
-            enqueuedFingerprintsRef.current.delete(fingerprint);
-            setRetryVersion((version) => version + 1);
-          }, 3_000);
-          return false;
-        }
-
-        setEntry(result.entry);
-        entryRef.current = result.entry;
-        setPersistedDraft(snapshot);
-        enqueuedFingerprintsRef.current.delete(fingerprint);
-        setStatus(
-          sameDraft(currentDraftRef.current, snapshot) ? "saved" : "idle",
-        );
-        setHistoryRevision((revision) => revision + 1);
-        return true;
-      });
-      saveQueueRef.current = operation.then(() => undefined);
-      return operation;
-    },
-    [periodType, selectedDate],
-  );
-
-  useEffect(() => {
-    if (!timezoneConfirmed || status === "conflict" || !dirty) return;
-    const fingerprint = JSON.stringify(draft);
-    if (enqueuedFingerprintsRef.current.has(fingerprint)) return;
-    const timer = window.setTimeout(() => void runSave(draft), 750);
-    return () => window.clearTimeout(timer);
-  }, [dirty, draft, retryVersion, runSave, status, timezoneConfirmed]);
-
   function confirmTimezone() {
     startConfirmingTimezone(async () => {
       const result = await confirmHomeTimezone(homeTimezone.trim());
@@ -317,38 +225,10 @@ export function JournalWorkspace({
   }
 
   function navigateTo(type: JournalPeriodType, date: string) {
-    if (
-      warnBeforeLeaving &&
-      !window.confirm(
-        "Your latest journal changes have not been saved. Leave anyway?",
-      )
-    ) {
-      return;
-    }
+    if (!confirmLeave()) return;
     router.push(
       `/journal?type=${type}&date=${canonicalPeriodStart(type, date)}`,
     );
-  }
-
-  function reloadServerVersion() {
-    if (!serverConflict) return;
-    const serverDraft = draftFromEntry(serverConflict);
-    setEntry(serverConflict);
-    entryRef.current = serverConflict;
-    setDraft(serverDraft);
-    setPersistedDraft(serverDraft);
-    setServerConflict(null);
-    setSaveError(null);
-    setStatus("saved");
-    enqueuedFingerprintsRef.current.clear();
-  }
-
-  function overwriteServerVersion() {
-    if (!serverConflict) return;
-    setEntry(serverConflict);
-    entryRef.current = serverConflict;
-    setServerConflict(null);
-    void runSave(draft, true);
   }
 
   function removeEntry() {
@@ -356,53 +236,24 @@ export function JournalWorkspace({
     startDeleting(async () => {
       const result = await deleteJournalEntry(entry.id, periodType);
       if (result.error) {
-        setSaveError(result.error);
-        setStatus("error");
+        toast.error(result.error);
         return;
       }
-      const empty = draftFromEntry(null);
-      setEntry(null);
-      setDraft(empty);
-      setPersistedDraft(empty);
-      setStatus("idle");
-      setSaveError(null);
+      autosave.applyServerEntry(null);
       setImageRevision((revision) => revision + 1);
-      setHistoryRevision((revision) => revision + 1);
     });
   }
 
-  const syncEntryVersion = useCallback(
-    (updatedAt: string, entryId?: string) => {
-      const currentEntry = entryRef.current;
-      let nextEntry: InvestmentJournalEntry;
-      if (currentEntry) {
-        nextEntry = { ...currentEntry, updatedAt };
-      } else {
-        if (!entryId) return;
-        nextEntry = {
-          id: entryId,
-          periodType,
-          periodStart: selectedDate,
-          plan: persistedDraft.plan,
-          reflection: persistedDraft.reflection,
-          updatedAt,
-        };
-      }
-      setEntry(nextEntry);
-      entryRef.current = nextEntry;
-      setHistoryRevision((revision) => revision + 1);
-    },
-    [periodType, persistedDraft, selectedDate],
-  );
-
-  const prepareForImageMutation = useCallback(async () => {
-    if (status === "conflict" || status === "error") return false;
-    if (dirty || status === "saving") {
-      return runSave(currentDraftRef.current);
-    }
-    await saveQueueRef.current;
-    return true;
-  }, [dirty, runSave, status]);
+  function handleEntryVersionChanged(updatedAt: string, entryId?: string) {
+    autosave.syncEntryVersion(updatedAt, entryId, (draft, id) => ({
+      id,
+      periodType,
+      periodStart: selectedDate,
+      plan: draft.plan,
+      reflection: draft.reflection,
+      updatedAt,
+    }));
+  }
 
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -581,8 +432,7 @@ export function JournalWorkspace({
                       value={draft.plan}
                       placeholder="What is your plan for this period?"
                       onChange={(event) => {
-                        setStatus(status === "conflict" ? "conflict" : "idle");
-                        setDraft((current) => ({
+                        autosave.setDraft((current) => ({
                           ...current,
                           plan: event.target.value,
                         }));
@@ -609,8 +459,7 @@ export function JournalWorkspace({
                       value={draft.reflection}
                       placeholder="What happened and what did you learn?"
                       onChange={(event) => {
-                        setStatus(status === "conflict" ? "conflict" : "idle");
-                        setDraft((current) => ({
+                        autosave.setDraft((current) => ({
                           ...current,
                           reflection: event.target.value,
                         }));
@@ -627,8 +476,8 @@ export function JournalWorkspace({
                 disabled={
                   deleting || status === "error" || status === "conflict"
                 }
-                beforeMutation={prepareForImageMutation}
-                onEntryVersionChanged={syncEntryVersion}
+                beforeMutation={autosave.flushBeforeMutation}
+                onEntryVersionChanged={handleEntryVersionChanged}
                 onPendingChange={setImageMutationPending}
               />
 
@@ -654,11 +503,11 @@ export function JournalWorkspace({
                 </CardDescription>
               </CardHeader>
               <CardFooter className="flex-wrap">
-                <Button variant="outline" onClick={reloadServerVersion}>
+                <Button variant="outline" onClick={autosave.reloadServerVersion}>
                   <RiRefreshLine data-icon="inline-start" />
                   Reload server version
                 </Button>
-                <Button onClick={overwriteServerVersion}>
+                <Button onClick={autosave.overwriteServerVersion}>
                   Overwrite with my edits
                 </Button>
               </CardFooter>
