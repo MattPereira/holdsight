@@ -12,6 +12,10 @@ _Avoid_: Transaction journal entry, trade journal entry, note
 A user's record of the reasoning, emotions, market bias, notes, and images associated with one specific investment transaction.
 _Avoid_: Investment journal entry, trade journal entry
 
+**Transaction History Sync**:
+An asynchronous refresh of a user's provider transaction history that may continue after the user action returns a current snapshot.
+_Avoid_: Transaction fetch, transaction import, refresh transactions
+
 **Journal Period**:
 The calendar day, Monday–Sunday week, or calendar month covered by an Investment Journal Entry, interpreted in the user's home timezone.
 _Avoid_: Entry type, date range

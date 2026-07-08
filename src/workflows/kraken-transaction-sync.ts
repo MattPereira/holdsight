@@ -1,5 +1,3 @@
-import { FatalError } from "workflow";
-
 import {
   getUserKrakenAccounts,
 } from "@/lib/exchange/kraken/accounts";
@@ -7,58 +5,29 @@ import {
   processKrakenTransactionSyncPage,
 } from "@/lib/exchange/kraken/transactions";
 import {
-  failInvestmentTransactionSyncLease,
-  releaseInvestmentTransactionSyncLease,
-  renewInvestmentTransactionSyncLease,
-} from "@/lib/investment-transactions/ingestion";
+  runSingleAccountTransactionSync,
+  type TransactionSyncPageOutcome,
+} from "@/workflows/transaction-sync-runner";
 
 const KRAKEN_PROVIDER = "kraken";
 
-async function processPage(userId: string, accountId: string, leaseToken: string) {
+async function processPage(
+  userId: string,
+  accountId: string,
+): Promise<TransactionSyncPageOutcome> {
   "use step";
-
-  const hasLease = await renewInvestmentTransactionSyncLease({
-    userId,
-    investmentAccountId: accountId,
-    provider: KRAKEN_PROVIDER,
-    leaseToken,
-  });
-  if (!hasLease) throw new FatalError("Kraken transaction sync lease was lost.");
 
   const account = (await getUserKrakenAccounts(userId)).find(
     (candidate) => candidate.id === accountId,
   );
-  if (!account) throw new FatalError("Kraken account no longer exists.");
+  if (!account) throw new Error("Kraken account no longer exists.");
 
-  return processKrakenTransactionSyncPage({ userId, account });
-}
-
-async function releaseLease(userId: string, accountId: string, leaseToken: string) {
-  "use step";
-
-  await releaseInvestmentTransactionSyncLease({
-    userId,
-    investmentAccountId: accountId,
-    provider: KRAKEN_PROVIDER,
-    leaseToken,
-  });
-}
-
-async function markLeaseFailed(
-  userId: string,
-  accountId: string,
-  leaseToken: string,
-  message: string,
-) {
-  "use step";
-
-  await failInvestmentTransactionSyncLease({
-    userId,
-    investmentAccountId: accountId,
-    provider: KRAKEN_PROVIDER,
-    leaseToken,
-    message,
-  });
+  const result = await processKrakenTransactionSyncPage({ userId, account });
+  return {
+    transactionCount: result.transactionCount,
+    shouldContinue: result.shouldContinue,
+    status: result.phase,
+  };
 }
 
 /** Runs one bounded Kraken page at a time until the durable checkpoint is current. */
@@ -69,23 +38,12 @@ export async function syncKrakenTransactionHistory(
 ) {
   "use workflow";
 
-  let totalTransactions = 0;
-  try {
-    while (true) {
-      const result = await processPage(userId, accountId, leaseToken);
-      totalTransactions += result.transactionCount;
-      if (!result.shouldContinue) {
-        await releaseLease(userId, accountId, leaseToken);
-        return { accountId, totalTransactions, phase: result.phase };
-      }
-    }
-  } catch (error) {
-    await markLeaseFailed(
-      userId,
-      accountId,
-      leaseToken,
-      error instanceof Error ? error.message : "Kraken transaction sync failed.",
-    );
-    throw error;
-  }
+  return runSingleAccountTransactionSync({
+    userId,
+    accountId,
+    leaseToken,
+    provider: KRAKEN_PROVIDER,
+    processPage,
+    failureMessage: "Kraken transaction sync failed.",
+  });
 }

@@ -1,52 +1,29 @@
-import { FatalError } from "workflow";
-
 import { getUserLighterAccounts } from "@/lib/lighter/accounts";
 import { processLighterTransactionSyncPage } from "@/lib/lighter/transactions";
 import {
-  failInvestmentTransactionSyncLease,
-  releaseInvestmentTransactionSyncLease,
-  renewInvestmentTransactionSyncLease,
-} from "@/lib/investment-transactions/ingestion";
+  runSingleAccountTransactionSync,
+  type TransactionSyncPageOutcome,
+} from "@/workflows/transaction-sync-runner";
 
-async function processPage(userId: string, accountId: string, leaseToken: string) {
-  "use step";
-  const hasLease = await renewInvestmentTransactionSyncLease({
-    userId, investmentAccountId: accountId, provider: "lighter", leaseToken,
-  });
-  if (!hasLease) throw new FatalError("Lighter transaction sync lease was lost.");
-  const account = (await getUserLighterAccounts(userId)).find((item) => item.id === accountId);
-  if (!account) throw new FatalError("Lighter account no longer exists.");
-  return processLighterTransactionSyncPage({ userId, account });
+function httpStatus(error: unknown): number | null {
+  return error instanceof Error && "httpStatus" in error
+    ? Number(error.httpStatus) || null
+    : null;
 }
 
-async function releaseLease(userId: string, accountId: string, leaseToken: string) {
-  "use step";
-
-  await releaseInvestmentTransactionSyncLease({
-    userId,
-    investmentAccountId: accountId,
-    provider: "lighter",
-    leaseToken,
-  });
-}
-
-async function markLeaseFailed(
+async function processPage(
   userId: string,
   accountId: string,
-  leaseToken: string,
-  message: string,
-  httpStatus: number | null,
-) {
+): Promise<TransactionSyncPageOutcome> {
   "use step";
-
-  await failInvestmentTransactionSyncLease({
-    userId,
-    investmentAccountId: accountId,
-    provider: "lighter",
-    leaseToken,
-    message,
-    httpStatus,
-  });
+  const account = (await getUserLighterAccounts(userId)).find((item) => item.id === accountId);
+  if (!account) throw new Error("Lighter account no longer exists.");
+  const result = await processLighterTransactionSyncPage({ userId, account });
+  return {
+    transactionCount: result.transactionCount,
+    shouldContinue: result.shouldContinue,
+    status: result.phase,
+  };
 }
 
 export async function syncLighterTransactionHistory(
@@ -55,26 +32,14 @@ export async function syncLighterTransactionHistory(
   leaseToken: string,
 ) {
   "use workflow";
-  try {
-    let totalTransactions = 0;
-    while (true) {
-      const result = await processPage(userId, accountId, leaseToken);
-      totalTransactions += result.transactionCount;
-      if (!result.shouldContinue) {
-        await releaseLease(userId, accountId, leaseToken);
-        return { accountId, totalTransactions, phase: result.phase };
-      }
-    }
-  } catch (error) {
-    await markLeaseFailed(
-      userId,
-      accountId,
-      leaseToken,
-      error instanceof Error ? error.message : "Lighter transaction sync failed.",
-      error instanceof Error && "httpStatus" in error
-        ? Number(error.httpStatus) || null
-        : null,
-    );
-    throw error;
-  }
+
+  return runSingleAccountTransactionSync({
+    userId,
+    accountId,
+    leaseToken,
+    provider: "lighter",
+    processPage,
+    failureMessage: "Lighter transaction sync failed.",
+    httpStatus,
+  });
 }

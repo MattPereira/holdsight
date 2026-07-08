@@ -14,7 +14,6 @@ import {
   getCurrentHyperCoreBalances,
   syncHyperCoreAccounts,
 } from "@/lib/hyper-core/balances";
-import { processHyperCoreTransactionSyncPage } from "@/lib/hyper-core/transactions";
 import {
   getCurrentWalletTransactions,
   getWalletTransactionHistoryStatus,
@@ -34,7 +33,6 @@ import {
   syncLighterAccounts,
 } from "@/lib/lighter/balances";
 import { syncLighterTransactionHistory } from "@/workflows/lighter-transaction-sync";
-import { processLighterTransactionSyncPage } from "@/lib/lighter/transactions";
 import {
   ensureUserKrakenAccount,
   getUserKrakenAccounts,
@@ -350,33 +348,14 @@ export async function loadWalletTransactions(): Promise<WalletTransactionsAction
       if (!claimed) continue;
 
       try {
-        const firstPage = await processHyperCoreTransactionSyncPage({
-          userId,
-          account,
-        });
-        if (firstPage.shouldContinue) {
-          await start(syncHyperCoreTransactionHistory, [userId, account.id, leaseToken]);
-        } else {
-          await releaseInvestmentTransactionSyncLease({
-            userId,
-            investmentAccountId: account.id,
-            provider: "hyperliquid",
-            leaseToken,
-          });
-        }
+        await start(syncHyperCoreTransactionHistory, [userId, account.id, leaseToken]);
         queuedHyperCoreAccountCount += 1;
       } catch (error) {
-        await failInvestmentTransactionSyncLease({
+        await releaseInvestmentTransactionSyncLease({
           userId,
           investmentAccountId: account.id,
           provider: "hyperliquid",
           leaseToken,
-          message: error instanceof Error
-            ? error.message
-            : "HyperCore transaction sync failed.",
-          httpStatus: error instanceof Error && "httpStatus" in error
-            ? Number(error.httpStatus) || null
-            : null,
         });
         throw error;
       }
@@ -390,24 +369,11 @@ export async function loadWalletTransactions(): Promise<WalletTransactionsAction
       });
       if (!claimed) continue;
       try {
-        const firstPage = await processLighterTransactionSyncPage({ userId, account });
-        if (firstPage.shouldContinue) {
-          await start(syncLighterTransactionHistory, [userId, account.id, leaseToken]);
-        } else {
-          await releaseInvestmentTransactionSyncLease({
-            userId, investmentAccountId: account.id, provider: "lighter", leaseToken,
-          });
-        }
+        await start(syncLighterTransactionHistory, [userId, account.id, leaseToken]);
         queuedLighterAccountCount += 1;
       } catch (error) {
-        await failInvestmentTransactionSyncLease({
+        await releaseInvestmentTransactionSyncLease({
           userId, investmentAccountId: account.id, provider: "lighter", leaseToken,
-          message: error instanceof Error
-            ? error.message
-            : "Lighter transaction sync failed.",
-          httpStatus: error instanceof Error && "httpStatus" in error
-            ? Number(error.httpStatus) || null
-            : null,
         });
         throw error;
       }
@@ -699,29 +665,13 @@ export async function saveLighterConnection(input: {
     });
     if (claimed) {
       try {
-        const firstPage = await processLighterTransactionSyncPage({ userId, account });
-        if (firstPage.shouldContinue) {
-          await start(syncLighterTransactionHistory, [userId, account.id, leaseToken]);
-        } else {
-          await releaseInvestmentTransactionSyncLease({
-            userId,
-            investmentAccountId: account.id,
-            provider: "lighter",
-            leaseToken,
-          });
-        }
+        await start(syncLighterTransactionHistory, [userId, account.id, leaseToken]);
       } catch (error) {
-        await failInvestmentTransactionSyncLease({
+        await releaseInvestmentTransactionSyncLease({
           userId,
           investmentAccountId: account.id,
           provider: "lighter",
           leaseToken,
-          message: error instanceof Error
-            ? error.message
-            : "Lighter transaction sync failed.",
-          httpStatus: error instanceof Error && "httpStatus" in error
-            ? Number(error.httpStatus) || null
-            : null,
         });
         throw error;
       }
