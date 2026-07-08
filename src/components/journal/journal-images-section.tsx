@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   JOURNAL_IMAGE_CONTENT_TYPES,
   MAX_JOURNAL_IMAGE_SIZE_BYTES,
-} from "@/lib/journal-images/policy";
+} from "@/lib/journal/images/policy";
 
 const ACCEPTED_TYPES: readonly string[] = JOURNAL_IMAGE_CONTENT_TYPES;
 const ACCEPT_ATTR = ACCEPTED_TYPES.join(",");

@@ -16,12 +16,12 @@ import {
   validateJournalImage,
   type JournalImageContentType,
   type JournalImageUploadError as SharedJournalImageUploadError,
-} from "@/lib/journal-images/upload";
+} from "@/lib/journal/images/upload";
 
 export {
   MAX_JOURNAL_IMAGE_COUNT,
   MAX_JOURNAL_IMAGE_SIZE_BYTES,
-} from "@/lib/journal-images/upload";
+} from "@/lib/journal/images/upload";
 
 export type InvestmentTransactionJournalImage = {
   id: string;

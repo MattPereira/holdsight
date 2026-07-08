@@ -62,7 +62,7 @@ export const investmentTransactionSyncStatus = pgEnum(
 
 // Trade journal vocabulary (reasons, emotions) lives as plain `text`/`text[]`
 // columns with the allowed values defined and validated in TypeScript
-// (`@/lib/investment-transactions/journal-labels`). Avoids the painful enum
+// (`@/lib/journal/transaction-entry-labels`). Avoids the painful enum
 // migrations Postgres requires to drop or rename values.
 
 export const investmentTransactions = pgTable(

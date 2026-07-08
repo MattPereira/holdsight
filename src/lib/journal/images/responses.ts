@@ -1,7 +1,7 @@
 import {
   MAX_JOURNAL_IMAGE_COUNT,
   type JournalImageUploadError,
-} from "@/lib/journal-images/upload";
+} from "@/lib/journal/images/upload";
 
 type UploadError = JournalImageUploadError | "transaction_not_found";
 

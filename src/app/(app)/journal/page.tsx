@@ -3,12 +3,12 @@ import { getCurrentUserId } from "@/lib/auth/session";
 import {
   getJournalWorkspace,
   todayInTimezone,
-} from "@/lib/investment-journal/journal";
+} from "@/lib/journal/investment-entry";
 import {
   canonicalPeriodStart,
   isCalendarDate,
   isJournalPeriodType,
-} from "@/lib/investment-journal/periods";
+} from "@/lib/journal/periods";
 
 export default async function JournalPage({
   searchParams,

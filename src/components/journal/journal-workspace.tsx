@@ -53,18 +53,18 @@ import { Textarea } from "@/components/ui/textarea";
 import type {
   InvestmentJournalEntry,
   JournalWorkspace as JournalWorkspaceData,
-} from "@/lib/investment-journal/journal";
-import { periodLabel } from "@/lib/investment-journal/period-label";
+} from "@/lib/journal/investment-entry";
+import { periodLabel } from "@/lib/journal/period-label";
 import {
   canonicalPeriodStart,
   moveJournalPeriod,
   type JournalPeriodType,
-} from "@/lib/investment-journal/periods";
+} from "@/lib/journal/periods";
 import {
   useAutosaveEntry,
   type SaveStatus,
-} from "@/lib/journal-autosave/use-autosave-entry";
-import { useUnsavedChangesGuard } from "@/lib/journal-autosave/use-unsaved-changes-guard";
+} from "@/lib/journal/use-autosave-entry";
+import { useUnsavedChangesGuard } from "@/lib/journal/use-unsaved-changes-guard";
 import { cn } from "@/lib/utils";
 
 type Draft = { plan: string; reflection: string };

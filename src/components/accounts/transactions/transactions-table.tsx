@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
-import { TRADE_JOURNAL_REASON_LABELS } from "@/lib/investment-transactions/journal-labels";
+import { TRADE_JOURNAL_REASON_LABELS } from "@/lib/journal/transaction-entry-labels";
 
 const usdFormat = new Intl.NumberFormat("en-US", {
   style: "currency",

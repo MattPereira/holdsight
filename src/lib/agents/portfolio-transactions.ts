@@ -7,11 +7,11 @@ import type {
 import {
   getUserInvestmentTransactionJournalImagesForTransactions,
   type InvestmentTransactionJournalImage,
-} from "@/lib/investment-transactions/journal-images";
+} from "@/lib/journal/transaction-entry-images";
 import {
   getUserInvestmentTransactionJournalEntries,
   type TradeJournalEntryRow,
-} from "@/lib/investment-transactions/journal";
+} from "@/lib/journal/transaction-entry";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import type { AssetGroup } from "@/lib/portfolio/asset-totals";
 import { getUserAssetGroups } from "@/lib/portfolio/groups";

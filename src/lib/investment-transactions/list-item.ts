@@ -3,7 +3,7 @@ import type {
   InvestmentTransactionSide,
   InvestmentTransactionStatus,
 } from "@/lib/investment-transactions/ingestion";
-import type { TradeJournalReason } from "@/lib/investment-transactions/journal";
+import type { TradeJournalReason } from "@/lib/journal/transaction-entry";
 
 /** Lightweight journal preview surfaced inline in the transactions list. */
 export type TradeJournalSummary = {

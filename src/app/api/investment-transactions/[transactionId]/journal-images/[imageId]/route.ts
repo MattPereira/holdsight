@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { getCurrentUserId } from "@/lib/auth/session";
-import { removeUserInvestmentTransactionJournalImage } from "@/lib/investment-transactions/journal-images";
+import { removeUserInvestmentTransactionJournalImage } from "@/lib/journal/transaction-entry-images";
 
 const idSchema = z.string().uuid();
 

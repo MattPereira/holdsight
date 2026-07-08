@@ -1,10 +1,10 @@
 import { z } from "zod";
 
 import { getCurrentUserId } from "@/lib/auth/session";
-import { removeUserInvestmentJournalImage } from "@/lib/investment-journal/images";
+import { removeUserInvestmentJournalImage } from "@/lib/journal/investment-entry-images";
 import {
   parseCanonicalJournalPeriod,
-} from "@/lib/investment-journal/periods";
+} from "@/lib/journal/periods";
 
 const idSchema = z.string().uuid();
 

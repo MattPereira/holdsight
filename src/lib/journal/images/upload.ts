@@ -6,13 +6,13 @@ import { enqueueBlobDeletion } from "@/lib/blob/deletion-jobs";
 import {
   MAX_JOURNAL_IMAGE_SIZE_BYTES,
   type JournalImageContentType,
-} from "@/lib/journal-images/policy";
+} from "@/lib/journal/images/policy";
 
 export {
   JOURNAL_IMAGE_CONTENT_TYPES,
   MAX_JOURNAL_IMAGE_COUNT,
   MAX_JOURNAL_IMAGE_SIZE_BYTES,
-} from "@/lib/journal-images/policy";
+} from "@/lib/journal/images/policy";
 
 const IMAGE_TYPES = {
   "image/jpeg": "jpg",
@@ -20,7 +20,7 @@ const IMAGE_TYPES = {
   "image/webp": "webp",
 } as const;
 
-export type { JournalImageContentType } from "@/lib/journal-images/policy";
+export type { JournalImageContentType } from "@/lib/journal/images/policy";
 
 export type JournalImageUploadError =
   | "invalid_file"

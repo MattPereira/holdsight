@@ -13,7 +13,7 @@ import { getUserEvmAccounts } from "@/lib/evm/accounts";
 import { getUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
 import { getUserLighterAccounts } from "@/lib/lighter/accounts";
 import type { TransactionSyncPhase } from "@/lib/investment-transactions/ingestion";
-import { withTransactionJournalSummaries } from "@/lib/investment-transactions/journal";
+import { withTransactionJournalSummaries } from "@/lib/journal/transaction-entry";
 import type {
   InvestmentTransactionListItem,
   TransactionExecutedAtRange,

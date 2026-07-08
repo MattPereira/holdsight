@@ -8,8 +8,8 @@ import {
   setHomeTimezone,
   type RecentJournalEntriesCursor,
   type SaveJournalResult,
-} from "@/lib/investment-journal/journal";
-import type { JournalPeriodType } from "@/lib/investment-journal/periods";
+} from "@/lib/journal/investment-entry";
+import type { JournalPeriodType } from "@/lib/journal/periods";
 
 export async function confirmHomeTimezone(homeTimezone: string) {
   const userId = await getCurrentUserId();

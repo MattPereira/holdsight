@@ -13,7 +13,7 @@ import {
   isJournalPeriodType,
   journalPeriodUtcRange,
   type JournalPeriodType,
-} from "@/lib/investment-journal/periods";
+} from "@/lib/journal/periods";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import { getPortfolioTransactionsInRange } from "@/lib/portfolio/transactions";
 

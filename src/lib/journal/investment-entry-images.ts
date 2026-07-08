@@ -16,8 +16,8 @@ import {
   validateJournalImage,
   type JournalImageContentType,
   type JournalImageUploadError,
-} from "@/lib/journal-images/upload";
-import type { JournalPeriodType } from "@/lib/investment-journal/periods";
+} from "@/lib/journal/images/upload";
+import type { JournalPeriodType } from "@/lib/journal/periods";
 
 export type InvestmentJournalImage = {
   id: string;

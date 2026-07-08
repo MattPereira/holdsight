@@ -15,7 +15,7 @@ import {
   getTransactionJournalEntry,
   removeTransactionJournalEntry,
   saveTransactionJournalEntry,
-} from "@/app/actions";
+} from "@/components/accounts/transactions/actions";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -52,16 +52,16 @@ import type {
   TransactionJournalEntry,
   TradeJournalEmotion,
   TradeJournalReason,
-} from "@/lib/investment-transactions/journal";
+} from "@/lib/journal/transaction-entry";
 import {
   TRADE_JOURNAL_EMOTION_OPTIONS,
   TRADE_JOURNAL_REASON_OPTIONS,
-} from "@/lib/investment-transactions/journal-labels";
+} from "@/lib/journal/transaction-entry-labels";
 import {
   useAutosaveEntry,
   type SaveStatus,
-} from "@/lib/journal-autosave/use-autosave-entry";
-import { useUnsavedChangesGuard } from "@/lib/journal-autosave/use-unsaved-changes-guard";
+} from "@/lib/journal/use-autosave-entry";
+import { useUnsavedChangesGuard } from "@/lib/journal/use-unsaved-changes-guard";
 import { cn } from "@/lib/utils";
 
 // Radix Select can't hold an empty string value, so an explicit sentinel maps

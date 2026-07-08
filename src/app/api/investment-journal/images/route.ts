@@ -2,16 +2,16 @@ import { getCurrentUserId } from "@/lib/auth/session";
 import {
   getUserInvestmentJournalImages,
   uploadUserInvestmentJournalImage,
-} from "@/lib/investment-journal/images";
+} from "@/lib/journal/investment-entry-images";
 import {
   parseCanonicalJournalPeriod,
-} from "@/lib/investment-journal/periods";
+} from "@/lib/journal/periods";
 import {
   JOURNAL_IMAGE_CONTENT_TYPES,
   MAX_JOURNAL_IMAGE_COUNT,
   MAX_JOURNAL_IMAGE_SIZE_BYTES,
-} from "@/lib/journal-images/upload";
-import { journalImageUploadErrorResponse } from "@/lib/journal-images/responses";
+} from "@/lib/journal/images/upload";
+import { journalImageUploadErrorResponse } from "@/lib/journal/images/responses";
 
 const MAX_MULTIPART_BODY_BYTES = MAX_JOURNAL_IMAGE_SIZE_BYTES + 64 * 1024;
 

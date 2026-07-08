@@ -6,8 +6,8 @@ import {
   MAX_JOURNAL_IMAGE_COUNT,
   MAX_JOURNAL_IMAGE_SIZE_BYTES,
   uploadUserInvestmentTransactionJournalImage,
-} from "@/lib/investment-transactions/journal-images";
-import { journalImageUploadErrorResponse } from "@/lib/journal-images/responses";
+} from "@/lib/journal/transaction-entry-images";
+import { journalImageUploadErrorResponse } from "@/lib/journal/images/responses";
 
 const transactionIdSchema = z.string().uuid();
 const MAX_MULTIPART_BODY_BYTES = MAX_JOURNAL_IMAGE_SIZE_BYTES + 64 * 1024;

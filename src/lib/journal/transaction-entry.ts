@@ -14,7 +14,7 @@ import {
   TRADE_JOURNAL_REASONS,
   type TradeJournalEmotion,
   type TradeJournalReason,
-} from "@/lib/investment-transactions/journal-labels";
+} from "@/lib/journal/transaction-entry-labels";
 import type {
   InvestmentTransactionListItem,
   TradeJournalSummary,
@@ -23,15 +23,15 @@ import type {
 const MAX_NOTE_LENGTH = 10_000;
 
 // Re-exported so existing importers of these from the server module keep working;
-// the vocabulary itself now lives in the client-safe journal-labels module.
+// the vocabulary itself now lives in the client-safe transaction-entry-labels module.
 export {
   TRADE_JOURNAL_EMOTIONS,
   TRADE_JOURNAL_REASONS,
-} from "@/lib/investment-transactions/journal-labels";
+} from "@/lib/journal/transaction-entry-labels";
 export type {
   TradeJournalEmotion,
   TradeJournalReason,
-} from "@/lib/investment-transactions/journal-labels";
+} from "@/lib/journal/transaction-entry-labels";
 
 export type TradeJournalEntryInput = {
   note?: string | null;

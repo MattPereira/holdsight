@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import type {
   RecentJournalEntriesCursor,
   RecentJournalEntry,
-} from "@/lib/investment-journal/journal";
-import { periodLabel } from "@/lib/investment-journal/period-label";
-import type { JournalPeriodType } from "@/lib/investment-journal/periods";
+} from "@/lib/journal/investment-entry";
+import { periodLabel } from "@/lib/journal/period-label";
+import type { JournalPeriodType } from "@/lib/journal/periods";
 
 export function RecentJournalEntries({
   periodType,
