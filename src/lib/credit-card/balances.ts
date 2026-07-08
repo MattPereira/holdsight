@@ -14,7 +14,7 @@ export async function syncUserCreditCardAccounts(userId: string): Promise<void> 
   const items = await getUserCreditCardPlaidItems(userId);
 
   for (const item of items) {
-    const accessToken = decrypt(item.accessTokenEncrypted);
+    const accessToken = decrypt(item.accessTokenEncrypted, userId);
     const result = await getCreditCardAccounts(accessToken);
     if (result.status !== "ready") continue;
     await saveCreditCardAccounts(

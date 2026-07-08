@@ -28,18 +28,21 @@ function isExchangeApiCredentials(
 
 export function encryptExchangeApiCredentials(
   credentials: ExchangeApiCredentials,
+  userId: string,
 ): string {
   return encryptWithEnvKey(
     JSON.stringify(credentials),
     EXCHANGE_CREDENTIAL_ENCRYPTION_KEY,
+    userId,
   );
 }
 
 export function decryptExchangeApiCredentials(
   payload: string,
+  userId: string,
 ): ExchangeApiCredentials {
   const decrypted = JSON.parse(
-    decryptWithEnvKey(payload, EXCHANGE_CREDENTIAL_ENCRYPTION_KEY),
+    decryptWithEnvKey(payload, EXCHANGE_CREDENTIAL_ENCRYPTION_KEY, userId),
   ) as unknown;
 
   if (!isExchangeApiCredentials(decrypted)) {

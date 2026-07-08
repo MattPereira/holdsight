@@ -71,7 +71,7 @@ export async function getLighterToken(userId: string, accountId: string): Promis
       eq(lighterCredentials.userId, userId),
       eq(lighterCredentials.investmentAccountId, accountId),
     )).limit(1);
-  return row ? decryptWithEnvKey(row.value, ENCRYPTION_KEY) : null;
+  return row ? decryptWithEnvKey(row.value, ENCRYPTION_KEY, userId) : null;
 }
 
 export async function connectLighterAccount(input: {
@@ -119,7 +119,7 @@ export async function connectLighterAccount(input: {
     await tx.insert(lighterCredentials).values({
       investmentAccountId: id,
       userId: input.userId,
-      readOnlyTokenEncrypted: encryptWithEnvKey(token, ENCRYPTION_KEY),
+      readOnlyTokenEncrypted: encryptWithEnvKey(token, ENCRYPTION_KEY, input.userId),
       expiresAt: parsed.expiresAt,
     });
   });

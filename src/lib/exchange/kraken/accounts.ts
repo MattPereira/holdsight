@@ -93,7 +93,10 @@ export async function saveUserKrakenCredentials(
     throw new Error("Failed to create Kraken account.");
   }
 
-  const credentialsEncrypted = encryptExchangeApiCredentials(credentials);
+  const credentialsEncrypted = encryptExchangeApiCredentials(
+    credentials,
+    userId,
+  );
   await db
     .insert(exchangeApiCredentials)
     .values({
@@ -160,6 +163,6 @@ export async function getUserKrakenCredentials(
     .limit(1);
 
   return row
-    ? decryptExchangeApiCredentials(row.credentialsEncrypted)
+    ? decryptExchangeApiCredentials(row.credentialsEncrypted, userId)
     : null;
 }

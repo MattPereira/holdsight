@@ -194,9 +194,10 @@ export async function applyItemHoldings(
  * token never leaves this function.
  */
 export async function syncPlaidItem(
+  userId: string,
   item: SavedPlaidItem,
 ): Promise<HoldingsResult> {
-  const accessToken = decrypt(item.accessTokenEncrypted);
+  const accessToken = decrypt(item.accessTokenEncrypted, userId);
   const result = await getPlaidHoldings(accessToken);
   await applyItemHoldings(item.id, result);
   return result;
@@ -283,23 +284,29 @@ async function getUsableSchwabAccessToken(
   const refreshBefore = Date.now() + 60_000;
 
   if (!expiresAt || expiresAt > refreshBefore) {
-    return decryptBrokerageToken(connection.accessTokenEncrypted);
+    return decryptBrokerageToken(connection.accessTokenEncrypted, connection.userId);
   }
 
   if (!connection.refreshTokenEncrypted) {
-    return decryptBrokerageToken(connection.accessTokenEncrypted);
+    return decryptBrokerageToken(connection.accessTokenEncrypted, connection.userId);
   }
 
-  const refreshToken = decryptBrokerageToken(connection.refreshTokenEncrypted);
+  const refreshToken = decryptBrokerageToken(
+    connection.refreshTokenEncrypted,
+    connection.userId,
+  );
   const tokens = await refreshSchwabAccessToken(refreshToken);
   const refreshTokenEncrypted = tokens.refresh_token
-    ? encryptBrokerageToken(tokens.refresh_token)
+    ? encryptBrokerageToken(tokens.refresh_token, connection.userId)
     : connection.refreshTokenEncrypted;
 
   await db
     .update(brokerageConnections)
     .set({
-      accessTokenEncrypted: encryptBrokerageToken(tokens.access_token),
+      accessTokenEncrypted: encryptBrokerageToken(
+        tokens.access_token,
+        connection.userId,
+      ),
       refreshTokenEncrypted,
       tokenExpiresAt: schwabTokenExpiresAt(tokens.expires_in),
       status: "active",
@@ -321,7 +328,7 @@ export async function syncUserBrokerageBalances(userId: string): Promise<void> {
   ]);
 
   for (const item of items) {
-    await syncPlaidItem(item);
+    await syncPlaidItem(userId, item);
   }
 
   for (const connection of schwabConnections) {

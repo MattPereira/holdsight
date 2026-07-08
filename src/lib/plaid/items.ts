@@ -49,7 +49,7 @@ export async function upsertPlaidItem(
   exchange: { accessToken: string; itemId: string },
   institution: { institutionId: string | null; institutionName: string | null },
 ): Promise<string> {
-  const accessTokenEncrypted = encrypt(exchange.accessToken);
+  const accessTokenEncrypted = encrypt(exchange.accessToken, userId);
 
   const [item] = await db
     .insert(plaidItems)
@@ -288,7 +288,7 @@ export async function removeUserPlaidItem(
   // no local record). Only swallow errors that mean the Item/token is already
   // gone at Plaid; treat anything else as retryable so the row survives.
   try {
-    await removeItem(decrypt(item.accessTokenEncrypted));
+    await removeItem(decrypt(item.accessTokenEncrypted, userId));
   } catch (error) {
     const { code, message, httpStatus } = readPlaidError(error);
     // ITEM_NOT_FOUND / INVALID_ACCESS_TOKEN: the authorization no longer exists

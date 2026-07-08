@@ -134,7 +134,7 @@ export async function saveSchwabOAuthConnection(input: {
   tokens: SchwabTokenResponse;
 }): Promise<string> {
   const refreshTokenEncrypted = input.tokens.refresh_token
-    ? encryptBrokerageToken(input.tokens.refresh_token)
+    ? encryptBrokerageToken(input.tokens.refresh_token, input.userId)
     : null;
 
   const [connection] = await db
@@ -143,7 +143,10 @@ export async function saveSchwabOAuthConnection(input: {
       userId: input.userId,
       provider: SCHWAB_BROKERAGE_PROVIDER,
       externalConnectionId: SCHWAB_CONNECTION_EXTERNAL_ID,
-      accessTokenEncrypted: encryptBrokerageToken(input.tokens.access_token),
+      accessTokenEncrypted: encryptBrokerageToken(
+        input.tokens.access_token,
+        input.userId,
+      ),
       refreshTokenEncrypted,
       tokenExpiresAt: schwabTokenExpiresAt(input.tokens.expires_in),
       institutionName: "Charles Schwab",
@@ -163,7 +166,10 @@ export async function saveSchwabOAuthConnection(input: {
         brokerageConnections.externalConnectionId,
       ],
       set: {
-        accessTokenEncrypted: encryptBrokerageToken(input.tokens.access_token),
+        accessTokenEncrypted: encryptBrokerageToken(
+          input.tokens.access_token,
+          input.userId,
+        ),
         refreshTokenEncrypted,
         tokenExpiresAt: schwabTokenExpiresAt(input.tokens.expires_in),
         institutionName: "Charles Schwab",

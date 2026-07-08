@@ -310,7 +310,7 @@ export async function processBrokerageTransactionSyncPage(input: {
       }
     : checkpoint.page;
   const result = await getPlaidInvestmentTransactionsPage(
-    decrypt(item.accessTokenEncrypted),
+    decrypt(item.accessTokenEncrypted, input.userId),
     { ...page, accountId: externalAccountId },
   );
 

@@ -14,7 +14,7 @@ export async function syncUserDepositoryBalances(userId: string): Promise<void> 
   const items = await getUserDepositoryPlaidItems(userId);
 
   for (const item of items) {
-    const accessToken = decrypt(item.accessTokenEncrypted);
+    const accessToken = decrypt(item.accessTokenEncrypted, userId);
     const result = await getDepositoryAccounts(accessToken);
     if (result.status !== "ready") continue;
     await saveDepositoryAccounts(

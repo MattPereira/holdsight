@@ -15,10 +15,10 @@ import {
 
 const PLAID_TOKEN_ENCRYPTION_KEY = "PLAID_TOKEN_ENCRYPTION_KEY";
 
-export function encrypt(plaintext: string): string {
-  return encryptWithEnvKey(plaintext, PLAID_TOKEN_ENCRYPTION_KEY);
+export function encrypt(plaintext: string, userId: string): string {
+  return encryptWithEnvKey(plaintext, PLAID_TOKEN_ENCRYPTION_KEY, userId);
 }
 
-export function decrypt(payload: string): string {
-  return decryptWithEnvKey(payload, PLAID_TOKEN_ENCRYPTION_KEY);
+export function decrypt(payload: string, userId: string): string {
+  return decryptWithEnvKey(payload, PLAID_TOKEN_ENCRYPTION_KEY, userId);
 }
