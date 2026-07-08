@@ -2,10 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { RiImageAddLine, RiLoader4Line, RiCloseLine } from "@remixicon/react";
+import {
+  RiImageAddLine,
+  RiLoader4Line,
+  RiCloseLine,
+  RiArrowLeftSLine,
+  RiArrowRightSLine,
+} from "@remixicon/react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   JOURNAL_IMAGE_CONTENT_TYPES,
@@ -65,6 +72,7 @@ export function JournalImagesSection({
   const [limit, setLimit] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [removing, setRemoving] = useState<string[]>([]);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset whenever the section targets a different journal owner.
@@ -236,6 +244,35 @@ export function JournalImagesSection({
     }
   }
 
+  const showPrev = useCallback(() => {
+    setViewerIndex((current) => {
+      if (current === null || images.length === 0) return current;
+      return (current - 1 + images.length) % images.length;
+    });
+  }, [images.length]);
+
+  const showNext = useCallback(() => {
+    setViewerIndex((current) => {
+      if (current === null || images.length === 0) return current;
+      return (current + 1) % images.length;
+    });
+  }, [images.length]);
+
+  // Radix's Dialog already closes on Escape; this only adds arrow-key paging.
+  useEffect(() => {
+    if (viewerIndex === null) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "ArrowLeft") showPrev();
+      if (event.key === "ArrowRight") showNext();
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [viewerIndex, showPrev, showNext]);
+
+  const viewerImage = viewerIndex !== null ? images[viewerIndex] : null;
+
   const interactionDisabled = disabled || loading || atLimit || mutationPending;
 
   return (
@@ -269,23 +306,32 @@ export function JournalImagesSection({
       </div>
 
       {loading ? (
-        <div className="flex flex-col gap-2">
-          <Skeleton className="aspect-video w-full rounded-md" />
+        <div className="grid grid-cols-3 gap-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="aspect-square w-full rounded-md" />
+          ))}
         </div>
       ) : (
-        <div className="flex flex-col gap-2">
-          {images.map((image) => (
+        <div className="grid grid-cols-3 gap-2">
+          {images.map((image, index) => (
             <div
               key={image.id}
-              className="group relative overflow-hidden rounded-md border"
+              className="group relative aspect-square overflow-hidden rounded-md border"
             >
-              {/* Blob URLs aren't in next/image's allowlist, so use a plain img. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={image.blobUrl}
-                alt={image.originalFilename}
-                className="h-auto w-full object-contain"
-              />
+              <button
+                type="button"
+                onClick={() => setViewerIndex(index)}
+                aria-label={`View screenshot: ${image.originalFilename}`}
+                className="block size-full cursor-pointer"
+              >
+                {/* Blob URLs aren't in next/image's allowlist, so use a plain img. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={image.blobUrl}
+                  alt={image.originalFilename}
+                  className="size-full object-cover transition-opacity group-hover:opacity-90"
+                />
+              </button>
               <button
                 type="button"
                 disabled={disabled || mutationPending}
@@ -300,13 +346,13 @@ export function JournalImagesSection({
           {pending.map((item) => (
             <div
               key={item.id}
-              className="relative overflow-hidden rounded-md border"
+              className="relative aspect-square overflow-hidden rounded-md border"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={item.previewUrl}
                 alt="Uploading screenshot"
-                className="h-auto w-full object-contain opacity-40"
+                className="size-full object-cover opacity-40"
               />
               <div className="absolute inset-0 flex items-center justify-center">
                 <RiLoader4Line className="size-5 animate-spin text-foreground" />
@@ -315,6 +361,60 @@ export function JournalImagesSection({
           ))}
         </div>
       )}
+
+      <Dialog
+        open={viewerIndex !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setViewerIndex(null);
+        }}
+      >
+        <DialogContent className="max-w-[95vw] sm:max-w-[95vw]">
+          <DialogTitle className="sr-only">
+            {viewerImage?.originalFilename ?? "Screenshot"}
+          </DialogTitle>
+          {viewerImage && (
+            <div className="flex flex-col items-center gap-2">
+              <div className="relative flex w-full items-center justify-center">
+                {images.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={showPrev}
+                    aria-label="Previous screenshot"
+                    className="absolute left-2 top-1/2 -translate-y-1/2"
+                  >
+                    <RiArrowLeftSLine />
+                  </Button>
+                )}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={viewerImage.blobUrl}
+                  alt={viewerImage.originalFilename}
+                  className="max-h-[95vh] w-auto max-w-full rounded-md object-contain"
+                />
+                {images.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={showNext}
+                    aria-label="Next screenshot"
+                    className="absolute right-2 top-1/2 -translate-y-1/2"
+                  >
+                    <RiArrowRightSLine />
+                  </Button>
+                )}
+              </div>
+              {images.length > 1 && (
+                <span className="text-sm text-muted-foreground">
+                  {(viewerIndex ?? 0) + 1} / {images.length}
+                </span>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

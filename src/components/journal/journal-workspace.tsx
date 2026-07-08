@@ -383,26 +383,62 @@ export function JournalWorkspace({
                 </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Tabs
-              value={view}
-              onValueChange={(value) => setView(value as JournalView)}
-            >
-              <TabsList aria-label="Journal view">
-                <TabsTrigger value="write">Record</TabsTrigger>
-                <TabsTrigger value="history">History</TabsTrigger>
-                <TabsTrigger value="transactions">Trades</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            {view === "write" ? <SaveIndicator status={status} /> : null}
-            {view === "history" ? (
-              <span className="text-muted-foreground text-sm">
-                Recent {periodType} journal entries
-              </span>
-            ) : null}
-            {view === "transactions" ? (
-              <span className="text-muted-foreground text-sm">
-                Trades for {periodLabel(periodType, selectedDate)}
-              </span>
+            <div className="flex flex-wrap items-center gap-3">
+              <Tabs
+                value={view}
+                onValueChange={(value) => setView(value as JournalView)}
+              >
+                <TabsList aria-label="Journal view">
+                  <TabsTrigger value="write">Record</TabsTrigger>
+                  <TabsTrigger value="history">History</TabsTrigger>
+                  <TabsTrigger value="transactions">Trades</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              {view === "history" ? (
+                <span className="text-muted-foreground text-sm">
+                  Recent {periodType} journal entries
+                </span>
+              ) : null}
+              {view === "transactions" ? (
+                <span className="text-muted-foreground text-sm">
+                  Trades for {periodLabel(periodType, selectedDate)}
+                </span>
+              ) : null}
+            </div>
+            {view === "write" && entry ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground"
+                    disabled={deleting || warnBeforeLeaving}
+                    aria-label="Delete entry"
+                  >
+                    <RiDeleteBinLine />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Delete this Investment Journal Entry?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This explicitly removes the entry for {selectedDate}. This
+                      action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={removeEntry}
+                    >
+                      Delete entry
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             ) : null}
           </div>
 
@@ -481,6 +517,10 @@ export function JournalWorkspace({
                 onPendingChange={setImageMutationPending}
               />
 
+              <div className="flex justify-end">
+                <SaveIndicator status={status} />
+              </div>
+
               {status === "error" ? (
             <Card>
               <CardHeader>
@@ -512,42 +552,6 @@ export function JournalWorkspace({
                 </Button>
               </CardFooter>
             </Card>
-              ) : null}
-
-              {entry ? (
-                <div className="flex justify-end">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="destructive"
-                    disabled={deleting || warnBeforeLeaving}
-                  >
-                    <RiDeleteBinLine data-icon="inline-start" />
-                    Delete entry
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      Delete this Investment Journal Entry?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This explicitly removes the entry for {selectedDate}. This
-                      action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      variant="destructive"
-                      onClick={removeEntry}
-                    >
-                      Delete entry
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-                </div>
               ) : null}
             </div>
 
