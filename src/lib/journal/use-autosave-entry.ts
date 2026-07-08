@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const AUTOSAVE_DEBOUNCE_MS = 750;
+export const AUTOSAVE_DEBOUNCE_MS = 750;
 const SAVE_RETRY_DELAY_MS = 3_000;
 
 export type SaveStatus = "idle" | "saving" | "saved" | "error" | "conflict";
