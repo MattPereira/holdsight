@@ -1,22 +1,20 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import {
-  RiArrowLeftLine,
-  RiDeleteBinLine,
-  RiErrorWarningLine,
-  RiLoader4Line,
-  RiSaveLine,
-} from "@remixicon/react";
+import { RiArrowLeftLine } from "@remixicon/react";
 import { toast } from "sonner";
 
 import {
   getTransactionJournalEntry,
-  removeTransactionJournalEntry,
   saveTransactionJournalEntry,
 } from "@/components/accounts/transactions/actions";
+import {
+  Leg,
+  transactionLegs,
+} from "@/components/accounts/transactions/transaction-legs";
+import { SaveIndicator } from "@/components/journal/save-indicator";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -28,7 +26,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -50,10 +47,7 @@ import {
   TRADE_JOURNAL_EMOTION_OPTIONS,
   TRADE_JOURNAL_REASON_OPTIONS,
 } from "@/lib/journal/transaction-entry-labels";
-import {
-  useAutosaveEntry,
-  type SaveStatus,
-} from "@/lib/journal/use-autosave-entry";
+import { useAutosaveEntry } from "@/lib/journal/use-autosave-entry";
 import { useUnsavedChangesGuard } from "@/lib/journal/use-unsaved-changes-guard";
 import { cn } from "@/lib/utils";
 
@@ -73,38 +67,17 @@ const MARKET_BIAS_OPTIONS = Array.from({ length: 10 }, (_, index) => {
   return [value, label] as const;
 });
 
-const dateTimeFormat = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
+const transactionDateFormat = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
-  hour: "numeric",
+  month: "long",
+  day: "numeric",
+});
+
+const transactionTimeFormat = new Intl.DateTimeFormat("en-US", {
+  hour: "2-digit",
   minute: "2-digit",
+  hour12: true,
 });
-
-const amountFormat = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 6,
-});
-
-const usdFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
-const TRANSACTION_ACTION_LABELS: Record<
-  InvestmentTransactionListItem["side"],
-  string
-> = {
-  buy: "Bought",
-  sell: "Sold",
-  swap: "Bought",
-  open: "Opened",
-  close: "Closed",
-  increase: "Increased",
-  decrease: "Reduced",
-  receive: "Received",
-  send: "Sent",
-  unknown: "Transaction",
-};
 
 type FormState = {
   note: string;
@@ -135,60 +108,6 @@ function formFromEntry(entry: TransactionJournalEntry | null): FormState {
   };
 }
 
-function SaveIndicator({ status }: { status: SaveStatus }) {
-  if (status === "saving") return <Badge variant="secondary">Saving…</Badge>;
-  if (status === "saved") {
-    return (
-      <Badge variant="secondary">
-        <RiSaveLine data-icon="inline-start" />
-        Saved
-      </Badge>
-    );
-  }
-  if (status === "error") {
-    return (
-      <Badge variant="destructive">
-        <RiErrorWarningLine data-icon="inline-start" />
-        Save failed
-      </Badge>
-    );
-  }
-  if (status === "conflict") {
-    return <Badge variant="destructive">Edit conflict</Badge>;
-  }
-  return <Badge variant="outline">Not saved yet</Badge>;
-}
-
-function transactionDescription(
-  transaction: InvestmentTransactionListItem,
-): { dateTime: string; trade: string | null } {
-  const when = dateTimeFormat.format(new Date(transaction.executedAt));
-  const baseAsset =
-    transaction.baseAmount !== null && transaction.baseAssetSymbol
-      ? `${amountFormat.format(Math.abs(transaction.baseAmount))} ${transaction.baseAssetSymbol}`
-      : null;
-  const quoteAsset =
-    transaction.quoteAmount !== null && transaction.quoteAssetSymbol
-      ? `${amountFormat.format(Math.abs(transaction.quoteAmount))} ${transaction.quoteAssetSymbol}`
-      : transaction.valueUsd !== null
-        ? usdFormat.format(Math.abs(transaction.valueUsd))
-        : null;
-
-  if (baseAsset) {
-    const action = TRANSACTION_ACTION_LABELS[transaction.side];
-    const isExchange =
-      transaction.side === "buy" ||
-      transaction.side === "sell" ||
-      transaction.side === "swap";
-    const trade = isExchange && quoteAsset
-      ? `${action} ${baseAsset} for ${quoteAsset}`
-      : `${action} ${baseAsset}`;
-    return { dateTime: when, trade };
-  }
-
-  return { dateTime: when, trade: null };
-}
-
 export function TransactionJournalForm({
   transaction,
   onBack,
@@ -199,7 +118,6 @@ export function TransactionJournalForm({
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [imageMutationPending, setImageMutationPending] = useState(false);
-  const [removing, startRemoving] = useTransition();
 
   const transactionId = transaction.id;
 
@@ -223,7 +141,7 @@ export function TransactionJournalForm({
       if (Boolean(previousEntry) !== Boolean(nextEntry)) router.refresh();
     },
   });
-  const { draft: form, entry, status, saveError } = autosave;
+  const { draft: form, status, saveError } = autosave;
 
   // Hydrate the form from the existing entry. Only the lightweight summary
   // ships with the list, so the full entry (note + emotions) is fetched here.
@@ -278,19 +196,6 @@ export function TransactionJournalForm({
     }));
   }
 
-  function handleRemove() {
-    startRemoving(async () => {
-      const result = await removeTransactionJournalEntry(transactionId);
-      if (result.error) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success("Journal entry removed");
-      autosave.applyServerEntry(null);
-      onBack();
-    });
-  }
-
   function handleBack() {
     if (!confirmLeave()) return;
     onBack();
@@ -307,40 +212,51 @@ export function TransactionJournalForm({
     }));
   }
 
-  const busy = removing;
-  const description = transactionDescription(transaction);
+  const executedAt = new Date(transaction.executedAt);
+  const legs = transactionLegs(transaction);
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="-ml-2 self-start"
-          onClick={handleBack}
-        >
-          <RiArrowLeftLine data-icon="inline-start" />
-          Back
-        </Button>
+      <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-heading text-base font-medium text-foreground">
-            {entry ? "Edit journal entry" : "Add journal entry"}
-          </h2>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="-ml-2 self-start"
+            onClick={handleBack}
+          >
+            <RiArrowLeftLine data-icon="inline-start" />
+            Back
+          </Button>
           <SaveIndicator status={status} />
         </div>
-        <div className="flex flex-col text-sm text-muted-foreground">
-          <span>{description.dateTime}</span>
-          {description.trade ? <span>{description.trade}</span> : null}
+        <div className="flex items-start gap-1 border-y py-2.5">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-base">
+              {transaction.accountLabel ?? "—"}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {transactionDateFormat.format(executedAt)}
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {transactionTimeFormat.format(executedAt)}
+            </span>
+          </div>
+          <div className="ml-auto flex flex-col items-end gap-1">
+            {legs.map((leg, index) => (
+              <Leg key={index} leg={leg} />
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-col gap-5 px-4">
+      <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
           <Label htmlFor="journal-reason">Trade reason</Label>
           <Select
             value={form.tradeReason ?? NONE_VALUE}
-            disabled={loading || busy}
+            disabled={loading}
             onValueChange={(value) =>
               updateImmediately((prev) => ({
                 ...prev,
@@ -377,7 +293,7 @@ export function TransactionJournalForm({
             value={
               form.marketBias === null ? NONE_VALUE : String(form.marketBias)
             }
-            disabled={loading || busy}
+            disabled={loading}
             onValueChange={(value) =>
               updateImmediately((prev) => ({
                 ...prev,
@@ -414,7 +330,7 @@ export function TransactionJournalForm({
                 <button
                   key={value}
                   type="button"
-                  disabled={loading || busy}
+                  disabled={loading}
                   aria-pressed={selected}
                   onClick={() => toggleEmotion(value)}
                   className={cn(
@@ -438,7 +354,7 @@ export function TransactionJournalForm({
             rows={5}
             placeholder="What was the thinking behind this trade?"
             value={form.note}
-            disabled={loading || busy}
+            disabled={loading}
             onChange={(event) =>
               autosave.setDraft((prev) => ({
                 ...prev,
@@ -451,7 +367,7 @@ export function TransactionJournalForm({
         <JournalImagesSection
           endpoint={`/api/investment-transactions/${transactionId}/journal-images`}
           open
-          disabled={busy}
+          disabled={loading}
           onEntryVersionChanged={handleEntryVersionChanged}
           onPendingChange={setImageMutationPending}
           beforeMutation={autosave.flushBeforeMutation}
@@ -462,23 +378,6 @@ export function TransactionJournalForm({
           </p>
         ) : null}
       </div>
-
-      {entry ? (
-        <div>
-          <Button
-            variant="destructive"
-            onClick={handleRemove}
-            disabled={loading || busy || warnBeforeLeaving}
-          >
-            {removing ? (
-              <RiLoader4Line className="animate-spin" />
-            ) : (
-              <RiDeleteBinLine />
-            )}
-            Remove entry
-          </Button>
-        </div>
-      ) : null}
 
       <AlertDialog open={status === "conflict"}>
         <AlertDialogContent>

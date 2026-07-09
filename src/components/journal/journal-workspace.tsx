@@ -7,11 +7,7 @@ import {
   RiArrowRightSLine,
   RiCalendarLine,
   RiDeleteBinLine,
-  RiErrorWarningLine,
-  RiLoader4Line,
   RiRefreshLine,
-  RiSaveLine,
-  RiTimeLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
 
@@ -22,6 +18,7 @@ import {
 } from "@/app/(app)/journal/actions";
 import { JournalImagesSection } from "@/components/journal/journal-images-section";
 import { JournalTransactionContext } from "@/components/journal/journal-transaction-context";
+import { SaveIndicator } from "@/components/journal/save-indicator";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,7 +30,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -65,10 +61,7 @@ import {
   moveJournalPeriod,
   type JournalPeriodType,
 } from "@/lib/journal/periods";
-import {
-  useAutosaveEntry,
-  type SaveStatus,
-} from "@/lib/journal/use-autosave-entry";
+import { useAutosaveEntry } from "@/lib/journal/use-autosave-entry";
 import { useUnsavedChangesGuard } from "@/lib/journal/use-unsaved-changes-guard";
 import { cn } from "@/lib/utils";
 
@@ -104,42 +97,6 @@ function draftFromEntry(entry: InvestmentJournalEntry | null): Draft {
 
 function sameDraft(left: Draft, right: Draft): boolean {
   return left.plan === right.plan && left.reflection === right.reflection;
-}
-
-function SaveIndicator({ status }: { status: SaveStatus }) {
-  if (status === "saving") {
-    return (
-      <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
-        <RiLoader4Line className="size-4 animate-spin" />
-        Saving…
-      </span>
-    );
-  }
-  if (status === "saved") {
-    return (
-      <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
-        <RiSaveLine className="size-4" />
-        Saved
-      </span>
-    );
-  }
-  if (status === "error") {
-    return (
-      <Badge variant="destructive">
-        <RiErrorWarningLine data-icon="inline-start" />
-        Save failed
-      </Badge>
-    );
-  }
-  if (status === "conflict") {
-    return <Badge variant="destructive">Edit conflict</Badge>;
-  }
-  return (
-    <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
-      <RiTimeLine className="size-4" />
-      Not saved yet
-    </span>
-  );
 }
 
 function JournalPeriodStrip({
