@@ -35,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 import { Textarea } from "@/components/ui/textarea";
 import { JournalImagesSection } from "@/components/journal/journal-images-section";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
@@ -52,20 +53,11 @@ import { useUnsavedChangesGuard } from "@/lib/journal/use-unsaved-changes-guard"
 import { cn } from "@/lib/utils";
 
 // Radix Select can't hold an empty string value, so an explicit sentinel maps
-// to "no selection" for the nullable reason and market bias fields.
+// to "no selection" for the nullable trade reason field.
 const NONE_VALUE = "__none__";
-const MARKET_BIAS_OPTIONS = Array.from({ length: 10 }, (_, index) => {
-  const value = index + 1;
-  const label =
-    value === 1
-      ? "1 — Bearish"
-      : value === 5
-        ? "5 — Neutral"
-        : value === 10
-          ? "10 — Bullish"
-          : String(value);
-  return [value, label] as const;
-});
+const MARKET_BIAS_MIN = 1;
+const MARKET_BIAS_MAX = 10;
+const DEFAULT_MARKET_BIAS = 5;
 
 const transactionDateFormat = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
@@ -142,6 +134,21 @@ export function TransactionJournalForm({
     },
   });
   const { draft: form, status, saveError } = autosave;
+
+  // Slider value while dragging/keying, decoupled from the committed draft so
+  // that onValueChange can move the thumb without firing an autosave on every
+  // intermediate tick; onValueCommit is what actually persists a choice. Kept
+  // in sync with the draft (e.g. once hydrate() loads the saved entry) using
+  // the render-time "adjust state" pattern rather than an effect, since an
+  // effect here would cause an extra render on every sync.
+  const [syncedMarketBias, setSyncedMarketBias] = useState(form.marketBias);
+  const [marketBiasDisplay, setMarketBiasDisplay] = useState(
+    form.marketBias ?? DEFAULT_MARKET_BIAS,
+  );
+  if (form.marketBias !== syncedMarketBias) {
+    setSyncedMarketBias(form.marketBias);
+    setMarketBiasDisplay(form.marketBias ?? DEFAULT_MARKET_BIAS);
+  }
 
   // Hydrate the form from the existing entry. Only the lightweight summary
   // ships with the list, so the full entry (note + emotions) is fetched here.
@@ -253,7 +260,7 @@ export function TransactionJournalForm({
 
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="journal-reason">Trade reason</Label>
+          <Label htmlFor="journal-reason">Reason</Label>
           <Select
             value={form.tradeReason ?? NONE_VALUE}
             disabled={loading}
@@ -269,7 +276,7 @@ export function TransactionJournalForm({
           >
             <SelectTrigger
               id="journal-reason"
-              className="w-full"
+              className="w-full sm:hidden"
               aria-required="true"
             >
               <SelectValue placeholder="Choose" />
@@ -285,45 +292,76 @@ export function TransactionJournalForm({
               </SelectGroup>
             </SelectContent>
           </Select>
+          <div className="hidden flex-wrap gap-1.5 sm:flex">
+            {TRADE_JOURNAL_REASON_OPTIONS.map(([value, label]) => {
+              const selected = form.tradeReason === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  disabled={loading}
+                  aria-pressed={selected}
+                  onClick={() =>
+                    updateImmediately((prev) => ({
+                      ...prev,
+                      tradeReason: selected ? null : value,
+                    }))
+                  }
+                  className={cn(
+                    "inline-flex h-7 w-32 items-center justify-center rounded-lg border text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
+                    selected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="flex flex-col gap-2">
-          <Label htmlFor="journal-market-bias">Market bias</Label>
-          <Select
-            value={
-              form.marketBias === null ? NONE_VALUE : String(form.marketBias)
-            }
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="journal-market-bias">Sentiment</Label>
+            <span className="text-sm text-muted-foreground">
+              {marketBiasDisplay}
+            </span>
+          </div>
+          <Slider
+            id="journal-market-bias"
+            className="w-full"
             disabled={loading}
-            onValueChange={(value) =>
-              updateImmediately((prev) => ({
-                ...prev,
-                marketBias: value === NONE_VALUE ? null : Number(value),
-              }))
+            min={MARKET_BIAS_MIN}
+            max={MARKET_BIAS_MAX}
+            step={1}
+            value={[marketBiasDisplay]}
+            onValueChange={([value]) => setMarketBiasDisplay(value)}
+            onValueCommit={([value]) =>
+              updateImmediately((prev) => ({ ...prev, marketBias: value }))
             }
-          >
-            <SelectTrigger
-              id="journal-market-bias"
-              className="w-full"
-              aria-required="true"
+          />
+          <div className="relative h-4 text-xs text-muted-foreground">
+            <span className="absolute left-0">Bearish</span>
+            <span
+              className="absolute -translate-x-1/2"
+              style={{
+                left: `${
+                  ((DEFAULT_MARKET_BIAS - MARKET_BIAS_MIN) /
+                    (MARKET_BIAS_MAX - MARKET_BIAS_MIN)) *
+                  100
+                }%`,
+              }}
             >
-              <SelectValue placeholder="Choose" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value={NONE_VALUE}>Choose</SelectItem>
-                {MARKET_BIAS_OPTIONS.map(([value, label]) => (
-                  <SelectItem key={value} value={String(value)}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+              Neutral
+            </span>
+            <span className="absolute right-0">Bullish</span>
+          </div>
         </div>
 
         <div className="flex flex-col gap-2">
           <Label>Emotions</Label>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap">
             {TRADE_JOURNAL_EMOTION_OPTIONS.map(([value, label]) => {
               const selected = form.emotions.includes(value);
               return (
@@ -334,7 +372,7 @@ export function TransactionJournalForm({
                   aria-pressed={selected}
                   onClick={() => toggleEmotion(value)}
                   className={cn(
-                    "inline-flex h-7 items-center rounded-4xl border px-3 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
+                    "inline-flex h-7 w-full items-center justify-center rounded-lg border text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 sm:w-24",
                     selected
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",

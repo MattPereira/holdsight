@@ -41,7 +41,7 @@ export const TRADE_JOURNAL_REASON_LABELS: Record<TradeJournalReason, string> = {
   breakout_buy: "Breakout buy",
   take_profit: "Take profit",
   stop_loss: "Stop loss",
-  rebalance: "Rebalance portfolio",
+  rebalance: "Rebalance port",
   thesis_change: "Thesis change",
   cash_raise: "Raise cash",
 };
