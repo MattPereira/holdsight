@@ -1,9 +1,9 @@
 {
   "enabledPlugins": {
     "neon@claude-plugins-official": true,
-    "enableAllProjectMcpServers": true,
-    "enabledMcpjsonServers": ["shadcn", "zerion-api"],
     "typescript-lsp@claude-plugins-official": true,
     "vercel@claude-plugins-official": true
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": ["shadcn"]
 }
