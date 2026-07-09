@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   RiArrowLeftSLine,
   RiArrowRightSLine,
+  RiCalendarLine,
   RiDeleteBinLine,
   RiErrorWarningLine,
   RiRefreshLine,
@@ -58,6 +59,7 @@ import { journalStripLabel, periodLabel } from "@/lib/journal/period-label";
 import {
   canonicalPeriodStart,
   JOURNAL_STRIP_MOBILE_SIZE,
+  JOURNAL_STRIP_SIZE,
   journalStripMobileVisibleIndices,
   moveJournalPeriod,
   type JournalPeriodType,
@@ -132,14 +134,12 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
 function JournalPeriodStrip({
   periodType,
   selectedDate,
-  todayDate,
   stripDates,
   entryDates,
   onSelect,
 }: {
   periodType: JournalPeriodType;
   selectedDate: string;
-  todayDate: string;
   stripDates: string[];
   entryDates: string[];
   onSelect: (date: string) => void;
@@ -155,13 +155,12 @@ function JournalPeriodStrip({
 
   return (
     <div
-      className="flex flex-wrap items-center gap-1.5"
+      className="flex min-w-0 flex-1 items-center gap-1.5"
       role="group"
       aria-label={`Choose a ${PERIOD_UNIT[periodType]}`}
     >
       {stripDates.map((date, index) => {
         const isSelected = date === selectedDate;
-        const isToday = date === todayDate;
         const hasEntry = entryDates.includes(date);
         const label = journalStripLabel(periodType, date);
         return (
@@ -173,20 +172,27 @@ function JournalPeriodStrip({
             aria-current={isSelected ? "date" : undefined}
             aria-label={`${label.top}${label.bottom ? ` ${label.bottom}` : ""}${hasEntry ? " · entry recorded" : ""}`}
             className={cn(
-              "relative h-auto flex-col gap-0 px-2 py-1.5 leading-tight",
-              isToday && "ring-2 ring-primary ring-offset-1",
+              "relative h-12 min-w-0 flex-1 basis-0 flex-col justify-center gap-0 px-2 leading-tight",
               !mobileVisible.has(index) && "hidden sm:flex",
             )}
             onClick={() => onSelect(date)}
           >
-            <span className="text-[11px] opacity-80">{label.top}</span>
+            <span
+              className={cn(
+                label.bottom
+                  ? "text-[11px] opacity-80"
+                  : "text-sm font-medium",
+              )}
+            >
+              {label.top}
+            </span>
             {label.bottom ? (
               <span className="text-sm font-medium">{label.bottom}</span>
             ) : null}
             {hasEntry ? (
               <span
                 aria-hidden="true"
-                className="absolute -bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full bg-foreground"
+                className="absolute top-1 right-1 size-1.5 rounded-full bg-current opacity-70"
               />
             ) : null}
           </Button>
@@ -212,6 +218,7 @@ export function JournalWorkspace({
   stripEntryDates: string[];
 }) {
   const router = useRouter();
+  const dateInputRef = useRef<HTMLInputElement>(null);
   const [homeTimezone, setHomeTimezone] = useState(
     initialWorkspace.homeTimezone ?? "",
   );
@@ -317,11 +324,6 @@ export function JournalWorkspace({
     });
   }
 
-  const todayDate = canonicalPeriodStart(
-    periodType,
-    todayInTimezone(homeTimezone),
-  );
-
   function handleEntryVersionChanged(updatedAt: string, entryId?: string) {
     autosave.syncEntryVersion(updatedAt, entryId, (draft, id) => ({
       id,
@@ -338,18 +340,47 @@ export function JournalWorkspace({
       <div className="flex flex-wrap items-center gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">Journal</h1>
         {timezoneConfirmed ? (
-          <Tabs
-            value={periodType}
-            onValueChange={(value) =>
-              navigateTo(value as JournalPeriodType, selectedDate)
-            }
-          >
-            <TabsList aria-label="Journal Period type">
-              <TabsTrigger value="daily">Daily</TabsTrigger>
-              <TabsTrigger value="weekly">Weekly</TabsTrigger>
-              <TabsTrigger value="monthly">Monthly</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <>
+            <Tabs
+              value={periodType}
+              onValueChange={(value) =>
+                navigateTo(value as JournalPeriodType, selectedDate)
+              }
+            >
+              <TabsList aria-label="Journal Period type">
+                <TabsTrigger value="daily">Daily</TabsTrigger>
+                <TabsTrigger value="weekly">Weekly</TabsTrigger>
+                <TabsTrigger value="monthly">Monthly</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="Jump to a specific date"
+              onClick={() => dateInputRef.current?.showPicker?.()}
+            >
+              <RiCalendarLine />
+            </Button>
+            <input
+              ref={dateInputRef}
+              className="sr-only"
+              type={periodType === "monthly" ? "month" : "date"}
+              value={
+                periodType === "monthly"
+                  ? selectedDate.slice(0, 7)
+                  : selectedDate
+              }
+              aria-label={`${periodType} Journal Period`}
+              onChange={(event) =>
+                navigateTo(
+                  periodType,
+                  periodType === "monthly"
+                    ? `${event.target.value}-01`
+                    : event.target.value,
+                )
+              }
+            />
+          </>
         ) : null}
       </div>
 
@@ -391,76 +422,54 @@ export function JournalWorkspace({
       ) : (
         <>
           <div
-                  className={cn(
-                    "flex flex-wrap items-center gap-2",
-                    view === "history" && "hidden",
-                  )}
-                >
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label={`Previous ${PERIOD_UNIT[periodType]}`}
-                  onClick={() =>
-                    navigateTo(
-                      periodType,
-                      moveJournalPeriod(periodType, selectedDate, -1),
-                    )
-                  }
-                >
-                  <RiArrowLeftSLine />
-                </Button>
-                <Input
-                  className="w-auto"
-                  type={periodType === "monthly" ? "month" : "date"}
-                  value={
-                    periodType === "monthly"
-                      ? selectedDate.slice(0, 7)
-                      : selectedDate
-                  }
-                  aria-label={`${periodType} Journal Period`}
-                  onChange={(event) =>
-                    navigateTo(
-                      periodType,
-                      periodType === "monthly"
-                        ? `${event.target.value}-01`
-                        : event.target.value,
-                    )
-                  }
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label={`Next ${PERIOD_UNIT[periodType]}`}
-                  onClick={() =>
-                    navigateTo(
-                      periodType,
-                      moveJournalPeriod(periodType, selectedDate, 1),
-                    )
-                  }
-                >
-                  <RiArrowRightSLine />
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => navigateTo(periodType, todayDate)}
-                >
-                  {periodType === "daily"
-                    ? "Today"
-                    : periodType === "weekly"
-                      ? "This week"
-                      : "This month"}
-                </Button>
-                </div>
-
-          <div className={cn(view === "history" && "hidden")}>
+            className={cn(
+              "flex items-center gap-2",
+              view === "history" && "hidden",
+            )}
+          >
+            <Button
+              variant="outline"
+              size="icon"
+              className="shrink-0"
+              aria-label={`Previous ${JOURNAL_STRIP_SIZE[periodType]} ${PERIOD_UNIT[periodType]}s`}
+              onClick={() =>
+                navigateTo(
+                  periodType,
+                  moveJournalPeriod(
+                    periodType,
+                    selectedDate,
+                    -JOURNAL_STRIP_SIZE[periodType],
+                  ),
+                )
+              }
+            >
+              <RiArrowLeftSLine />
+            </Button>
             <JournalPeriodStrip
               periodType={periodType}
               selectedDate={selectedDate}
-              todayDate={todayDate}
               stripDates={stripDates}
               entryDates={stripEntryDates}
               onSelect={(date) => navigateTo(periodType, date)}
             />
+            <Button
+              variant="outline"
+              size="icon"
+              className="shrink-0"
+              aria-label={`Next ${JOURNAL_STRIP_SIZE[periodType]} ${PERIOD_UNIT[periodType]}s`}
+              onClick={() =>
+                navigateTo(
+                  periodType,
+                  moveJournalPeriod(
+                    periodType,
+                    selectedDate,
+                    JOURNAL_STRIP_SIZE[periodType],
+                  ),
+                )
+              }
+            >
+              <RiArrowRightSLine />
+            </Button>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -486,41 +495,7 @@ export function JournalWorkspace({
                 </span>
               ) : null}
             </div>
-            {view === "write" && entry ? (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="text-muted-foreground"
-                    disabled={deleting || warnBeforeLeaving}
-                    aria-label="Delete entry"
-                  >
-                    <RiDeleteBinLine />
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      Delete this Investment Journal Entry?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This explicitly removes the entry for {selectedDate}. This
-                      action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      variant="destructive"
-                      onClick={removeEntry}
-                    >
-                      Delete entry
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            ) : null}
+            {view === "write" ? <SaveIndicator status={status} /> : null}
           </div>
 
           <div className="flex flex-col gap-6">
@@ -598,9 +573,43 @@ export function JournalWorkspace({
                 onPendingChange={setImageMutationPending}
               />
 
-              <div className="flex justify-end">
-                <SaveIndicator status={status} />
-              </div>
+              {entry ? (
+                <div className="flex justify-end">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-muted-foreground"
+                        disabled={deleting || warnBeforeLeaving}
+                        aria-label="Delete entry"
+                      >
+                        <RiDeleteBinLine />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          Delete this Investment Journal Entry?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This explicitly removes the entry for {selectedDate}.
+                          This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          variant="destructive"
+                          onClick={removeEntry}
+                        >
+                          Delete entry
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              ) : null}
 
               {status === "error" ? (
             <Card>

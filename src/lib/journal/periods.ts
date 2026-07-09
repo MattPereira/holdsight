@@ -134,8 +134,8 @@ export const JOURNAL_STRIP_SIZE: Record<JournalPeriodType, number> = {
 /** Number of strip buttons kept visible on narrow viewports. */
 export const JOURNAL_STRIP_MOBILE_SIZE: Record<JournalPeriodType, number> = {
   daily: 5,
-  weekly: 4,
-  monthly: 4,
+  weekly: 3,
+  monthly: 3,
 };
 
 /**

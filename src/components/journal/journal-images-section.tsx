@@ -282,13 +282,14 @@ export function JournalImagesSection({
         <div className="flex items-center gap-2">
           <Button
             type="button"
-            variant="outline"
-            size="sm"
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground"
             disabled={interactionDisabled}
+            aria-label="Add screenshots"
             onClick={() => fileInputRef.current?.click()}
           >
             <RiImageAddLine />
-            Browse
           </Button>
           <input
             ref={fileInputRef}

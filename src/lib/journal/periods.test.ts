@@ -79,17 +79,21 @@ describe("journalStripDates", () => {
 });
 
 describe("journalStripMobileVisibleIndices", () => {
-  it("keeps the closest indices to a centered selection, favoring the later index on ties", () => {
+  it("keeps the closest indices to a centered weekly/monthly selection", () => {
     // 6-item weekly/monthly strip, selected at index 2 (offsets -2..+3).
-    // Ties at distance 2 (idx0 vs idx4) resolve toward idx4, preserving the
-    // strip's future lean.
     expect(
       journalStripMobileVisibleIndices(
         JOURNAL_STRIP_SIZE.weekly,
         2,
         JOURNAL_STRIP_MOBILE_SIZE.weekly,
       ),
-    ).toEqual([1, 2, 3, 4]);
+    ).toEqual([1, 2, 3]);
+  });
+
+  it("breaks ties toward the later index, preserving the strip's future lean", () => {
+    // Selected at index 2; idx1 and idx3 are equidistant. Only one fits in
+    // the remaining budget of 1, so the later index (idx3) wins the tie.
+    expect(journalStripMobileVisibleIndices(6, 2, 2)).toEqual([2, 3]);
   });
 
   it("shifts the visible window when the selection sits at the edge of the daily week", () => {
