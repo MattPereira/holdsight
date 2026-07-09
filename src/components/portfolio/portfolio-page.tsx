@@ -137,8 +137,12 @@ export function PortfolioPage({
         <h1 className="text-xl font-semibold">Portfolio</h1>
 
         <TabsList>
-          <TabsTrigger value="balances">Balances</TabsTrigger>
-          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          <TabsTrigger value="balances" className="w-24">
+            Balances
+          </TabsTrigger>
+          <TabsTrigger value="transactions" className="w-24">
+            Trades
+          </TabsTrigger>
         </TabsList>
 
         <Button

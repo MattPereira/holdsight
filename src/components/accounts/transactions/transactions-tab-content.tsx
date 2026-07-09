@@ -26,35 +26,6 @@ import { cn } from "@/lib/utils";
 const PAGE_SIZE_OPTIONS = [10, 20, 30];
 const DEFAULT_PAGE_SIZE = 10;
 
-const dateFormat = new Intl.DateTimeFormat("en-US", {
-  month: "numeric",
-  day: "numeric",
-  year: "numeric",
-});
-
-function historyLabel(panel: TransactionsPanel, total: number): string {
-  const count = `${total} trade${total === 1 ? "" : "s"}`;
-  const status = panel.historyStatus;
-  if (!status) return count;
-
-  const { earliestTransactionAt, latestTransactionAt, hasMore } = status;
-  if (!earliestTransactionAt || !latestTransactionAt) {
-    return count;
-  }
-
-  const range = `${dateFormat.format(new Date(earliestTransactionAt))} to ${dateFormat.format(new Date(latestTransactionAt))}`;
-  const label = `${count} from ${range}`;
-  if (!hasMore) return label;
-
-  const phaseLabel =
-    status.phase === "backfilling"
-      ? "importing history…"
-      : status.phase === "catching_up"
-        ? "catching up…"
-        : "syncing…";
-  return `${label} · ${phaseLabel}`;
-}
-
 export function TransactionsTabContent({
   panel,
 }: {
@@ -110,8 +81,6 @@ export function TransactionsTabContent({
     setPage(1);
   }
 
-  const status = historyLabel(panel, total);
-
   return (
     <div className="flex flex-col gap-4">
       {panel.error ? (
@@ -130,11 +99,7 @@ export function TransactionsTabContent({
       ) : null}
 
       {panel.transactions.length > 0 ? (
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <span className="text-sm font-normal text-muted-foreground">
-            {status}
-          </span>
-
+        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <TransactionsSymbolFilter
               symbols={symbols}
