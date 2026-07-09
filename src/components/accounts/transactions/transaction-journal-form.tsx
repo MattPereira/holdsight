@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import {
+  RiArrowLeftLine,
   RiDeleteBinLine,
   RiErrorWarningLine,
   RiLoader4Line,
@@ -37,14 +38,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { JournalImagesSection } from "@/components/journal/journal-images-section";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
@@ -196,54 +189,33 @@ function transactionDescription(
   return { dateTime: when, trade: null };
 }
 
-export function JournalEntrySheet({
+export function TransactionJournalForm({
   transaction,
-  open,
-  onOpenChange,
+  onBack,
 }: {
-  transaction: InvestmentTransactionListItem | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+  transaction: InvestmentTransactionListItem;
+  onBack: () => void;
 }) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [imageMutationPending, setImageMutationPending] = useState(false);
   const [removing, startRemoving] = useTransition();
 
-  const transactionId = transaction?.id ?? null;
-  const activeId = open ? transactionId : null;
-
-  // Reset `loading` during render whenever the sheet targets a new
-  // transaction, so the async fetch below never has to clear stale state
-  // from inside the effect body. Mirrors the render-phase sync used by
-  // useTransactionsPanel. The draft/entry/status reset is handled by
-  // useAutosaveEntry itself, keyed on the same identity.
-  const [syncedId, setSyncedId] = useState<string | null>(null);
-  if (syncedId !== activeId) {
-    setSyncedId(activeId);
-    setLoading(activeId !== null);
-  }
+  const transactionId = transaction.id;
 
   const autosave = useAutosaveEntry<FormState, TransactionJournalEntry>({
-    key: activeId ?? "closed",
+    key: transactionId,
     initialEntry: null,
-    enabled: open && !loading,
+    enabled: !loading,
     draftFromEntry: formFromEntry,
     sameDraft: sameForm,
-    save: (snapshot, currentEntry, overwrite) => {
-      if (!transactionId) {
-        return Promise.resolve({
-          status: "error",
-          message: "No transaction selected.",
-        });
-      }
-      return saveTransactionJournalEntry(
+    save: (snapshot, currentEntry, overwrite) =>
+      saveTransactionJournalEntry(
         transactionId,
         snapshot,
         currentEntry?.updatedAt ?? null,
         overwrite,
-      );
-    },
+      ),
     // Refresh the surrounding transaction list only when the entry's
     // existence toggles (materialized or removed) — a plain content update
     // doesn't need to invalidate the list's own "has journal entry" badge.
@@ -255,9 +227,9 @@ export function JournalEntrySheet({
 
   // Hydrate the form from the existing entry. Only the lightweight summary
   // ships with the list, so the full entry (note + emotions) is fetched here.
+  // This component is mounted fresh per selected transaction, so the effect
+  // only ever needs to run once, on mount.
   useEffect(() => {
-    if (!open || !transactionId) return;
-
     let cancelled = false;
     getTransactionJournalEntry(transactionId)
       .then((result) => {
@@ -279,7 +251,7 @@ export function JournalEntrySheet({
     // without re-running this effect on every keystroke; `autosave.hydrate`
     // itself is stable (empty-deps useCallback).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, transactionId]);
+  }, [transactionId]);
 
   const warnBeforeLeaving =
     autosave.dirty ||
@@ -288,7 +260,7 @@ export function JournalEntrySheet({
     status === "error" ||
     status === "conflict";
   const { confirmLeave } = useUnsavedChangesGuard(
-    open && warnBeforeLeaving,
+    warnBeforeLeaving,
     UNSAVED_CHANGES_MESSAGE,
   );
 
@@ -307,7 +279,6 @@ export function JournalEntrySheet({
   }
 
   function handleRemove() {
-    if (!transactionId) return;
     startRemoving(async () => {
       const result = await removeTransactionJournalEntry(transactionId);
       if (result.error) {
@@ -316,17 +287,16 @@ export function JournalEntrySheet({
       }
       toast.success("Journal entry removed");
       autosave.applyServerEntry(null);
-      onOpenChange(false);
+      onBack();
     });
   }
 
-  function requestOpenChange(nextOpen: boolean) {
-    if (!nextOpen && !confirmLeave()) return;
-    onOpenChange(nextOpen);
+  function handleBack() {
+    if (!confirmLeave()) return;
+    onBack();
   }
 
   function handleEntryVersionChanged(updatedAt: string, entryId?: string) {
-    if (!transactionId) return;
     autosave.syncEntryVersion(updatedAt, entryId, (draft, id) => ({
       id,
       transactionId,
@@ -338,175 +308,178 @@ export function JournalEntrySheet({
   }
 
   const busy = removing;
-  const description = transaction
-    ? transactionDescription(transaction)
-    : null;
+  const description = transactionDescription(transaction);
 
   return (
-    <Sheet open={open} onOpenChange={requestOpenChange}>
-      <SheetContent className="overflow-y-auto data-[side=right]:sm:max-w-lg data-[side=right]:lg:max-w-2xl data-[side=right]:xl:max-w-[60vw]">
-        <SheetHeader>
-          <div className="flex items-center justify-between gap-3 pr-8">
-            <SheetTitle>{entry ? "Edit journal entry" : "Add journal entry"}</SheetTitle>
-            <SaveIndicator status={status} />
-          </div>
-          {description ? (
-            <SheetDescription className="flex flex-col">
-              <span>{description.dateTime}</span>
-              {description.trade ? <span>{description.trade}</span> : null}
-            </SheetDescription>
-          ) : null}
-        </SheetHeader>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="-ml-2 self-start"
+          onClick={handleBack}
+        >
+          <RiArrowLeftLine data-icon="inline-start" />
+          Back
+        </Button>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-heading text-base font-medium text-foreground">
+            {entry ? "Edit journal entry" : "Add journal entry"}
+          </h2>
+          <SaveIndicator status={status} />
+        </div>
+        <div className="flex flex-col text-sm text-muted-foreground">
+          <span>{description.dateTime}</span>
+          {description.trade ? <span>{description.trade}</span> : null}
+        </div>
+      </div>
 
-        <div className="flex flex-col gap-5 px-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="journal-reason">Trade reason</Label>
-            <Select
-              value={form.tradeReason ?? NONE_VALUE}
-              disabled={loading || busy}
-              onValueChange={(value) =>
-                updateImmediately((prev) => ({
-                  ...prev,
-                  tradeReason:
-                    value === NONE_VALUE
-                      ? null
-                      : (value as TradeJournalReason),
-                }))
-              }
-            >
-              <SelectTrigger
-                id="journal-reason"
-                className="w-full"
-                aria-required="true"
-              >
-                <SelectValue placeholder="Choose" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value={NONE_VALUE}>Choose</SelectItem>
-                  {TRADE_JOURNAL_REASON_OPTIONS.map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="journal-market-bias">Market bias</Label>
-            <Select
-              value={
-                form.marketBias === null ? NONE_VALUE : String(form.marketBias)
-              }
-              disabled={loading || busy}
-              onValueChange={(value) =>
-                updateImmediately((prev) => ({
-                  ...prev,
-                  marketBias: value === NONE_VALUE ? null : Number(value),
-                }))
-              }
-            >
-              <SelectTrigger
-                id="journal-market-bias"
-                className="w-full"
-                aria-required="true"
-              >
-                <SelectValue placeholder="Choose" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectGroup>
-                  <SelectItem value={NONE_VALUE}>Choose</SelectItem>
-                  {MARKET_BIAS_OPTIONS.map(([value, label]) => (
-                    <SelectItem key={value} value={String(value)}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label>Emotions</Label>
-            <div className="flex flex-wrap gap-1.5">
-              {TRADE_JOURNAL_EMOTION_OPTIONS.map(([value, label]) => {
-                const selected = form.emotions.includes(value);
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    disabled={loading || busy}
-                    aria-pressed={selected}
-                    onClick={() => toggleEmotion(value)}
-                    className={cn(
-                      "inline-flex h-7 items-center rounded-4xl border px-3 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
-                      selected
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
-                    )}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="journal-note">Notes</Label>
-            <Textarea
-              id="journal-note"
-              rows={5}
-              placeholder="What was the thinking behind this trade?"
-              value={form.note}
-              disabled={loading || busy}
-              onChange={(event) =>
-                autosave.setDraft((prev) => ({
-                  ...prev,
-                  note: event.target.value,
-                }))
-              }
-            />
-          </div>
-
-          <JournalImagesSection
-            endpoint={
-              transactionId
-                ? `/api/investment-transactions/${transactionId}/journal-images`
-                : null
+      <div className="flex flex-col gap-5 px-4">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="journal-reason">Trade reason</Label>
+          <Select
+            value={form.tradeReason ?? NONE_VALUE}
+            disabled={loading || busy}
+            onValueChange={(value) =>
+              updateImmediately((prev) => ({
+                ...prev,
+                tradeReason:
+                  value === NONE_VALUE
+                    ? null
+                    : (value as TradeJournalReason),
+              }))
             }
-            open={open}
-            disabled={busy}
-            onEntryVersionChanged={handleEntryVersionChanged}
-            onPendingChange={setImageMutationPending}
-            beforeMutation={autosave.flushBeforeMutation}
-          />
-          {saveError ? (
-            <p role="alert" className="text-sm text-destructive">
-              {saveError} Changes will retry while this sheet remains open.
-            </p>
-          ) : null}
+          >
+            <SelectTrigger
+              id="journal-reason"
+              className="w-full"
+              aria-required="true"
+            >
+              <SelectValue placeholder="Choose" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value={NONE_VALUE}>Choose</SelectItem>
+                {TRADE_JOURNAL_REASON_OPTIONS.map(([value, label]) => (
+                  <SelectItem key={value} value={value}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
 
-        <SheetFooter>
-          {entry ? (
-            <Button
-              variant="destructive"
-              onClick={handleRemove}
-              disabled={loading || busy || warnBeforeLeaving}
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="journal-market-bias">Market bias</Label>
+          <Select
+            value={
+              form.marketBias === null ? NONE_VALUE : String(form.marketBias)
+            }
+            disabled={loading || busy}
+            onValueChange={(value) =>
+              updateImmediately((prev) => ({
+                ...prev,
+                marketBias: value === NONE_VALUE ? null : Number(value),
+              }))
+            }
+          >
+            <SelectTrigger
+              id="journal-market-bias"
+              className="w-full"
+              aria-required="true"
             >
-              {removing ? (
-                <RiLoader4Line className="animate-spin" />
-              ) : (
-                <RiDeleteBinLine />
-              )}
-              Remove entry
-            </Button>
-          ) : null}
-        </SheetFooter>
-      </SheetContent>
+              <SelectValue placeholder="Choose" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem value={NONE_VALUE}>Choose</SelectItem>
+                {MARKET_BIAS_OPTIONS.map(([value, label]) => (
+                  <SelectItem key={value} value={String(value)}>
+                    {label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label>Emotions</Label>
+          <div className="flex flex-wrap gap-1.5">
+            {TRADE_JOURNAL_EMOTION_OPTIONS.map(([value, label]) => {
+              const selected = form.emotions.includes(value);
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  disabled={loading || busy}
+                  aria-pressed={selected}
+                  onClick={() => toggleEmotion(value)}
+                  className={cn(
+                    "inline-flex h-7 items-center rounded-4xl border px-3 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-50",
+                    selected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="journal-note">Notes</Label>
+          <Textarea
+            id="journal-note"
+            rows={5}
+            placeholder="What was the thinking behind this trade?"
+            value={form.note}
+            disabled={loading || busy}
+            onChange={(event) =>
+              autosave.setDraft((prev) => ({
+                ...prev,
+                note: event.target.value,
+              }))
+            }
+          />
+        </div>
+
+        <JournalImagesSection
+          endpoint={`/api/investment-transactions/${transactionId}/journal-images`}
+          open
+          disabled={busy}
+          onEntryVersionChanged={handleEntryVersionChanged}
+          onPendingChange={setImageMutationPending}
+          beforeMutation={autosave.flushBeforeMutation}
+        />
+        {saveError ? (
+          <p role="alert" className="text-sm text-destructive">
+            {saveError} Changes will retry while this view remains open.
+          </p>
+        ) : null}
+      </div>
+
+      {entry ? (
+        <div>
+          <Button
+            variant="destructive"
+            onClick={handleRemove}
+            disabled={loading || busy || warnBeforeLeaving}
+          >
+            {removing ? (
+              <RiLoader4Line className="animate-spin" />
+            ) : (
+              <RiDeleteBinLine />
+            )}
+            Remove entry
+          </Button>
+        </div>
+      ) : null}
+
       <AlertDialog open={status === "conflict"}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -528,6 +501,6 @@ export function JournalEntrySheet({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Sheet>
+    </div>
   );
 }

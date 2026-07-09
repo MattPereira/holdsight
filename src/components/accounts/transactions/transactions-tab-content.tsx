@@ -2,11 +2,10 @@
 
 import { useMemo, useState } from "react";
 
-import { JournalEntrySheet } from "@/components/accounts/transactions/journal-entry-sheet";
+import { TransactionJournalSwitcher } from "@/components/accounts/transactions/transaction-journal-switcher";
 import { TransactionsSymbolFilter } from "@/components/accounts/transactions/transactions-symbol-filter";
 import { TransactionsTable } from "@/components/accounts/transactions/transactions-table";
 import type { TransactionsPanel } from "@/components/accounts/transactions/types";
-import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import {
   Pagination,
   PaginationContent,
@@ -34,9 +33,6 @@ export function TransactionsTabContent({
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [page, setPage] = useState(1);
   const [symbol, setSymbol] = useState<string | null>(null);
-  const [editing, setEditing] = useState<InvestmentTransactionListItem | null>(
-    null,
-  );
 
   // Unique base asset symbols across all loaded transactions, for the filter.
   const symbols = useMemo(() => {
@@ -82,100 +78,96 @@ export function TransactionsTabContent({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      {panel.error ? (
-        <p
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-        >
-          {panel.error}
-        </p>
-      ) : null}
-
-      {panel.message ? (
-        <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-          {panel.message}
-        </p>
-      ) : null}
-
-      {panel.transactions.length > 0 ? (
-        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <TransactionsSymbolFilter
-              symbols={symbols}
-              value={symbol}
-              onChange={handleSymbolChange}
-            />
-
-            <Select
-              value={String(pageSize)}
-              onValueChange={handlePageSizeChange}
+    <TransactionJournalSwitcher>
+      {(selectTransaction) => (
+        <div className="flex flex-col gap-4">
+          {panel.error ? (
+            <p
+              role="alert"
+              className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
             >
-              <SelectTrigger
-                size="sm"
-                aria-label="Transactions per page"
-                className="w-[64px]"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAGE_SIZE_OPTIONS.map((option) => (
-                  <SelectItem key={option} value={String(option)}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              {panel.error}
+            </p>
+          ) : null}
+
+          {panel.message ? (
+            <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+              {panel.message}
+            </p>
+          ) : null}
+
+          {panel.transactions.length > 0 ? (
+            <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <TransactionsSymbolFilter
+                  symbols={symbols}
+                  value={symbol}
+                  onChange={handleSymbolChange}
+                />
+
+                <Select
+                  value={String(pageSize)}
+                  onValueChange={handlePageSizeChange}
+                >
+                  <SelectTrigger
+                    size="sm"
+                    aria-label="Transactions per page"
+                    className="w-[64px]"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAGE_SIZE_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={String(option)}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : null}
+
+          <TransactionsTable
+            transactions={pageTransactions}
+            onEditJournal={selectTransaction}
+          />
+
+          {pageCount > 1 ? (
+            <Pagination className="mx-0 w-auto justify-end">
+              <PaginationContent className="gap-1">
+                <PaginationItem>
+                  <PaginationPrevious
+                    text=""
+                    aria-disabled={currentPage <= 1}
+                    className={cn(
+                      "cursor-pointer",
+                      currentPage <= 1 && "pointer-events-none opacity-50",
+                    )}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  />
+                </PaginationItem>
+                <PaginationItem>
+                  <span className="px-1 text-sm tabular-nums text-muted-foreground">
+                    {currentPage} / {pageCount}
+                  </span>
+                </PaginationItem>
+                <PaginationItem>
+                  <PaginationNext
+                    text=""
+                    aria-disabled={currentPage >= pageCount}
+                    className={cn(
+                      "cursor-pointer",
+                      currentPage >= pageCount && "pointer-events-none opacity-50",
+                    )}
+                    onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          ) : null}
         </div>
-      ) : null}
-
-      <TransactionsTable
-        transactions={pageTransactions}
-        onEditJournal={setEditing}
-      />
-
-      {pageCount > 1 ? (
-        <Pagination className="mx-0 w-auto justify-end">
-          <PaginationContent className="gap-1">
-            <PaginationItem>
-              <PaginationPrevious
-                text=""
-                aria-disabled={currentPage <= 1}
-                className={cn(
-                  "cursor-pointer",
-                  currentPage <= 1 && "pointer-events-none opacity-50",
-                )}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              />
-            </PaginationItem>
-            <PaginationItem>
-              <span className="px-1 text-sm tabular-nums text-muted-foreground">
-                {currentPage} / {pageCount}
-              </span>
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationNext
-                text=""
-                aria-disabled={currentPage >= pageCount}
-                className={cn(
-                  "cursor-pointer",
-                  currentPage >= pageCount && "pointer-events-none opacity-50",
-                )}
-                onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      ) : null}
-
-      <JournalEntrySheet
-        transaction={editing}
-        open={editing !== null}
-        onOpenChange={(open) => {
-          if (!open) setEditing(null);
-        }}
-      />
-    </div>
+      )}
+    </TransactionJournalSwitcher>
   );
 }
