@@ -507,12 +507,7 @@ export function JournalWorkspace({
             >
               <div className="grid gap-6 xl:grid-cols-2">
                 <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <h2 className="font-medium">Plan</h2>
-                    <span className="text-muted-foreground text-sm">
-                      {draft.plan.length.toLocaleString()} / 10,000
-                    </span>
-                  </div>
+                  <h2 className="font-medium">Plan</h2>
                   <Field>
                     <FieldLabel className="sr-only" htmlFor="journal-plan">
                       Plan
@@ -534,12 +529,7 @@ export function JournalWorkspace({
                 </div>
 
                 <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <h2 className="font-medium">Reflection</h2>
-                    <span className="text-muted-foreground text-sm">
-                      {draft.reflection.length.toLocaleString()} / 10,000
-                    </span>
-                  </div>
+                  <h2 className="font-medium">Reflection</h2>
                   <Field>
                     <FieldLabel className="sr-only" htmlFor="journal-reflection">
                       Reflection

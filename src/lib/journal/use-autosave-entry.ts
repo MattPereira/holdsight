@@ -53,7 +53,9 @@ export function useAutosaveEntry<TDraft, TEntry extends { updatedAt: string }>({
   const [persistedDraft, setPersistedDraft] = useState(() =>
     draftFromEntry(initialEntry),
   );
-  const [status, setStatus] = useState<SaveStatus>("idle");
+  const [status, setStatus] = useState<SaveStatus>(
+    initialEntry ? "saved" : "idle",
+  );
   const [saveError, setSaveError] = useState<string | null>(null);
   const [serverConflict, setServerConflict] = useState<TEntry | null>(null);
   const [retryVersion, setRetryVersion] = useState(0);
@@ -92,7 +94,7 @@ export function useAutosaveEntry<TDraft, TEntry extends { updatedAt: string }>({
     setEntry(initialEntry);
     setDraftState(nextDraft);
     setPersistedDraft(nextDraft);
-    setStatus("idle");
+    setStatus(initialEntry ? "saved" : "idle");
     setSaveError(null);
     setServerConflict(null);
   }
