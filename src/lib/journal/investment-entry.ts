@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, lte, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -131,6 +131,29 @@ export async function getJournalWorkspace(
         )
       : [],
   };
+}
+
+/** Period starts (canonical dates) that already have an entry within [rangeStart, rangeEnd]. */
+export async function getJournalEntryDatesInRange(
+  userId: string,
+  periodType: JournalPeriodType,
+  rangeStart: string,
+  rangeEnd: string,
+): Promise<string[]> {
+  if (!isJournalPeriodType(periodType)) return [];
+
+  const rows = await db
+    .select({ periodStart: investmentJournalEntries.periodStart })
+    .from(investmentJournalEntries)
+    .where(
+      and(
+        eq(investmentJournalEntries.userId, userId),
+        eq(investmentJournalEntries.periodType, periodType),
+        gte(investmentJournalEntries.periodStart, rangeStart),
+        lte(investmentJournalEntries.periodStart, rangeEnd),
+      ),
+    );
+  return rows.map((row) => row.periodStart);
 }
 
 export async function getRecentJournalEntries(

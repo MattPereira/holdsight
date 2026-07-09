@@ -54,9 +54,11 @@ import type {
   InvestmentJournalEntry,
   JournalWorkspace as JournalWorkspaceData,
 } from "@/lib/journal/investment-entry";
-import { periodLabel } from "@/lib/journal/period-label";
+import { journalStripLabel, periodLabel } from "@/lib/journal/period-label";
 import {
   canonicalPeriodStart,
+  JOURNAL_STRIP_MOBILE_SIZE,
+  journalStripMobileVisibleIndices,
   moveJournalPeriod,
   type JournalPeriodType,
 } from "@/lib/journal/periods";
@@ -127,16 +129,87 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
   return <Badge variant="outline">Not saved yet</Badge>;
 }
 
+function JournalPeriodStrip({
+  periodType,
+  selectedDate,
+  todayDate,
+  stripDates,
+  entryDates,
+  onSelect,
+}: {
+  periodType: JournalPeriodType;
+  selectedDate: string;
+  todayDate: string;
+  stripDates: string[];
+  entryDates: string[];
+  onSelect: (date: string) => void;
+}) {
+  const selectedIndex = stripDates.indexOf(selectedDate);
+  const mobileVisible = new Set(
+    journalStripMobileVisibleIndices(
+      stripDates.length,
+      selectedIndex === -1 ? 0 : selectedIndex,
+      JOURNAL_STRIP_MOBILE_SIZE[periodType],
+    ),
+  );
+
+  return (
+    <div
+      className="flex flex-wrap items-center gap-1.5"
+      role="group"
+      aria-label={`Choose a ${PERIOD_UNIT[periodType]}`}
+    >
+      {stripDates.map((date, index) => {
+        const isSelected = date === selectedDate;
+        const isToday = date === todayDate;
+        const hasEntry = entryDates.includes(date);
+        const label = journalStripLabel(periodType, date);
+        return (
+          <Button
+            key={date}
+            type="button"
+            variant={isSelected ? "default" : "outline"}
+            size="sm"
+            aria-current={isSelected ? "date" : undefined}
+            aria-label={`${label.top}${label.bottom ? ` ${label.bottom}` : ""}${hasEntry ? " · entry recorded" : ""}`}
+            className={cn(
+              "relative h-auto flex-col gap-0 px-2 py-1.5 leading-tight",
+              isToday && "ring-2 ring-primary ring-offset-1",
+              !mobileVisible.has(index) && "hidden sm:flex",
+            )}
+            onClick={() => onSelect(date)}
+          >
+            <span className="text-[11px] opacity-80">{label.top}</span>
+            {label.bottom ? (
+              <span className="text-sm font-medium">{label.bottom}</span>
+            ) : null}
+            {hasEntry ? (
+              <span
+                aria-hidden="true"
+                className="absolute -bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full bg-foreground"
+              />
+            ) : null}
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function JournalWorkspace({
   periodType,
   selectedDate,
   initialWorkspace,
   dateWasRequested,
+  stripDates,
+  stripEntryDates,
 }: {
   periodType: JournalPeriodType;
   selectedDate: string;
   initialWorkspace: JournalWorkspaceData;
   dateWasRequested: boolean;
+  stripDates: string[];
+  stripEntryDates: string[];
 }) {
   const router = useRouter();
   const [homeTimezone, setHomeTimezone] = useState(
@@ -243,6 +316,11 @@ export function JournalWorkspace({
       setImageRevision((revision) => revision + 1);
     });
   }
+
+  const todayDate = canonicalPeriodStart(
+    periodType,
+    todayInTimezone(homeTimezone),
+  );
 
   function handleEntryVersionChanged(updatedAt: string, entryId?: string) {
     autosave.syncEntryVersion(updatedAt, entryId, (draft, id) => ({
@@ -364,15 +442,7 @@ export function JournalWorkspace({
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() =>
-                    navigateTo(
-                      periodType,
-                      canonicalPeriodStart(
-                        periodType,
-                        todayInTimezone(homeTimezone),
-                      ),
-                    )
-                  }
+                  onClick={() => navigateTo(periodType, todayDate)}
                 >
                   {periodType === "daily"
                     ? "Today"
@@ -381,6 +451,17 @@ export function JournalWorkspace({
                       : "This month"}
                 </Button>
                 </div>
+
+          <div className={cn(view === "history" && "hidden")}>
+            <JournalPeriodStrip
+              periodType={periodType}
+              selectedDate={selectedDate}
+              todayDate={todayDate}
+              stripDates={stripDates}
+              entryDates={stripEntryDates}
+              onSelect={(date) => navigateTo(periodType, date)}
+            />
+          </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">

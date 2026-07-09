@@ -34,3 +34,26 @@ export function periodLabel(
     year: "numeric",
   });
 }
+
+/** Compact label for a period-navigation strip button. */
+export function journalStripLabel(
+  periodType: JournalPeriodType,
+  periodStart: string,
+): { top: string; bottom?: string } {
+  if (periodType === "daily") {
+    return {
+      top: formatDate(periodStart, { weekday: "short" }),
+      bottom: formatDate(periodStart, { day: "numeric" }),
+    };
+  }
+  if (periodType === "weekly") {
+    const periodEnd = moveJournalPeriod("daily", periodStart, 6);
+    const startMonth = formatDate(periodStart, { month: "short" });
+    const endMonth = formatDate(periodEnd, { month: "short" });
+    const startDay = formatDate(periodStart, { day: "numeric" });
+    const endDay = formatDate(periodEnd, { day: "numeric" });
+    const end = startMonth === endMonth ? endDay : `${endMonth} ${endDay}`;
+    return { top: `${startMonth} ${startDay}–${end}` };
+  }
+  return { top: formatDate(periodStart, { month: "short" }) };
+}

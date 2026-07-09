@@ -123,3 +123,59 @@ export function journalPeriodUtcRange(
     end: localMidnightUtc(nextStart, timeZone),
   };
 }
+
+/** Number of buttons in the period-navigation strip, per period type. */
+export const JOURNAL_STRIP_SIZE: Record<JournalPeriodType, number> = {
+  daily: 7,
+  weekly: 6,
+  monthly: 6,
+};
+
+/** Number of strip buttons kept visible on narrow viewports. */
+export const JOURNAL_STRIP_MOBILE_SIZE: Record<JournalPeriodType, number> = {
+  daily: 5,
+  weekly: 4,
+  monthly: 4,
+};
+
+/**
+ * Dates for the period-navigation strip. Daily always shows the Mon–Sun
+ * week containing the selection; weekly/monthly show a window centered on
+ * the selection (leaning one extra period into the future).
+ */
+export function journalStripDates(
+  periodType: JournalPeriodType,
+  selectedDate: string,
+): string[] {
+  const canonicalSelected = canonicalPeriodStart(periodType, selectedDate);
+  if (periodType === "daily") {
+    const weekStart = canonicalPeriodStart("weekly", canonicalSelected);
+    return Array.from({ length: JOURNAL_STRIP_SIZE.daily }, (_, index) =>
+      moveJournalPeriod("daily", weekStart, index),
+    );
+  }
+  const size = JOURNAL_STRIP_SIZE[periodType];
+  const before = Math.floor((size - 1) / 2);
+  return Array.from({ length: size }, (_, index) =>
+    moveJournalPeriod(periodType, canonicalSelected, index - before),
+  );
+}
+
+/**
+ * Indices to keep visible on narrow viewports: the `count` indices closest
+ * to `selectedIndex`. Ties are broken toward the later index, matching the
+ * strip's own future-leaning center (see journalStripDates).
+ */
+export function journalStripMobileVisibleIndices(
+  length: number,
+  selectedIndex: number,
+  count: number,
+): number[] {
+  const indices = Array.from({ length }, (_, index) => index);
+  indices.sort((a, b) => {
+    const distanceDiff =
+      Math.abs(a - selectedIndex) - Math.abs(b - selectedIndex);
+    return distanceDiff !== 0 ? distanceDiff : b - a;
+  });
+  return indices.slice(0, count).sort((a, b) => a - b);
+}

@@ -1,6 +1,7 @@
 import { JournalWorkspace } from "@/components/journal/journal-workspace";
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
+  getJournalEntryDatesInRange,
   getJournalWorkspace,
   todayInTimezone,
 } from "@/lib/journal/investment-entry";
@@ -8,6 +9,7 @@ import {
   canonicalPeriodStart,
   isCalendarDate,
   isJournalPeriodType,
+  journalStripDates,
 } from "@/lib/journal/periods";
 
 export default async function JournalPage({
@@ -45,6 +47,14 @@ export default async function JournalPage({
     workspace = await getJournalWorkspace(userId, periodType, selectedDate);
   }
 
+  const stripDates = journalStripDates(periodType, selectedDate);
+  const stripEntryDates = await getJournalEntryDatesInRange(
+    userId,
+    periodType,
+    stripDates[0],
+    stripDates[stripDates.length - 1],
+  );
+
   return (
     <JournalWorkspace
       key={`${periodType}:${selectedDate}`}
@@ -52,6 +62,8 @@ export default async function JournalPage({
       selectedDate={selectedDate}
       initialWorkspace={workspace}
       dateWasRequested={hasValidRequestedDate}
+      stripDates={stripDates}
+      stripEntryDates={stripEntryDates}
     />
   );
 }
