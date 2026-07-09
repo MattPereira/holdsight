@@ -307,17 +307,17 @@ export function JournalImagesSection({
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="aspect-square w-full rounded-md" />
+            <Skeleton key={i} className="aspect-video w-full rounded-md" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
           {images.map((image, index) => (
             <div
               key={image.id}
-              className="group relative aspect-square overflow-hidden rounded-md border"
+              className="group relative aspect-video overflow-hidden rounded-md border"
             >
               <button
                 type="button"
@@ -347,7 +347,7 @@ export function JournalImagesSection({
           {pending.map((item) => (
             <div
               key={item.id}
-              className="relative aspect-square overflow-hidden rounded-md border"
+              className="relative aspect-video overflow-hidden rounded-md border"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img

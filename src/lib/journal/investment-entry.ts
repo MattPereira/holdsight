@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, gte, lt, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -39,26 +39,6 @@ export type SaveJournalResult =
   | { status: "saved"; entry: InvestmentJournalEntry }
   | { status: "conflict"; entry: InvestmentJournalEntry }
   | { status: "error"; message: string };
-
-export type RecentJournalEntry = {
-  id: string;
-  periodStart: string;
-  hasPlan: boolean;
-  hasReflection: boolean;
-  hasImages: boolean;
-  updatedAt: string;
-};
-
-export type RecentJournalEntriesPage = {
-  entries: RecentJournalEntry[];
-  nextCursor: RecentJournalEntriesCursor | null;
-};
-
-export type RecentJournalEntriesCursor = { updatedAt: string; id: string };
-
-const RECENT_JOURNAL_PAGE_SIZE = 10;
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function serializeEntry(
   entry: typeof investmentJournalEntries.$inferSelect,
@@ -154,80 +134,6 @@ export async function getJournalEntryDatesInRange(
       ),
     );
   return rows.map((row) => row.periodStart);
-}
-
-export async function getRecentJournalEntries(
-  userId: string,
-  periodType: JournalPeriodType,
-  cursor?: RecentJournalEntriesCursor | null,
-): Promise<RecentJournalEntriesPage> {
-  if (!isJournalPeriodType(periodType)) {
-    return { entries: [], nextCursor: null };
-  }
-
-  const cursorDate = cursor ? new Date(cursor.updatedAt) : null;
-  const validCursor =
-    cursor &&
-    cursorDate &&
-    !Number.isNaN(cursorDate.valueOf()) &&
-    UUID_PATTERN.test(cursor.id)
-      ? cursor
-      : null;
-  const rows = await db
-    .select({
-      id: investmentJournalEntries.id,
-      periodStart: investmentJournalEntries.periodStart,
-      plan: investmentJournalEntries.plan,
-      reflection: investmentJournalEntries.reflection,
-      updatedAt: investmentJournalEntries.updatedAt,
-      hasImages: sql<boolean>`exists (
-        select 1
-        from investment_journal_entry_images image
-        where image.journal_entry_id = ${investmentJournalEntries.id}
-          and image.user_id = ${userId}
-      )`,
-    })
-    .from(investmentJournalEntries)
-    .where(
-      and(
-        eq(investmentJournalEntries.userId, userId),
-        eq(investmentJournalEntries.periodType, periodType),
-        validCursor
-          ? or(
-              lt(investmentJournalEntries.updatedAt, new Date(validCursor.updatedAt)),
-              and(
-                eq(
-                  investmentJournalEntries.updatedAt,
-                  new Date(validCursor.updatedAt),
-                ),
-                lt(investmentJournalEntries.id, validCursor.id),
-              ),
-            )
-          : undefined,
-      ),
-    )
-    .orderBy(
-      desc(investmentJournalEntries.updatedAt),
-      desc(investmentJournalEntries.id),
-    )
-    .limit(RECENT_JOURNAL_PAGE_SIZE + 1);
-
-  const pageRows = rows.slice(0, RECENT_JOURNAL_PAGE_SIZE);
-  const lastRow = pageRows.at(-1);
-  return {
-    entries: pageRows.map((row) => ({
-      id: row.id,
-      periodStart: row.periodStart,
-      hasPlan: Boolean(row.plan),
-      hasReflection: Boolean(row.reflection),
-      hasImages: row.hasImages,
-      updatedAt: row.updatedAt.toISOString(),
-    })),
-    nextCursor:
-      rows.length > RECENT_JOURNAL_PAGE_SIZE && lastRow
-        ? { updatedAt: lastRow.updatedAt.toISOString(), id: lastRow.id }
-        : null,
-  };
 }
 
 export async function setHomeTimezone(

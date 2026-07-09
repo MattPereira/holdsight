@@ -8,8 +8,10 @@ import {
   RiCalendarLine,
   RiDeleteBinLine,
   RiErrorWarningLine,
+  RiLoader4Line,
   RiRefreshLine,
   RiSaveLine,
+  RiTimeLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
 
@@ -19,7 +21,6 @@ import {
   saveJournalEntry,
 } from "@/app/(app)/journal/actions";
 import { JournalImagesSection } from "@/components/journal/journal-images-section";
-import { RecentJournalEntries } from "@/components/journal/recent-journal-entries";
 import { JournalTransactionContext } from "@/components/journal/journal-transaction-context";
 import {
   AlertDialog,
@@ -72,7 +73,7 @@ import { useUnsavedChangesGuard } from "@/lib/journal/use-unsaved-changes-guard"
 import { cn } from "@/lib/utils";
 
 type Draft = { plan: string; reflection: string };
-type JournalView = "write" | "history" | "transactions";
+type JournalView = "write" | "transactions";
 
 const MAX_LENGTH = 10_000;
 const UNSAVED_CHANGES_MESSAGE =
@@ -107,14 +108,19 @@ function sameDraft(left: Draft, right: Draft): boolean {
 
 function SaveIndicator({ status }: { status: SaveStatus }) {
   if (status === "saving") {
-    return <Badge variant="secondary">Saving…</Badge>;
+    return (
+      <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
+        <RiLoader4Line className="size-4 animate-spin" />
+        Saving…
+      </span>
+    );
   }
   if (status === "saved") {
     return (
-      <Badge variant="secondary">
-        <RiSaveLine data-icon="inline-start" />
+      <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
+        <RiSaveLine className="size-4" />
         Saved
-      </Badge>
+      </span>
     );
   }
   if (status === "error") {
@@ -128,7 +134,12 @@ function SaveIndicator({ status }: { status: SaveStatus }) {
   if (status === "conflict") {
     return <Badge variant="destructive">Edit conflict</Badge>;
   }
-  return <Badge variant="outline">Not saved yet</Badge>;
+  return (
+    <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
+      <RiTimeLine className="size-4" />
+      Not saved yet
+    </span>
+  );
 }
 
 function JournalPeriodStrip({
@@ -229,7 +240,6 @@ export function JournalWorkspace({
   const [confirmingTimezone, startConfirmingTimezone] = useTransition();
   const [imageMutationPending, setImageMutationPending] = useState(false);
   const [imageRevision, setImageRevision] = useState(0);
-  const [historyRevision, setHistoryRevision] = useState(0);
   const [deleting, startDeleting] = useTransition();
   const [view, setView] = useState<JournalView>("write");
   const imageEndpoint = `/api/investment-journal/images?type=${periodType}&date=${selectedDate}`;
@@ -250,7 +260,6 @@ export function JournalWorkspace({
         expectedUpdatedAt: currentEntry?.updatedAt ?? null,
         overwrite,
       }),
-    onEntryChange: () => setHistoryRevision((revision) => revision + 1),
   });
   const { draft, entry, status, saveError } = autosave;
 
@@ -347,14 +356,17 @@ export function JournalWorkspace({
                 navigateTo(value as JournalPeriodType, selectedDate)
               }
             >
-              <TabsList aria-label="Journal Period type">
+              <TabsList
+                aria-label="Journal Period type"
+                className="grid grid-cols-3"
+              >
                 <TabsTrigger value="daily">Daily</TabsTrigger>
                 <TabsTrigger value="weekly">Weekly</TabsTrigger>
                 <TabsTrigger value="monthly">Monthly</TabsTrigger>
               </TabsList>
             </Tabs>
             <Button
-              variant="outline"
+              variant="secondary"
               size="icon"
               aria-label="Jump to a specific date"
               onClick={() => dateInputRef.current?.showPicker?.()}
@@ -421,16 +433,11 @@ export function JournalWorkspace({
         </Card>
       ) : (
         <>
-          <div
-            className={cn(
-              "flex items-center gap-2",
-              view === "history" && "hidden",
-            )}
-          >
+          <div className="flex items-center gap-2">
             <Button
-              variant="outline"
+              variant="secondary"
               size="icon"
-              className="shrink-0"
+              className="h-12 shrink-0"
               aria-label={`Previous ${JOURNAL_STRIP_SIZE[periodType]} ${PERIOD_UNIT[periodType]}s`}
               onClick={() =>
                 navigateTo(
@@ -453,9 +460,9 @@ export function JournalWorkspace({
               onSelect={(date) => navigateTo(periodType, date)}
             />
             <Button
-              variant="outline"
+              variant="secondary"
               size="icon"
-              className="shrink-0"
+              className="h-12 shrink-0"
               aria-label={`Next ${JOURNAL_STRIP_SIZE[periodType]} ${PERIOD_UNIT[periodType]}s`}
               onClick={() =>
                 navigateTo(
@@ -480,22 +487,51 @@ export function JournalWorkspace({
               >
                 <TabsList aria-label="Journal view">
                   <TabsTrigger value="write">Record</TabsTrigger>
-                  <TabsTrigger value="history">History</TabsTrigger>
                   <TabsTrigger value="transactions">Trades</TabsTrigger>
                 </TabsList>
               </Tabs>
-              {view === "history" ? (
-                <span className="text-muted-foreground text-sm">
-                  Recent {periodType} journal entries
-                </span>
-              ) : null}
+              {view === "write" ? <SaveIndicator status={status} /> : null}
               {view === "transactions" ? (
                 <span className="text-muted-foreground text-sm">
                   Trades for {periodLabel(periodType, selectedDate)}
                 </span>
               ) : null}
             </div>
-            {view === "write" ? <SaveIndicator status={status} /> : null}
+            {view === "write" && entry ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-muted-foreground"
+                    disabled={deleting || warnBeforeLeaving}
+                    aria-label="Delete entry"
+                  >
+                    <RiDeleteBinLine />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>
+                      Delete this Investment Journal Entry?
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This explicitly removes the entry for {selectedDate}.
+                      This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      variant="destructive"
+                      onClick={removeEntry}
+                    >
+                      Delete entry
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : null}
           </div>
 
           <div className="flex flex-col gap-6">
@@ -506,7 +542,7 @@ export function JournalWorkspace({
               )}
             >
               <div className="grid gap-6 xl:grid-cols-2">
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2">
                   <h2 className="font-medium">Plan</h2>
                   <Field>
                     <FieldLabel className="sr-only" htmlFor="journal-plan">
@@ -528,7 +564,7 @@ export function JournalWorkspace({
                   </Field>
                 </div>
 
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-2">
                   <h2 className="font-medium">Reflection</h2>
                   <Field>
                     <FieldLabel className="sr-only" htmlFor="journal-reflection">
@@ -563,44 +599,6 @@ export function JournalWorkspace({
                 onPendingChange={setImageMutationPending}
               />
 
-              {entry ? (
-                <div className="flex justify-end">
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        className="text-muted-foreground"
-                        disabled={deleting || warnBeforeLeaving}
-                        aria-label="Delete entry"
-                      >
-                        <RiDeleteBinLine />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>
-                          Delete this Investment Journal Entry?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This explicitly removes the entry for {selectedDate}.
-                          This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          variant="destructive"
-                          onClick={removeEntry}
-                        >
-                          Delete entry
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              ) : null}
-
               {status === "error" ? (
             <Card>
               <CardHeader>
@@ -634,17 +632,6 @@ export function JournalWorkspace({
             </Card>
               ) : null}
             </div>
-
-            {view === "history" ? (
-              <RecentJournalEntries
-                periodType={periodType}
-                revision={historyRevision}
-                onSelect={(periodStart) => {
-                  setView("write");
-                  navigateTo(periodType, periodStart);
-                }}
-              />
-            ) : null}
 
             {view === "transactions" ? (
               <JournalTransactionContext
