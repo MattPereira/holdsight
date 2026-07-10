@@ -1,56 +1,25 @@
 import "server-only";
 
-import { revalidatePath } from "next/cache";
-
-import { getUserEvmAccounts } from "@/lib/evm/accounts";
-import { syncEvmWalletBalances } from "@/lib/evm/balances";
-import { ensureUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
-import { syncHyperCoreAccounts } from "@/lib/hyper-core/balances";
-import { getUserLighterAccounts } from "@/lib/lighter/accounts";
-import { syncLighterAccounts } from "@/lib/lighter/balances";
-import { syncUserKrakenAccounts } from "@/lib/exchange/kraken/balances";
-import { syncUserBrokerageBalances } from "@/lib/brokerage/balances";
 import { syncUserDepositoryBalances } from "@/lib/depository/balances";
 import { syncUserCreditCardAccounts } from "@/lib/credit-card/balances";
+import { portfolioProviderRegistry } from "@/lib/portfolio/providers/registry";
 import {
   getCurrentPortfolioHomeData,
   type PortfolioHomeData,
 } from "@/lib/portfolio/page-data";
 
-function revalidatePortfolioPaths() {
-  revalidatePath("/");
-  revalidatePath("/wallets");
-  revalidatePath("/exchange");
-  revalidatePath("/brokerages");
-}
-
 export async function refreshPortfolioForUser(
   userId: string,
 ): Promise<PortfolioHomeData> {
-  const syncWallets = async () => {
-    const wallets = await getUserEvmAccounts(userId);
-    if (wallets.length === 0) return;
-
-    await syncEvmWalletBalances(wallets);
-
-    const hyperCoreAccounts = await ensureUserHyperCoreAccounts(
-      userId,
-      wallets,
-    );
-    await syncHyperCoreAccounts(hyperCoreAccounts);
-    const lighterAccounts = await getUserLighterAccounts(userId);
-    await syncLighterAccounts(userId, lighterAccounts);
-  };
-
+  // The wallet/kraken/brokerage providers and portfolio-path revalidation are
+  // owned by the registry's refreshAll. Depository and credit-card balances stay
+  // outside the registry (balance-only, no sync phase), so they're refreshed
+  // alongside it here.
   await Promise.all([
-    syncWallets(),
-    syncUserKrakenAccounts(userId),
-    syncUserBrokerageBalances(userId),
+    portfolioProviderRegistry.refreshAll(userId),
     syncUserDepositoryBalances(userId),
     syncUserCreditCardAccounts(userId),
   ]);
-
-  revalidatePortfolioPaths();
 
   return getCurrentPortfolioHomeData(userId);
 }

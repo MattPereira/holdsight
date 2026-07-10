@@ -43,7 +43,6 @@ import {
 import {
   getCurrentUserKrakenBalances,
   syncKrakenAccounts,
-  syncUserKrakenAccounts,
 } from "@/lib/exchange/kraken/balances";
 import {
   getCurrentKrakenTransactions,
@@ -133,9 +132,9 @@ import {
 } from "@/lib/manual-balance/items";
 import {
   emptyPortfolioHomeData,
-  getCurrentPortfolioHomeData,
   type PortfolioHomeData,
 } from "@/lib/portfolio/page-data";
+import { refreshPortfolioForUser } from "@/lib/portfolio/refresh";
 import type { BalancesResult } from "@/lib/portfolio/types";
 import { isSchwabConfigured } from "@/lib/brokerage/providers/schwab/config";
 
@@ -1490,28 +1489,5 @@ export async function loadPortfolioPageData(): Promise<PortfolioHomeData> {
   const userId = await getCurrentUserId();
   if (!userId) return emptyPortfolioHomeData();
 
-  const syncWallets = async () => {
-    const wallets = await getUserEvmAccounts(userId);
-    if (wallets.length === 0) return;
-
-    await syncEvmWalletBalances(wallets);
-
-    const hyperCoreAccounts = await ensureUserHyperCoreAccounts(
-      userId,
-      wallets,
-    );
-    await syncHyperCoreAccounts(hyperCoreAccounts);
-    const lighterAccounts = await getUserLighterAccounts(userId);
-    await syncLighterAccounts(userId, lighterAccounts);
-  };
-
-  await Promise.all([
-    syncWallets(),
-    syncUserKrakenAccounts(userId),
-    syncUserBrokerageBalances(userId),
-    syncUserDepositoryBalances(userId),
-    syncUserCreditCardAccounts(userId),
-  ]);
-
-  return getCurrentPortfolioHomeData(userId);
+  return refreshPortfolioForUser(userId);
 }
