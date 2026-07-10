@@ -1,27 +1,12 @@
 import "server-only";
 
 import type { TransactionHistoryStatus } from "@/components/accounts/transactions/types";
-import {
-  getCurrentBrokerageTransactions,
-  getBrokerageTransactionImportStatus,
-} from "@/lib/brokerage/transactions";
-import {
-  getCurrentKrakenTransactions,
-  getKrakenTransactionHistoryStatus,
-} from "@/lib/exchange/kraken/transactions";
-import { getUserEvmAccounts } from "@/lib/evm/accounts";
-import { getUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
-import { getUserLighterAccounts } from "@/lib/lighter/accounts";
 import type { TransactionSyncPhase } from "@/lib/investment-transactions/ingestion";
-import { withTransactionJournalSummaries } from "@/lib/journal/transaction-entry";
 import type {
   InvestmentTransactionListItem,
   TransactionExecutedAtRange,
 } from "@/lib/investment-transactions/list-item";
-import {
-  getCurrentWalletTransactions,
-  getWalletTransactionHistoryStatus,
-} from "@/lib/wallets/transactions";
+import { portfolioProviderRegistry } from "@/lib/portfolio/providers/registry";
 
 const SYNC_PHASE_RANK: Record<TransactionSyncPhase, number> = {
   backfilling: 0,
@@ -102,47 +87,7 @@ export function mergePortfolioTransactions(
 export async function getCurrentPortfolioTransactions(
   userId: string,
 ): Promise<PortfolioTransactionsSnapshot> {
-  const [wallets, hyperCoreAccounts, lighterAccounts] = await Promise.all([
-    getUserEvmAccounts(userId),
-    getUserHyperCoreAccounts(userId),
-    getUserLighterAccounts(userId),
-  ]);
-
-  const [
-    walletTransactions,
-    walletStatus,
-    krakenTransactions,
-    krakenStatus,
-    brokerageTransactions,
-    brokerageStatus,
-  ] = await Promise.all([
-    getCurrentWalletTransactions(userId),
-    getWalletTransactionHistoryStatus(userId, wallets, hyperCoreAccounts, lighterAccounts),
-    getCurrentKrakenTransactions(userId),
-    getKrakenTransactionHistoryStatus(userId),
-    getCurrentBrokerageTransactions(userId),
-    getBrokerageTransactionImportStatus(userId),
-  ]);
-
-  const snapshot = mergePortfolioTransactions(
-    [walletTransactions, krakenTransactions, brokerageTransactions],
-    {
-      walletPhase: walletStatus.phase,
-      walletHasMore: walletStatus.hasMore,
-      walletLatestTransactionUpdatedAt: walletStatus.latestTransactionUpdatedAt,
-      krakenPhase: krakenStatus.phase,
-      krakenHasMore: krakenStatus.hasMore,
-      brokerageIsSyncing: brokerageStatus.isSyncing,
-    },
-  );
-
-  return {
-    ...snapshot,
-    transactions: await withTransactionJournalSummaries(
-      userId,
-      snapshot.transactions,
-    ),
-  };
+  return portfolioProviderRegistry.getPortfolioTransactions(userId);
 }
 
 /** Uses the Portfolio feed's source and visibility rules within one UTC range. */
@@ -150,15 +95,7 @@ export async function getPortfolioTransactionsInRange(
   userId: string,
   range: TransactionExecutedAtRange,
 ): Promise<InvestmentTransactionListItem[]> {
-  const lists = await Promise.all([
-    getCurrentWalletTransactions(userId, range),
-    getCurrentKrakenTransactions(userId, range),
-    getCurrentBrokerageTransactions(userId, range),
-  ]);
-  const transactions = lists
-    .flat()
-    .sort((a, b) => b.executedAt.localeCompare(a.executedAt));
-  return withTransactionJournalSummaries(userId, transactions);
+  return portfolioProviderRegistry.getTransactionsInRange(userId, range);
 }
 
 export function emptyPortfolioTransactionsSnapshot(): PortfolioTransactionsSnapshot {
