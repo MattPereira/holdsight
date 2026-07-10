@@ -1,9 +1,8 @@
 import "server-only";
 
-import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { investmentAccounts } from "@/db/schema/investment-accounts";
 import { investmentTransactions } from "@/db/schema/investment-transactions";
 import {
   getInvestmentTransactionSyncState,
@@ -18,6 +17,7 @@ import type {
   InvestmentTransactionListItem,
   TransactionExecutedAtRange,
 } from "@/lib/investment-transactions/list-item";
+import { getProviderTransactions } from "@/lib/investment-transactions/transaction-read";
 
 import {
   getUserKrakenAccounts,
@@ -81,10 +81,6 @@ export type KrakenTransactionSyncPageResult = {
   phase: KrakenTransactionCheckpoint["phase"];
   shouldContinue: boolean;
 };
-
-function numberOrNull(value: string | null): number | null {
-  return value === null ? null : Number(value);
-}
 
 function assetPairForTrade(
   pairName: string | undefined,
@@ -318,48 +314,11 @@ export async function getCurrentKrakenTransactions(
   userId: string,
   range?: TransactionExecutedAtRange,
 ): Promise<CurrentKrakenTransaction[]> {
-  const rows = await db
-    .select({
-      id: investmentTransactions.id,
-      investmentAccountId: investmentTransactions.investmentAccountId,
-      accountLabel: investmentAccounts.label,
-      sourceTransactionId: investmentTransactions.sourceTransactionId,
-      sourceAccountId: investmentTransactions.sourceAccountId,
-      executedAt: investmentTransactions.executedAt,
-      settledAt: investmentTransactions.settledAt,
-      kind: investmentTransactions.kind,
-      side: investmentTransactions.side,
-      baseAssetSymbol: investmentTransactions.baseAssetSymbol,
-      baseAssetId: investmentTransactions.baseAssetId,
-      baseAmount: investmentTransactions.baseAmount,
-      quoteAssetSymbol: investmentTransactions.quoteAssetSymbol,
-      quoteAmount: investmentTransactions.quoteAmount,
-      priceQuote: investmentTransactions.priceQuote,
-      valueUsd: investmentTransactions.valueUsd,
-      feeAmount: investmentTransactions.feeAmount,
-      feeAssetSymbol: investmentTransactions.feeAssetSymbol,
-      status: investmentTransactions.status,
-    })
-    .from(investmentTransactions)
-    .innerJoin(investmentAccounts, eq(investmentAccounts.id, investmentTransactions.investmentAccountId))
-    .where(and(
-      eq(investmentTransactions.userId, userId),
-      eq(investmentTransactions.sourceProvider, KRAKEN_PROVIDER),
-      range ? gte(investmentTransactions.executedAt, range.start) : undefined,
-      range ? lt(investmentTransactions.executedAt, range.end) : undefined,
-    ))
-    .orderBy(desc(investmentTransactions.executedAt));
-
-  return rows.map((row) => ({
-    ...row,
-    executedAt: row.executedAt.toISOString(),
-    settledAt: row.settledAt?.toISOString() ?? null,
-    baseAmount: numberOrNull(row.baseAmount),
-    quoteAmount: numberOrNull(row.quoteAmount),
-    priceQuote: numberOrNull(row.priceQuote),
-    valueUsd: numberOrNull(row.valueUsd),
-    feeAmount: numberOrNull(row.feeAmount),
-  }));
+  return getProviderTransactions({
+    userId,
+    sourceProvider: KRAKEN_PROVIDER,
+    range,
+  });
 }
 
 export async function getKrakenTransactionHistoryStatus(

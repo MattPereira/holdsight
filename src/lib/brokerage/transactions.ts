@@ -1,17 +1,13 @@
 import "server-only";
 
-import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { InvestmentTransaction, Security } from "plaid";
 
 import { db } from "@/db";
-import {
-  brokerageAccounts,
-  investmentAccounts,
-} from "@/db/schema/investment-accounts";
+import { brokerageAccounts } from "@/db/schema/investment-accounts";
 import {
   brokerageTransactionDetails,
   investmentTransactionSyncs,
-  investmentTransactions,
 } from "@/db/schema/investment-transactions";
 import type { SavedBrokerageAccount } from "@/lib/brokerage/accounts";
 import {
@@ -28,40 +24,21 @@ import {
   type NormalizedBrokerageTransactionDetails,
   type NormalizedInvestmentTransaction,
 } from "@/lib/investment-transactions/ingestion";
+import type { TransactionExecutedAtRange } from "@/lib/investment-transactions/list-item";
+import {
+  getProviderTransactions,
+  type ProviderTransactionBrokerageDetail,
+  type ProviderTransactionRow,
+} from "@/lib/investment-transactions/transaction-read";
 import { decrypt } from "@/lib/plaid/crypto";
 import { getUserBrokeragePlaidItems } from "@/lib/plaid/items";
-import type { TransactionExecutedAtRange } from "@/lib/investment-transactions/list-item";
 
 const PLAID_PROVIDER = "plaid";
 const PLAID_HISTORY_LOOKBACK_DAYS = 730;
 const INCREMENTAL_SYNC_OVERLAP_DAYS = 7;
 
-export type CurrentBrokerageTransaction = {
-  id: string;
-  investmentAccountId: string;
-  accountLabel: string | null;
-  sourceTransactionId: string;
-  sourceAccountId: string | null;
-  executedAt: string;
-  settledAt: string | null;
-  kind: InvestmentTransactionKind;
-  side: InvestmentTransactionSide;
-  baseAssetSymbol: string | null;
-  baseAssetId: string | null;
-  baseAmount: number | null;
-  quoteAssetSymbol: string | null;
-  quoteAmount: number | null;
-  priceQuote: number | null;
-  valueUsd: number | null;
-  feeAmount: number | null;
-  feeAssetSymbol: string | null;
-  status: InvestmentTransactionStatus;
-  externalAccountId: string | null;
-  securityId: string | null;
-  plaidType: string | null;
-  plaidSubtype: string | null;
-  cancelTransactionId: string | null;
-};
+export type CurrentBrokerageTransaction = ProviderTransactionRow &
+  ProviderTransactionBrokerageDetail;
 
 type BrokeragePageCursor = {
   startDate: string;
@@ -83,14 +60,6 @@ export type BrokerageTransactionSyncPageResult = {
 export type BrokerageTransactionImportStatus = {
   isSyncing: boolean;
 };
-
-function numberOrNull(value: string | null): number | null {
-  return value === null ? null : Number(value);
-}
-
-function isoOrNull(value: Date | null): string | null {
-  return value === null ? null : value.toISOString();
-}
 
 function transactionDate(value: string): Date {
   return new Date(`${value}T00:00:00.000Z`);
@@ -387,52 +356,19 @@ export async function getCurrentBrokerageTransactions(
   userId: string,
   range?: TransactionExecutedAtRange,
 ): Promise<CurrentBrokerageTransaction[]> {
-  const rows = await db
-    .select({
-      id: investmentTransactions.id,
-      investmentAccountId: investmentTransactions.investmentAccountId,
-      accountLabel: investmentAccounts.label,
-      sourceTransactionId: investmentTransactions.sourceTransactionId,
-      sourceAccountId: investmentTransactions.sourceAccountId,
-      executedAt: investmentTransactions.executedAt,
-      settledAt: investmentTransactions.settledAt,
-      kind: investmentTransactions.kind,
-      side: investmentTransactions.side,
-      baseAssetSymbol: investmentTransactions.baseAssetSymbol,
-      baseAssetId: investmentTransactions.baseAssetId,
-      baseAmount: investmentTransactions.baseAmount,
-      quoteAssetSymbol: investmentTransactions.quoteAssetSymbol,
-      quoteAmount: investmentTransactions.quoteAmount,
-      priceQuote: investmentTransactions.priceQuote,
-      valueUsd: investmentTransactions.valueUsd,
-      feeAmount: investmentTransactions.feeAmount,
-      feeAssetSymbol: investmentTransactions.feeAssetSymbol,
-      status: investmentTransactions.status,
-      externalAccountId: brokerageTransactionDetails.externalAccountId,
-      securityId: brokerageTransactionDetails.securityId,
-      plaidType: brokerageTransactionDetails.plaidType,
-      plaidSubtype: brokerageTransactionDetails.plaidSubtype,
-      cancelTransactionId: brokerageTransactionDetails.cancelTransactionId,
-    })
-    .from(investmentTransactions)
-    .innerJoin(brokerageTransactionDetails, eq(brokerageTransactionDetails.transactionId, investmentTransactions.id))
-    .innerJoin(investmentAccounts, eq(investmentAccounts.id, investmentTransactions.investmentAccountId))
-    .where(and(
-      eq(investmentTransactions.userId, userId),
-      eq(investmentTransactions.sourceProvider, PLAID_PROVIDER),
-      range ? gte(investmentTransactions.executedAt, range.start) : undefined,
-      range ? lt(investmentTransactions.executedAt, range.end) : undefined,
-    ))
-    .orderBy(desc(investmentTransactions.executedAt));
-
-  return rows.map((row) => ({
-    ...row,
-    executedAt: row.executedAt.toISOString(),
-    settledAt: isoOrNull(row.settledAt),
-    baseAmount: numberOrNull(row.baseAmount),
-    quoteAmount: numberOrNull(row.quoteAmount),
-    priceQuote: numberOrNull(row.priceQuote),
-    valueUsd: numberOrNull(row.valueUsd),
-    feeAmount: numberOrNull(row.feeAmount),
-  }));
+  return getProviderTransactions({
+    userId,
+    sourceProvider: PLAID_PROVIDER,
+    range,
+    detail: {
+      table: brokerageTransactionDetails,
+      columns: {
+        externalAccountId: brokerageTransactionDetails.externalAccountId,
+        securityId: brokerageTransactionDetails.securityId,
+        plaidType: brokerageTransactionDetails.plaidType,
+        plaidSubtype: brokerageTransactionDetails.plaidSubtype,
+        cancelTransactionId: brokerageTransactionDetails.cancelTransactionId,
+      },
+    },
+  });
 }
