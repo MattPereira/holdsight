@@ -1,6 +1,7 @@
 import "server-only";
 
 import { desc, eq } from "drizzle-orm";
+import { cache } from "react";
 
 import { db } from "@/db";
 import {
@@ -426,36 +427,36 @@ function dedupeCashBalances(
   return deduped;
 }
 
-export async function getCurrentBrokerageBalances(
-  userId: string,
-): Promise<CurrentBrokerageAccount[]> {
-  const accounts = await getUserBrokerageAccounts(userId);
-  const results: CurrentBrokerageAccount[] = [];
+export const getCurrentBrokerageBalances = cache(
+  async (userId: string): Promise<CurrentBrokerageAccount[]> => {
+    const accounts = await getUserBrokerageAccounts(userId);
+    const results: CurrentBrokerageAccount[] = [];
 
-  for (const account of accounts) {
-    const rows = await db
-      .select({
-        sourceBalanceId: investmentBalances.sourceBalanceId,
-        symbol: investmentBalances.symbol,
-        name: investmentBalances.name,
-        assetClass: investmentBalances.assetClass,
-        amount: investmentBalances.amount,
-        priceUsd: investmentBalances.priceUsd,
-        valueUsd: investmentBalances.valueUsd,
-        costBasisUsd: investmentBalances.costBasisUsd,
-      })
-      .from(investmentBalances)
-      .where(eq(investmentBalances.investmentAccountId, account.id))
-      .orderBy(desc(investmentBalances.valueUsd));
+    for (const account of accounts) {
+      const rows = await db
+        .select({
+          sourceBalanceId: investmentBalances.sourceBalanceId,
+          symbol: investmentBalances.symbol,
+          name: investmentBalances.name,
+          assetClass: investmentBalances.assetClass,
+          amount: investmentBalances.amount,
+          priceUsd: investmentBalances.priceUsd,
+          valueUsd: investmentBalances.valueUsd,
+          costBasisUsd: investmentBalances.costBasisUsd,
+        })
+        .from(investmentBalances)
+        .where(eq(investmentBalances.investmentAccountId, account.id))
+        .orderBy(desc(investmentBalances.valueUsd));
 
-    results.push({
-      ...account,
-      balances: dedupeCashBalances(
-        rows.map(toBrokerageBalance),
-        account.externalAccountId,
-      ),
-    });
-  }
+      results.push({
+        ...account,
+        balances: dedupeCashBalances(
+          rows.map(toBrokerageBalance),
+          account.externalAccountId,
+        ),
+      });
+    }
 
-  return results;
-}
+    return results;
+  },
+);

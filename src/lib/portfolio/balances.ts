@@ -14,25 +14,12 @@ import {
   getUserCreditCardAccounts,
   type CreditCardAccountRow,
 } from "@/lib/credit-card/accounts";
-import { getUserKrakenAccounts } from "@/lib/exchange/kraken/accounts";
-import { getCurrentKrakenBalances } from "@/lib/exchange/kraken/balances";
-import { getCurrentEvmBalances } from "@/lib/evm/balances";
-import { getUserEvmAccounts } from "@/lib/evm/accounts";
-import { ensureUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
-import {
-  getCurrentHyperCoreBalances,
-  getCurrentHyperCoreSpotBalancesByAccountId,
-} from "@/lib/hyper-core/balances";
 import {
   getUserManualBalanceItems,
   type ManualBalanceItemRow,
 } from "@/lib/manual-balance/items";
-import { mergeWalletBalanceResults } from "@/lib/wallets/balances";
-import { getUserLighterAccounts } from "@/lib/lighter/accounts";
-import {
-  getCurrentLighterBalances,
-  getCurrentLighterBalancesForEvmAccount,
-} from "@/lib/lighter/balances";
+import { krakenAdapter } from "@/lib/portfolio/providers/kraken-adapter";
+import { portfolioProviderRegistry } from "@/lib/portfolio/providers/registry";
 import type { BalancesResult } from "@/lib/portfolio/types";
 
 export type CurrentPortfolioBalanceSnapshot = {
@@ -44,37 +31,6 @@ export type CurrentPortfolioBalanceSnapshot = {
   creditCardAccounts: CreditCardAccountRow[];
   manualItems: ManualBalanceItemRow[];
 };
-
-function brokerageAccountToBalancesResult(
-  account: CurrentBrokerageAccount,
-): BalancesResult {
-  return {
-    status: "ready",
-    address: account.label ?? account.institutionName ?? account.brokerage,
-    balances: account.balances.map((balance) => {
-      const isCash = balance.assetClass === "cash";
-      return {
-        sourceBalanceId: balance.sourceBalanceId,
-        aggregationKey: isCash
-          ? `brokerage-cash:${account.id}:${balance.symbol.toUpperCase()}`
-          : undefined,
-        symbol: balance.symbol,
-        name: isCash ? brokerageCashName(account) : balance.name,
-        chainId: "brokerage",
-        amount: balance.amount,
-        priceUsd: balance.priceUsd,
-        valueUsd: balance.valueUsd,
-      };
-    }),
-  };
-}
-
-function brokerageCashName(account: CurrentBrokerageAccount): string {
-  const institutionName = account.institutionName?.trim();
-  const accountLabel = account.label?.trim();
-
-  return `${institutionName} ${accountLabel}`;
-}
 
 function depositoryAccountsToBalancesResult(
   accounts: DepositoryAccountRow[],
@@ -146,68 +102,29 @@ function manualAssetsToBalancesResult(
 
 export const getCurrentPortfolioBalanceSnapshot = cache(
   async (userId: string): Promise<CurrentPortfolioBalanceSnapshot> => {
+    // The registry has no kraken-only or raw-brokerage-account accessor (only
+    // getWalletBalances, since wallet is the one grouping that needs a scoped
+    // view). exchangeResults/brokerageAccounts read the kraken adapter and the
+    // brokerage module directly; both underlying reads are cache()-wrapped so
+    // this doesn't duplicate the fetch registry.getPortfolioBalances also does.
     const [
-      evmResults,
-      evmAccounts,
-      krakenAccounts,
+      portfolioProviderResults,
+      walletResults,
+      exchangeResults,
       brokerageAccounts,
       depositoryAccounts,
       creditCardAccounts,
       manualItems,
     ] = await Promise.all([
-      getCurrentEvmBalances(userId),
-      getUserEvmAccounts(userId),
-      getUserKrakenAccounts(userId),
+      portfolioProviderRegistry.getPortfolioBalances(userId),
+      portfolioProviderRegistry.getWalletBalances(userId),
+      krakenAdapter.getBalances(userId),
       getCurrentBrokerageBalances(userId),
       getUserDepositoryAccounts(userId),
       getUserCreditCardAccounts(userId),
       getUserManualBalanceItems(userId),
     ]);
-    const hyperCoreAccounts = await ensureUserHyperCoreAccounts(
-      userId,
-      evmAccounts,
-    );
-    const lighterAccounts = await getUserLighterAccounts(userId);
-    const hyperCoreAccountByAddress = new Map(
-      hyperCoreAccounts.map((account) => [account.address, account]),
-    );
 
-    const [portfolioWalletResults, hyperCoreResults, lighterResults, krakenResults] =
-      await Promise.all([
-        Promise.all(
-          evmResults.map(async (result) => {
-            const hyperCoreAccount = hyperCoreAccountByAddress.get(
-              result.address,
-            );
-            const hyperCoreSpotBalances = hyperCoreAccount
-              ? await getCurrentHyperCoreSpotBalancesByAccountId(
-                  hyperCoreAccount.id,
-                )
-              : [];
-            const evmAccount = evmAccounts.find(
-              (account) => account.address === result.address,
-            );
-            const lighterBalances = evmAccount
-              ? await getCurrentLighterBalancesForEvmAccount(userId, evmAccount.id)
-              : [];
-
-            if (result.status !== "ready") return result;
-
-            return {
-              ...result,
-              balances: [...result.balances, ...hyperCoreSpotBalances, ...lighterBalances].sort(
-                (a, b) => b.valueUsd - a.valueUsd,
-              ),
-            };
-          }),
-        ),
-        getCurrentHyperCoreBalances(hyperCoreAccounts),
-        getCurrentLighterBalances(lighterAccounts),
-        getCurrentKrakenBalances(krakenAccounts),
-      ]);
-    const brokerageResults = brokerageAccounts.map(
-      brokerageAccountToBalancesResult,
-    );
     const depositoryResult = depositoryAccountsToBalancesResult(
       depositoryAccounts,
       creditCardAccounts,
@@ -217,14 +134,12 @@ export const getCurrentPortfolioBalanceSnapshot = cache(
 
     return {
       portfolioResults: [
-        ...portfolioWalletResults,
-        ...krakenResults,
-        ...brokerageResults,
+        ...portfolioProviderResults,
         ...(depositoryResult ? [depositoryResult] : []),
         ...(manualAssetsResult ? [manualAssetsResult] : []),
       ],
-      walletResults: mergeWalletBalanceResults(evmResults, hyperCoreResults, lighterResults),
-      exchangeResults: krakenResults,
+      walletResults,
+      exchangeResults,
       brokerageAccounts,
       depositoryAccounts,
       creditCardAccounts,

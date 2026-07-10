@@ -1,6 +1,7 @@
 import "server-only";
 
 import { desc, eq } from "drizzle-orm";
+import { cache } from "react";
 
 import { db } from "@/db";
 import {
@@ -152,12 +153,12 @@ export async function getCurrentKrakenBalances(
   return results;
 }
 
-export async function getCurrentUserKrakenBalances(
-  userId: string,
-): Promise<BalancesResult[]> {
-  const accounts = await getUserKrakenAccounts(userId);
-  return getCurrentKrakenBalances(accounts);
-}
+export const getCurrentUserKrakenBalances = cache(
+  async (userId: string): Promise<BalancesResult[]> => {
+    const accounts = await getUserKrakenAccounts(userId);
+    return getCurrentKrakenBalances(accounts);
+  },
+);
 
 export async function syncKrakenAccounts(
   userId: string,
