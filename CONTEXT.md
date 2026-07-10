@@ -16,6 +16,10 @@ _Avoid_: Investment journal entry, trade journal entry
 An asynchronous refresh of a user's provider transaction history that may continue after the user action returns a current snapshot.
 _Avoid_: Transaction fetch, transaction import, refresh transactions
 
+**Investment Provider**:
+The external source — an EVM wallet indexer, HyperCore, Lighter, Kraken, or a brokerage connection — that an Investment Account's balances and transactions are synced from.
+_Avoid_: Source, integration, data source
+
 **Journal Period**:
 The calendar day, Monday–Sunday week, or calendar month covered by an Investment Journal Entry, interpreted in the user's home timezone.
 _Avoid_: Entry type, date range

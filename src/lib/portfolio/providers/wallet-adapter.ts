@@ -15,6 +15,7 @@ import {
   getCurrentLighterBalances,
   syncLighterAccounts,
 } from "@/lib/lighter/balances";
+import { mergeWalletBalanceResults } from "@/lib/wallets/balance-merge";
 import {
   getCurrentWalletTransactions,
   getWalletTransactionHistoryStatus,
@@ -26,51 +27,6 @@ import type {
   PortfolioProviderAdapter,
   ProviderTransactionStatus,
 } from "./types";
-
-function addressKey(address: string): string {
-  return address.trim().toLowerCase();
-}
-
-function mergeReadyResults(
-  current: Extract<BalancesResult, { status: "ready" }>,
-  next: Extract<BalancesResult, { status: "ready" }>,
-): BalancesResult {
-  return {
-    ...current,
-    balances: [...current.balances, ...next.balances].sort(
-      (a, b) => b.valueUsd - a.valueUsd,
-    ),
-  };
-}
-
-/**
- * Merges the EVM, HyperCore, and Lighter balance results that share a wallet
- * address into one row per address. A ready result supersedes a non-ready one
- * for the same address; two ready results have their balances combined.
- */
-function mergeWalletBalanceResults(
-  ...resultGroups: BalancesResult[][]
-): BalancesResult[] {
-  const merged = new Map<string, BalancesResult>();
-
-  for (const result of resultGroups.flat()) {
-    const key = addressKey(result.address);
-    const current = merged.get(key);
-
-    if (!current) {
-      merged.set(key, result);
-      continue;
-    }
-
-    if (current.status === "ready" && result.status === "ready") {
-      merged.set(key, mergeReadyResults(current, result));
-    } else if (current.status !== "ready" && result.status === "ready") {
-      merged.set(key, result);
-    }
-  }
-
-  return Array.from(merged.values());
-}
 
 /**
  * The wallet family adapter. Owns the EVM→HyperCore→Lighter sequencing as
