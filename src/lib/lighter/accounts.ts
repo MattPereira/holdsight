@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -12,18 +12,16 @@ import {
 } from "@/db/schema/investment-accounts";
 import { fetchLighterAccount } from "@/lib/lighter/client";
 import { decryptWithEnvKey, encryptWithEnvKey } from "@/lib/security/encryption";
+import {
+  getUserWalletFamilyAccounts,
+  type WalletFamilyAccountBase,
+} from "@/lib/wallets/account-family";
 
 const ENCRYPTION_KEY = "EXCHANGE_CREDENTIAL_ENCRYPTION_KEY";
 
-export type SavedLighterAccount = {
-  id: string;
+export type SavedLighterAccount = WalletFamilyAccountBase & {
   evmInvestmentAccountId: string;
   accountIndex: number;
-  address: string;
-  label: string | null;
-  syncStatus: "idle" | "success" | "indexing" | "rate_limited" | "error";
-  syncHttpStatus: number | null;
-  syncErrorMessage: string | null;
 };
 
 export function parseLighterReadOnlyToken(token: string): {
@@ -44,24 +42,15 @@ export function parseLighterReadOnlyToken(token: string): {
 }
 
 export async function getUserLighterAccounts(userId: string): Promise<SavedLighterAccount[]> {
-  return db.select({
-    id: investmentAccounts.id,
-    evmInvestmentAccountId: lighterAccounts.evmInvestmentAccountId,
-    accountIndex: lighterAccounts.accountIndex,
-    address: lighterAccounts.address,
-    label: investmentAccounts.label,
-    syncStatus: investmentAccounts.syncStatus,
-    syncHttpStatus: investmentAccounts.syncHttpStatus,
-    syncErrorMessage: investmentAccounts.syncErrorMessage,
-  }).from(lighterAccounts).innerJoin(
-    investmentAccounts,
-    eq(lighterAccounts.investmentAccountId, investmentAccounts.id),
-  ).where(and(
-    eq(lighterAccounts.userId, userId),
-    eq(investmentAccounts.userId, userId),
-    eq(investmentAccounts.kind, "lighter"),
-    eq(investmentAccounts.status, "active"),
-  )).orderBy(desc(investmentAccounts.createdAt));
+  return getUserWalletFamilyAccounts({
+    table: lighterAccounts,
+    kind: "lighter",
+    userId,
+    extraColumns: {
+      evmInvestmentAccountId: lighterAccounts.evmInvestmentAccountId,
+      accountIndex: lighterAccounts.accountIndex,
+    },
+  });
 }
 
 export async function getLighterToken(userId: string, accountId: string): Promise<string | null> {

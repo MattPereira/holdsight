@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -9,42 +9,21 @@ import {
   hyperCoreAccounts,
 } from "@/db/schema/investment-accounts";
 import type { SavedEvmAccount } from "@/lib/evm/accounts";
+import {
+  getUserWalletFamilyAccounts,
+  type WalletFamilyAccountBase,
+} from "@/lib/wallets/account-family";
 
-export type SavedHyperCoreAccount = {
-  id: string;
-  address: string;
-  label: string | null;
-  syncStatus: "idle" | "success" | "indexing" | "rate_limited" | "error";
-  syncHttpStatus: number | null;
-  syncErrorMessage: string | null;
-};
+export type SavedHyperCoreAccount = WalletFamilyAccountBase;
 
 export async function getUserHyperCoreAccounts(
   userId: string,
 ): Promise<SavedHyperCoreAccount[]> {
-  return db
-    .select({
-      id: investmentAccounts.id,
-      address: hyperCoreAccounts.address,
-      label: investmentAccounts.label,
-      syncStatus: investmentAccounts.syncStatus,
-      syncHttpStatus: investmentAccounts.syncHttpStatus,
-      syncErrorMessage: investmentAccounts.syncErrorMessage,
-    })
-    .from(hyperCoreAccounts)
-    .innerJoin(
-      investmentAccounts,
-      eq(hyperCoreAccounts.investmentAccountId, investmentAccounts.id),
-    )
-    .where(
-      and(
-        eq(hyperCoreAccounts.userId, userId),
-        eq(investmentAccounts.userId, userId),
-        eq(investmentAccounts.kind, "hyper_core"),
-        eq(investmentAccounts.status, "active"),
-      ),
-    )
-    .orderBy(desc(investmentAccounts.createdAt));
+  return getUserWalletFamilyAccounts({
+    table: hyperCoreAccounts,
+    kind: "hyper_core",
+    userId,
+  });
 }
 
 export async function ensureUserHyperCoreAccounts(

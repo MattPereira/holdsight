@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -10,17 +10,14 @@ import {
   investmentAccounts,
   lighterAccounts,
 } from "@/db/schema/investment-accounts";
+import {
+  getUserWalletFamilyAccounts,
+  type WalletFamilyAccountBase,
+} from "@/lib/wallets/account-family";
 
 const EVM_ADDRESS_RE = /^0x[a-fA-F0-9]{40}$/;
 
-export type SavedEvmAccount = {
-  id: string;
-  address: string;
-  label: string | null;
-  syncStatus: "idle" | "success" | "indexing" | "rate_limited" | "error";
-  syncHttpStatus: number | null;
-  syncErrorMessage: string | null;
-};
+export type SavedEvmAccount = WalletFamilyAccountBase;
 
 export function isValidEvmAddress(address: string): boolean {
   return EVM_ADDRESS_RE.test(address);
@@ -46,29 +43,11 @@ export function parseEvmAddresses(value: string | undefined): string[] {
 export async function getUserEvmAccounts(
   userId: string,
 ): Promise<SavedEvmAccount[]> {
-  return db
-    .select({
-      id: investmentAccounts.id,
-      address: evmWalletAccounts.address,
-      label: investmentAccounts.label,
-      syncStatus: investmentAccounts.syncStatus,
-      syncHttpStatus: investmentAccounts.syncHttpStatus,
-      syncErrorMessage: investmentAccounts.syncErrorMessage,
-    })
-    .from(evmWalletAccounts)
-    .innerJoin(
-      investmentAccounts,
-      eq(evmWalletAccounts.investmentAccountId, investmentAccounts.id),
-    )
-    .where(
-      and(
-        eq(evmWalletAccounts.userId, userId),
-        eq(investmentAccounts.userId, userId),
-        eq(investmentAccounts.kind, "evm_wallet"),
-        eq(investmentAccounts.status, "active"),
-      ),
-    )
-    .orderBy(desc(investmentAccounts.createdAt));
+  return getUserWalletFamilyAccounts({
+    table: evmWalletAccounts,
+    kind: "evm_wallet",
+    userId,
+  });
 }
 
 export async function userHasEvmAccountAddress(

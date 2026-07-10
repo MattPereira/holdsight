@@ -1,12 +1,18 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { investmentAccounts, investmentBalances, lighterAccounts } from "@/db/schema/investment-accounts";
+import { investmentAccounts, lighterAccounts } from "@/db/schema/investment-accounts";
 import { getLighterToken, type SavedLighterAccount } from "@/lib/lighter/accounts";
 import { fetchLighterAccount } from "@/lib/lighter/client";
 import type { BalancesResult, InvestmentBalance } from "@/lib/portfolio/types";
+import {
+  readPersistedWalletBalances,
+  replaceWalletFamilyAccountBalances,
+} from "@/lib/wallets/balance-family";
+
+const LIGHTER_DEFAULT_ERROR = "Lighter balance sync failed.";
 
 function httpStatus(error: unknown): number {
   return error instanceof Error && "httpStatus" in error
@@ -14,73 +20,44 @@ function httpStatus(error: unknown): number {
     : 502;
 }
 
+async function fetchLighterBalances(
+  userId: string,
+  account: SavedLighterAccount,
+): Promise<BalancesResult> {
+  try {
+    const token = await getLighterToken(userId, account.id);
+    if (!token) throw new Error("Lighter read-only token is missing.");
+    const snapshot = await fetchLighterAccount(account.accountIndex, token);
+    return { status: "ready", address: account.address, balances: snapshot.balances };
+  } catch (error) {
+    const status = httpStatus(error);
+    if (status === 429) return { status: "rate_limited", address: account.address };
+    return {
+      status: "error",
+      address: account.address,
+      message: error instanceof Error ? error.message : LIGHTER_DEFAULT_ERROR,
+      httpStatus: status,
+    };
+  }
+}
+
 export async function syncLighterAccounts(
   userId: string,
   accounts: SavedLighterAccount[],
 ): Promise<void> {
   for (const account of accounts) {
-    try {
-      const token = await getLighterToken(userId, account.id);
-      if (!token) throw new Error("Lighter read-only token is missing.");
-      const snapshot = await fetchLighterAccount(account.accountIndex, token);
-      await db.transaction(async (tx) => {
-        await tx.update(investmentAccounts).set({
-          syncProvider: "lighter",
-          syncStatus: "success",
-          syncHttpStatus: null,
-          syncErrorMessage: null,
-          lastSyncedAt: new Date(),
-        }).where(eq(investmentAccounts.id, account.id));
-        await tx.delete(investmentBalances).where(
-          eq(investmentBalances.investmentAccountId, account.id),
-        );
-        if (snapshot.balances.length > 0) {
-          await tx.insert(investmentBalances).values(snapshot.balances.map((balance) => ({
-            investmentAccountId: account.id,
-            sourceBalanceId: balance.sourceBalanceId,
-            symbol: balance.symbol,
-            name: balance.name,
-            assetClass: balance.symbol.toUpperCase().includes("USD") ? "cash" as const : "token" as const,
-            amount: String(balance.amount),
-            priceUsd: String(balance.priceUsd),
-            valueUsd: String(balance.valueUsd),
-          })));
-        }
-      });
-    } catch (error) {
-      const status = httpStatus(error);
-      await db.update(investmentAccounts).set({
-        syncProvider: "lighter",
-        syncStatus: status === 429 ? "rate_limited" : "error",
-        syncHttpStatus: status,
-        syncErrorMessage: error instanceof Error ? error.message : "Lighter balance sync failed.",
-        lastSyncedAt: new Date(),
-      }).where(eq(investmentAccounts.id, account.id));
-      if (status === 429) break;
-    }
+    const result = await fetchLighterBalances(userId, account);
+    await replaceWalletFamilyAccountBalances(account.id, result, {
+      syncProvider: "lighter",
+      assetClass: (balance) =>
+        balance.symbol.toUpperCase().includes("USD") ? "cash" : "token",
+    });
+    if (result.status === "rate_limited") break;
   }
 }
 
-async function accountBalances(accountId: string): Promise<InvestmentBalance[]> {
-  const rows = await db.select({
-    sourceBalanceId: investmentBalances.sourceBalanceId,
-    symbol: investmentBalances.symbol,
-    name: investmentBalances.name,
-    amount: investmentBalances.amount,
-    priceUsd: investmentBalances.priceUsd,
-    valueUsd: investmentBalances.valueUsd,
-  }).from(investmentBalances).where(
-    eq(investmentBalances.investmentAccountId, accountId),
-  ).orderBy(desc(investmentBalances.valueUsd));
-  return rows.map((row) => ({
-    sourceBalanceId: row.sourceBalanceId ?? undefined,
-    symbol: row.symbol,
-    name: row.name ?? undefined,
-    chainId: "lighter",
-    amount: Number(row.amount),
-    priceUsd: Number(row.priceUsd),
-    valueUsd: Number(row.valueUsd),
-  }));
+function accountBalances(accountId: string): Promise<InvestmentBalance[]> {
+  return readPersistedWalletBalances(accountId, { chainId: "lighter" });
 }
 
 export async function getCurrentLighterBalances(
@@ -97,7 +74,7 @@ export async function getCurrentLighterBalances(
       results.push({
         status: "error",
         address,
-        message: failure.syncErrorMessage ?? "Lighter balance sync failed.",
+        message: failure.syncErrorMessage ?? LIGHTER_DEFAULT_ERROR,
         httpStatus: failure.syncHttpStatus ?? 502,
       });
       continue;
