@@ -2,47 +2,51 @@
 
 import Link from "next/link";
 import {
-  RiExchangeFundsLine,
-  RiFundsLine,
+  RiArrowRightSLine,
+  RiBankLine,
   RiBookOpenLine,
   RiLightbulbLine,
+  RiPieChartLine,
   RiSettings3Line,
-  RiWalletLine,
 } from "@remixicon/react";
 
 import { NavUser } from "@/components/app-shell/nav-user";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 
-const navGroups = [
-  {
-    label: "Portfolio",
-    items: [
-      { label: "Theses", href: "/theses", icon: RiLightbulbLine },
-      { label: "Journal", href: "/journal", icon: RiBookOpenLine },
-    ],
-  },
-  {
-    label: "Accounts",
-    action: { href: "/connections", srLabel: "Manage connections" },
-    items: [
-      { label: "Wallets", href: "/wallets", icon: RiWalletLine },
-      { label: "Exchanges", href: "/exchanges", icon: RiExchangeFundsLine },
-      { label: "Brokerages", href: "/brokerages", icon: RiFundsLine },
-    ],
-  },
+const navItems = [
+  { label: "Portfolio", href: "/", icon: RiPieChartLine },
+  { label: "Theses", href: "/theses", icon: RiLightbulbLine },
+  { label: "Journal", href: "/journal", icon: RiBookOpenLine },
+  { label: "Connections", href: "/connections", icon: RiSettings3Line },
 ];
+
+const accountsGroup = {
+  label: "Accounts",
+  icon: RiBankLine,
+  items: [
+    { label: "Wallets", href: "/wallets" },
+    { label: "Exchanges", href: "/exchanges" },
+    { label: "Brokerages", href: "/brokerages" },
+  ],
+};
 
 export function AppSidebar({ name, email }: { name: string; email: string }) {
   return (
@@ -58,46 +62,59 @@ export function AppSidebar({ name, email }: { name: string; email: string }) {
         </Link>
       </SidebarHeader>
       <SidebarContent>
-        {navGroups.map((group) => (
-          <SidebarGroup key={group.label}>
-            <div className="flex items-center justify-between">
-              <SidebarGroupLabel className="h-auto text-base font-normal text-muted-foreground">
-                {group.label}
-              </SidebarGroupLabel>
-              {group.action && (
-                <SidebarGroupAction
-                  asChild
-                  title={group.action.srLabel}
-                  className="static top-auto right-auto translate-x-0 translate-y-0"
-                >
-                  <Link href={group.action.href}>
-                    <RiSettings3Line />
-                    <span className="sr-only">{group.action.srLabel}</span>
-                  </Link>
-                </SidebarGroupAction>
-              )}
-            </div>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.label}>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navItems.map((item) => (
+                <SidebarMenuItem key={item.label}>
+                  <SidebarMenuButton
+                    asChild
+                    size="lg"
+                    tooltip={item.label}
+                    className="text-base [&>svg]:size-5"
+                  >
+                    <Link href={item.href}>
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+
+              <Collapsible defaultOpen className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
                     <SidebarMenuButton
-                      asChild
                       size="lg"
-                      tooltip={item.label}
+                      tooltip={accountsGroup.label}
                       className="text-base [&>svg]:size-5"
                     >
-                      <Link href={item.href}>
-                        <item.icon />
-                        <span>{item.label}</span>
-                      </Link>
+                      <accountsGroup.icon />
+                      <span>{accountsGroup.label}</span>
+                      <RiArrowRightSLine className="ml-auto size-4! transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {accountsGroup.items.map((item) => (
+                        <SidebarMenuSubItem key={item.label}>
+                          <SidebarMenuSubButton
+                            asChild
+                            className="h-10 data-[size=md]:text-base"
+                          >
+                            <Link href={item.href}>
+                              <span>{item.label}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
         <NavUser name={name} email={email} />
