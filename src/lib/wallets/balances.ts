@@ -1,11 +1,6 @@
 import "server-only";
 
-import { getCurrentEvmBalances } from "@/lib/evm/balances";
-import { getUserEvmAccounts, type SavedEvmAccount } from "@/lib/evm/accounts";
-import { ensureUserHyperCoreAccounts } from "@/lib/hyper-core/accounts";
-import { getCurrentHyperCoreBalances } from "@/lib/hyper-core/balances";
-import { getUserLighterAccounts } from "@/lib/lighter/accounts";
-import { getCurrentLighterBalances } from "@/lib/lighter/balances";
+import { portfolioProviderRegistry } from "@/lib/portfolio/providers/registry";
 import type { BalancesResult } from "@/lib/portfolio/types";
 
 function addressKey(address: string): string {
@@ -24,6 +19,13 @@ function mergeReadyResults(
   };
 }
 
+/**
+ * Merges balance results that share a wallet address into one row per
+ * address. Kept here for `app/actions.ts`'s wallet-refresh action, which
+ * still assembles its own EVM/HyperCore/Lighter results directly rather than
+ * going through the registry (it needs to trigger each source's sync before
+ * reading, not just read).
+ */
 export function mergeWalletBalanceResults(
   ...resultGroups: BalancesResult[][]
 ): BalancesResult[] {
@@ -50,19 +52,6 @@ export function mergeWalletBalanceResults(
 
 export async function getCurrentWalletBalances(
   userId: string,
-  wallets?: SavedEvmAccount[],
 ): Promise<BalancesResult[]> {
-  const evmAccounts = wallets ?? (await getUserEvmAccounts(userId));
-  const hyperCoreAccounts = await ensureUserHyperCoreAccounts(
-    userId,
-    evmAccounts,
-  );
-  const lighterAccounts = await getUserLighterAccounts(userId);
-  const [evmResults, hyperCoreResults, lighterResults] = await Promise.all([
-    getCurrentEvmBalances(userId),
-    getCurrentHyperCoreBalances(hyperCoreAccounts),
-    getCurrentLighterBalances(lighterAccounts),
-  ]);
-
-  return mergeWalletBalanceResults(evmResults, hyperCoreResults, lighterResults);
+  return portfolioProviderRegistry.getWalletBalances(userId);
 }

@@ -17,6 +17,7 @@ import type {
   InvestmentTransactionListItem,
   TransactionExecutedAtRange,
 } from "@/lib/investment-transactions/list-item";
+import type { ProviderTransactionsSnapshot } from "@/lib/portfolio/providers/types";
 
 const WALLET_TRANSACTION_PROVIDERS = ["hyperliquid", "lighter", "zerion"] as const;
 const WALLET_VISIBLE_TRANSACTION_KINDS = ["trade"] as const;
@@ -30,6 +31,27 @@ export type WalletTransactionHistoryStatus = {
   hasMore: boolean;
   phase: TransactionSyncPhase;
 };
+
+/**
+ * Adapts the registry's wallet transactions snapshot to this file's older
+ * {@link WalletTransactionHistoryStatus} shape, which the Wallets page's
+ * client components still expect (they also receive updates in this shape
+ * from `app/actions.ts`'s sync-trigger flow). `transactionCount` isn't part
+ * of the registry snapshot, so it's derived from the merged list itself.
+ */
+export function toWalletTransactionHistoryStatus(
+  snapshot: ProviderTransactionsSnapshot,
+): WalletTransactionHistoryStatus {
+  return {
+    transactionCount: snapshot.transactions.length,
+    earliestTransactionAt: snapshot.historyStatus.earliestTransactionAt,
+    latestTransactionAt: snapshot.historyStatus.latestTransactionAt,
+    latestTransactionUpdatedAt:
+      snapshot.historyStatus.latestTransactionUpdatedAt ?? null,
+    hasMore: snapshot.historyStatus.hasMore,
+    phase: snapshot.historyStatus.phase ?? "up_to_date",
+  };
+}
 
 function numberOrNull(value: string | null): number | null {
   return value === null ? null : Number(value);
