@@ -133,17 +133,19 @@ export function PortfolioPage({
       onValueChange={setActiveTab}
       className="flex flex-col gap-6"
     >
-      <div className="flex items-center justify-start gap-3">
-        <h1 className="text-xl font-semibold">Portfolio</h1>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold">Portfolio</h1>
 
-        <TabsList>
-          <TabsTrigger value="balances" className="w-24">
-            Balances
-          </TabsTrigger>
-          <TabsTrigger value="transactions" className="w-24">
-            Trades
-          </TabsTrigger>
-        </TabsList>
+          <TabsList>
+            <TabsTrigger value="balances" className="w-24">
+              Balances
+            </TabsTrigger>
+            <TabsTrigger value="transactions" className="w-24">
+              Trades
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <Button
           type="button"

@@ -87,30 +87,34 @@ export function AccountDetailsShell({
 
               {hasTransactions ? (
                 <TabsList>
-                  <TabsTrigger value="balances">Balances</TabsTrigger>
-                  <TabsTrigger value="transactions">Transactions</TabsTrigger>
+                  <TabsTrigger value="balances" className="w-24">
+                    Balances
+                  </TabsTrigger>
+                  <TabsTrigger value="transactions" className="w-24">
+                    Trades
+                  </TabsTrigger>
                 </TabsList>
               ) : null}
-
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                onClick={refresh}
-                disabled={refreshBusy}
-                aria-label={
-                  onTransactionsTab
-                    ? refreshBusy
-                      ? "Refreshing transactions"
-                      : "Refresh transactions"
-                    : refreshBusy
-                      ? "Refreshing"
-                      : "Refresh"
-                }
-              >
-                <RiRefreshLine />
-              </Button>
             </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="icon-sm"
+              onClick={refresh}
+              disabled={refreshBusy}
+              aria-label={
+                onTransactionsTab
+                  ? refreshBusy
+                    ? "Refreshing transactions"
+                    : "Refresh transactions"
+                  : refreshBusy
+                    ? "Refreshing"
+                    : "Refresh"
+              }
+            >
+              <RiRefreshLine />
+            </Button>
           </div>
 
           <TabsContent value="balances">
