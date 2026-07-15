@@ -57,22 +57,19 @@ export function AccountsPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold">Accounts</h1>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon-sm"
-            onClick={handleRefresh}
-            disabled={isPending}
-            aria-label={isPending ? "Refreshing" : "Refresh"}
-          >
-            <RiRefreshLine className={cn(isPending && "animate-spin")} />
-          </Button>
-        </div>
-
-        <Button asChild variant="outline" size="icon">
+      <div className="flex items-center gap-2">
+        <h1 className="text-xl font-semibold">Accounts</h1>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-sm"
+          onClick={handleRefresh}
+          disabled={isPending}
+          aria-label={isPending ? "Refreshing" : "Refresh"}
+        >
+          <RiRefreshLine className={cn(isPending && "animate-spin")} />
+        </Button>
+        <Button asChild variant="outline" size="icon-sm">
           <Link href="/connections" aria-label="Connections">
             <RiSettings3Line />
           </Link>
