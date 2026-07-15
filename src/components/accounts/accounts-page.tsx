@@ -72,10 +72,9 @@ export function AccountsPage({
           </Button>
         </div>
 
-        <Button asChild variant="outline">
-          <Link href="/connections">
+        <Button asChild variant="outline" size="icon">
+          <Link href="/connections" aria-label="Connections">
             <RiSettings3Line />
-            Connections
           </Link>
         </Button>
       </div>
