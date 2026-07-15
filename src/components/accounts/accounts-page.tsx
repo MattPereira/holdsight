@@ -72,7 +72,7 @@ export function AccountsPage({
           </Button>
         </div>
 
-        <Button asChild variant="outline" size="sm">
+        <Button asChild variant="outline">
           <Link href="/connections">
             <RiSettings3Line />
             Connections

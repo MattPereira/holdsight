@@ -1,9 +1,5 @@
 "use client";
 
-import { RiSettings3Line } from "@remixicon/react";
-import Link from "next/link";
-
-import { Button } from "@/components/ui/button";
 import {
   CollapsibleLineItem,
   LineItemGroup,
@@ -105,16 +101,6 @@ export function PortfolioAccountsList({
               <LineItemGroup type="multiple">
                 <div className="flex items-center justify-between gap-3 border-b bg-muted/50 px-4 py-3 font-medium">
                   <span>Investments</span>
-                  <Button
-                    asChild
-                    variant="ghost"
-                    size="icon"
-                    className="size-7"
-                  >
-                    <Link href="/connections" aria-label="Configure accounts">
-                      <RiSettings3Line />
-                    </Link>
-                  </Button>
                 </div>
                 {investmentAccountSections.map((section) => (
                   <CollapsibleLineItem
@@ -164,16 +150,6 @@ export function PortfolioAccountsList({
               <LineItemGroup type="multiple">
                 <div className="flex items-center justify-between gap-3 border-b bg-muted/50 px-4 py-3 font-medium">
                   <span>Banks</span>
-                  <Button
-                    asChild
-                    variant="ghost"
-                    size="icon"
-                    className="size-7"
-                  >
-                    <Link href="/connections" aria-label="Configure accounts">
-                      <RiSettings3Line />
-                    </Link>
-                  </Button>
                 </div>
                 {hasDepository ? (
                   <CollapsibleLineItem
