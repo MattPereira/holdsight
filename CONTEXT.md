@@ -4,6 +4,10 @@ Holdsight helps investors understand their activity and decision-making through 
 
 ## Language
 
+**Closed Instance**:
+A Holdsight deployment whose operator explicitly approves every user. It may serve multiple people, but it has no public enrollment.
+_Avoid_: Personal-only instance, single-user instance, public instance
+
 **Investment Journal Entry**:
 A user's canonical planning and reflection record for one calendar day, Monday–Sunday week, or month in the user's home timezone. It is independent of any individual investment transaction, and only one exists for each user and period.
 _Avoid_: Transaction journal entry, trade journal entry, note
