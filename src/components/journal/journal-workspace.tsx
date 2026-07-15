@@ -135,16 +135,24 @@ function JournalPeriodStrip({
           <Button
             key={date}
             type="button"
-            variant={isSelected ? "default" : "outline"}
+            variant="outline"
             size="sm"
             aria-current={isSelected ? "date" : undefined}
             aria-label={`${label.top}${label.bottom ? ` ${label.bottom}` : ""}${hasEntry ? " · entry recorded" : ""}`}
             className={cn(
               "relative h-12 min-w-0 flex-1 basis-0 flex-col justify-center gap-0 px-2 leading-tight",
+              isSelected &&
+                "border-primary/60 bg-primary/10 font-semibold text-primary hover:bg-primary/15 hover:text-primary dark:bg-primary/15 dark:hover:bg-primary/20",
               !mobileVisible.has(index) && "hidden sm:flex",
             )}
             onClick={() => onSelect(date)}
           >
+            {hasEntry ? (
+              <span
+                aria-hidden="true"
+                className="bg-primary absolute top-1.5 left-1.5 size-1.5 rounded-full"
+              />
+            ) : null}
             <span
               className={cn(
                 label.bottom
@@ -156,12 +164,6 @@ function JournalPeriodStrip({
             </span>
             {label.bottom ? (
               <span className="text-sm font-medium">{label.bottom}</span>
-            ) : null}
-            {hasEntry ? (
-              <span
-                aria-hidden="true"
-                className="absolute top-1 right-1 size-1.5 rounded-full bg-current opacity-70"
-              />
             ) : null}
           </Button>
         );
