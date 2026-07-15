@@ -310,7 +310,10 @@ export function JournalWorkspace({
             <Tabs
               value={periodType}
               onValueChange={(value) =>
-                navigateTo(value as JournalPeriodType, selectedDate)
+                navigateTo(
+                  value as JournalPeriodType,
+                  todayInTimezone(homeTimezone || undefined),
+                )
               }
             >
               <TabsList

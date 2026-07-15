@@ -24,7 +24,7 @@ export default async function JournalPage({
   const requestedType = requested.type ?? "";
   const periodType = isJournalPeriodType(requestedType)
     ? requestedType
-    : "daily";
+    : "weekly";
   const requestedDate = requested.date;
   const hasValidRequestedDate = isCalendarDate(requestedDate ?? "");
   const provisionalDate = hasValidRequestedDate
