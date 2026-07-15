@@ -1,6 +1,5 @@
 "use client";
 
-import { RiRefreshLine } from "@remixicon/react";
 import { useMemo } from "react";
 
 import {
@@ -8,12 +7,11 @@ import {
   pollPortfolioTransactions,
   type PortfolioTransactionsActionResult,
 } from "@/app/actions";
+import { PageHeader } from "@/components/app-shell/page-header";
 import { TransactionsTabContent } from "@/components/accounts/transactions/transactions-tab-content";
 import type { TransactionHistoryStatus } from "@/components/accounts/transactions/types";
 import { useTransactionsPanel } from "@/components/accounts/transactions/use-transactions-panel";
-import { Button } from "@/components/ui/button";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
-import { cn } from "@/lib/utils";
 
 export type TradesPageData = {
   transactions: InvestmentTransactionListItem[];
@@ -46,20 +44,13 @@ export function TradesPage({ initialData }: { initialData: TradesPageData }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">Trades</h1>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-sm"
-          onClick={panel?.onRefresh}
-          disabled={refreshBusy}
-          aria-label={refreshBusy ? "Syncing" : "Sync"}
-        >
-          <RiRefreshLine className={cn(refreshBusy && "animate-spin")} />
-        </Button>
-      </div>
+      <PageHeader
+        title="Trades"
+        onRefresh={panel?.onRefresh}
+        refreshBusy={refreshBusy}
+        refreshLabel="Sync"
+        refreshBusyLabel="Syncing"
+      />
 
       {panel ? <TransactionsTabContent panel={panel} /> : null}
     </div>

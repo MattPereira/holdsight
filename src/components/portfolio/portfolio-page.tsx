@@ -1,14 +1,13 @@
 "use client";
 
-import { RiRefreshLine } from "@remixicon/react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { loadPortfolioPageData } from "@/app/actions";
+import { PageHeader } from "@/components/app-shell/page-header";
 import { PortfolioAccountsList } from "@/components/portfolio/portfolio-accounts-list";
 import { useAssetGroups } from "@/components/portfolio/asset-groups-context";
 import { PortfolioAllocations } from "@/components/portfolio/portfolio-allocations";
-import { Button } from "@/components/ui/button";
 import type { CreditCardAccountRow } from "@/lib/credit-card/accounts";
 import type { DepositoryAccountRow } from "@/lib/depository/accounts";
 import type { ManualBalanceItemRow } from "@/lib/manual-balance/items";
@@ -86,20 +85,13 @@ export function PortfolioPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">Portfolio</h1>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="icon-sm"
-          onClick={handleRefresh}
-          disabled={isPending}
-          aria-label={isPending ? "Refreshing" : "Refresh"}
-        >
-          <RiRefreshLine className={cn(isPending && "animate-spin")} />
-        </Button>
-      </div>
+      <PageHeader
+        title="Portfolio"
+        onRefresh={handleRefresh}
+        refreshBusy={isPending}
+        refreshLabel="Refresh"
+        refreshBusyLabel="Refreshing"
+      />
 
       <div className="flex flex-col gap-10">
         <div
