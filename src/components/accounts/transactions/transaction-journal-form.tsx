@@ -79,7 +79,7 @@ type FormState = {
 };
 
 const UNSAVED_CHANGES_MESSAGE =
-  "Your latest Transaction Journal Entry changes have not been saved. Leave anyway?";
+  "Your latest Trade Journal Entry changes have not been saved. Leave anyway?";
 
 function sameForm(left: FormState, right: FormState): boolean {
   return (
@@ -421,7 +421,7 @@ export function TransactionJournalForm({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              This Transaction Journal Entry changed elsewhere
+              This Trade Journal Entry changed elsewhere
             </AlertDialogTitle>
             <AlertDialogDescription>
               Your local edits are still visible. Reload the server version or

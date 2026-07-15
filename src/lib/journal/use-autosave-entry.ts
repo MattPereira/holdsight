@@ -14,7 +14,7 @@ export type SaveResult<TEntry> =
 
 /**
  * Unifies the autosave/save-queue/conflict-resolution engine shared by the
- * Investment Journal Entry and Transaction Journal Entry editors. Persistence
+ * Investment Journal Entry and Trade Journal Entry editors. Persistence
  * is injected as a port (`save`) so this module never knows which journal
  * type it's driving.
  *

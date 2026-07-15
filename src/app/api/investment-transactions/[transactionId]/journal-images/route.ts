@@ -16,7 +16,7 @@ const uploadErrorResponse = (
   error: Parameters<typeof journalImageUploadErrorResponse>[0],
 ) =>
   journalImageUploadErrorResponse(error, {
-    limitOwner: "A Transaction Journal Entry",
+    limitOwner: "A Trade Journal Entry",
     notFoundMessage: "Transaction not found.",
   });
 
