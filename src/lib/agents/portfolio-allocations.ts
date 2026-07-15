@@ -5,7 +5,7 @@ import {
   serializeAssetGroupThesis,
   type AssetGroupThesisForAgent,
 } from "@/lib/portfolio/asset-group-thesis";
-import { getCurrentPortfolioHomeData } from "@/lib/portfolio/page-data";
+import { getPortfolioBalancesPageData } from "@/lib/portfolio/page-data";
 import { refreshPortfolioForUser } from "@/lib/portfolio/refresh";
 import { getUserAssetGroups } from "@/lib/portfolio/groups";
 
@@ -51,7 +51,7 @@ export async function getPortfolioAllocationsForAgent(
   const [data, groups] = await Promise.all([
     refresh
       ? refreshPortfolioForUser(userId)
-      : getCurrentPortfolioHomeData(userId),
+      : getPortfolioBalancesPageData(userId),
     getUserAssetGroups(userId),
   ]);
   // Agents receive every holding with no declutter cutoff — hiding small

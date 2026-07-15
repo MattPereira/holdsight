@@ -81,7 +81,7 @@ export function mergePortfolioTransactions(
 
 /**
  * Read-only snapshot of every investment transaction source merged into one
- * feed. Used for the home page's initial server render and for polling an
+ * feed. Used for the Trades page's initial server render and for polling an
  * in-progress sync; it never starts workflows or revalidates.
  */
 export async function getCurrentPortfolioTransactions(

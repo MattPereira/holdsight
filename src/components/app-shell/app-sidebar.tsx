@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import {
+  RiArrowLeftRightLine,
   RiArrowRightSLine,
   RiBankLine,
   RiBookOpenLine,
@@ -35,6 +36,7 @@ const navItems = [
   { label: "Portfolio", href: "/", icon: RiPieChartLine },
   { label: "Theses", href: "/theses", icon: RiLightbulbLine },
   { label: "Journal", href: "/journal", icon: RiBookOpenLine },
+  { label: "Trades", href: "/trades", icon: RiArrowLeftRightLine },
   { label: "Connections", href: "/connections", icon: RiSettings3Line },
 ];
 

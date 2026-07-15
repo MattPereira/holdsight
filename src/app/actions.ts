@@ -131,8 +131,8 @@ import {
   type ManualBalanceItemRow,
 } from "@/lib/manual-balance/items";
 import {
-  emptyPortfolioHomeData,
-  type PortfolioHomeData,
+  emptyPortfolioBalancesPageData,
+  type PortfolioBalancesPageData,
 } from "@/lib/portfolio/page-data";
 import { refreshPortfolioForUser } from "@/lib/portfolio/refresh";
 import type { BalancesResult } from "@/lib/portfolio/types";
@@ -1148,7 +1148,7 @@ function combinePortfolioTransactionResults(
 
 /**
  * Sync every investment transaction source (wallets, exchanges, brokerages) and
- * return the merged feed for the home page's Transactions tab. Fans out to the
+ * return the merged feed for the Trades page. Fans out to the
  * per-source loaders so each still claims its own leases and starts its own
  * workflows.
  */
@@ -1485,9 +1485,9 @@ export async function removeManualBalanceItem(
   return { items, error: null };
 }
 
-export async function loadPortfolioPageData(): Promise<PortfolioHomeData> {
+export async function loadPortfolioPageData(): Promise<PortfolioBalancesPageData> {
   const userId = await getCurrentUserId();
-  if (!userId) return emptyPortfolioHomeData();
+  if (!userId) return emptyPortfolioBalancesPageData();
 
   return refreshPortfolioForUser(userId);
 }
