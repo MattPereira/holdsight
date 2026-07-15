@@ -7,7 +7,6 @@ import {
   RiBookOpenLine,
   RiLightbulbLine,
   RiPieChartLine,
-  RiSettings3Line,
 } from "@remixicon/react";
 
 import { NavUser } from "@/components/app-shell/nav-user";
@@ -29,7 +28,6 @@ const navItems = [
   { label: "Theses", href: "/theses", icon: RiLightbulbLine },
   { label: "Journal", href: "/journal", icon: RiBookOpenLine },
   { label: "Trades", href: "/trades", icon: RiArrowLeftRightLine },
-  { label: "Connections", href: "/connections", icon: RiSettings3Line },
 ];
 
 export function AppSidebar({ name, email }: { name: string; email: string }) {
