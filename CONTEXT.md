@@ -12,9 +12,13 @@ _Avoid_: Personal-only instance, single-user instance, public instance
 A user's canonical planning and reflection record for one calendar day, Monday–Sunday week, or month in the user's home timezone. It is independent of any individual investment transaction, and only one exists for each user and period.
 _Avoid_: Transaction journal entry, trade journal entry, note
 
-**Transaction Journal Entry**:
-A user's record of the reasoning, emotions, market bias, notes, and images associated with one specific investment transaction.
-_Avoid_: Investment journal entry, trade journal entry
+**Trade**:
+An event where a user exchanged one asset for another — a buy, sell, or swap. A Trade is one kind of Investment Transaction; transfers, deposits, withdrawals, fees, dividends, and interest are not Trades. Trades are the decisions the app helps users reflect on.
+_Avoid_: Transaction (for the swap event itself), order, position
+
+**Trade Journal Entry**:
+A user's record of the reasoning, emotions, market bias, notes, and images associated with one specific Trade.
+_Avoid_: Investment journal entry, transaction journal entry, note
 
 **Transaction History Sync**:
 An asynchronous refresh of a user's provider transaction history that may continue after the user action returns a current snapshot.
