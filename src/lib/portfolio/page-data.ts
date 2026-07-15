@@ -66,3 +66,13 @@ export async function getPortfolioBalancesPageData(
     accountData: portfolioAccountsDataFromSnapshot(snapshot),
   };
 }
+
+// The Accounts page renders only the Investments/Banks accordions, so it loads
+// the account slice of the snapshot without building the portfolio summary.
+export async function getPortfolioAccountsData(
+  userId: string,
+): Promise<PortfolioAccountsData> {
+  const snapshot = await getCurrentPortfolioBalanceSnapshot(userId);
+
+  return portfolioAccountsDataFromSnapshot(snapshot);
+}

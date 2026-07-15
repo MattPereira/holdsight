@@ -131,7 +131,9 @@ import {
   type ManualBalanceItemRow,
 } from "@/lib/manual-balance/items";
 import {
+  emptyPortfolioAccountsData,
   emptyPortfolioBalancesPageData,
+  type PortfolioAccountsData,
   type PortfolioBalancesPageData,
 } from "@/lib/portfolio/page-data";
 import { refreshPortfolioForUser } from "@/lib/portfolio/refresh";
@@ -1490,4 +1492,12 @@ export async function loadPortfolioPageData(): Promise<PortfolioBalancesPageData
   if (!userId) return emptyPortfolioBalancesPageData();
 
   return refreshPortfolioForUser(userId);
+}
+
+export async function loadAccountsPageData(): Promise<PortfolioAccountsData> {
+  const userId = await getCurrentUserId();
+  if (!userId) return emptyPortfolioAccountsData();
+
+  const { accountData } = await refreshPortfolioForUser(userId);
+  return accountData;
 }

@@ -20,7 +20,6 @@ export default async function Home() {
     <PortfolioPage
       initialData={{
         portfolioSummary: data.portfolioSummary,
-        accountData: data.accountData,
       }}
       journalSection={<CurrentJournalEntries entries={journalEntries} />}
     />
