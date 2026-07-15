@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, lte, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -9,6 +9,7 @@ import {
 } from "@/db/schema/investment-journal";
 import {
   canonicalPeriodStart,
+  currentJournalPeriods,
   isCalendarDate,
   isJournalPeriodType,
   journalPeriodUtcRange,
@@ -111,6 +112,56 @@ export async function getJournalWorkspace(
         )
       : [],
   };
+}
+
+/**
+ * The current daily, weekly, and monthly Investment Journal Entries for the
+ * home page — only those with written Plan or Reflection text. Returns nothing
+ * until the user has set a home timezone, since "current" is undefined without
+ * it. Ordered daily → weekly → monthly.
+ */
+export async function getCurrentJournalEntries(
+  userId: string,
+): Promise<InvestmentJournalEntry[]> {
+  const preferences = await db.query.userPreferences.findFirst({
+    where: eq(userPreferences.userId, userId),
+    columns: { homeTimezone: true },
+  });
+  if (!preferences?.homeTimezone) return [];
+
+  const periods = currentJournalPeriods(
+    todayInTimezone(preferences.homeTimezone),
+  );
+  const hasText = sql`(
+    char_length(trim(coalesce(${investmentJournalEntries.plan}, ''))) > 0
+    or char_length(trim(coalesce(${investmentJournalEntries.reflection}, ''))) > 0
+  )`;
+
+  const rows = await db
+    .select()
+    .from(investmentJournalEntries)
+    .where(
+      and(
+        eq(investmentJournalEntries.userId, userId),
+        or(
+          ...periods.map((period) =>
+            and(
+              eq(investmentJournalEntries.periodType, period.periodType),
+              eq(investmentJournalEntries.periodStart, period.periodStart),
+            ),
+          ),
+        ),
+        hasText,
+      ),
+    );
+
+  const byKey = new Map(
+    rows.map((row) => [`${row.periodType}:${row.periodStart}`, row]),
+  );
+  return periods
+    .map((period) => byKey.get(`${period.periodType}:${period.periodStart}`))
+    .filter((row) => row !== undefined)
+    .map(serializeEntry);
 }
 
 /** Period starts (canonical dates) that already have an entry within [rangeStart, rangeEnd]. */

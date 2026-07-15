@@ -55,6 +55,20 @@ export function canonicalPeriodStart(
   return formatCalendarDate(date);
 }
 
+/**
+ * The daily, weekly, and monthly Journal Periods that contain `today` (a
+ * calendar date already resolved in the user's home timezone), each as its
+ * canonical period start. Ordered daily → weekly → monthly.
+ */
+export function currentJournalPeriods(
+  today: string,
+): { periodType: JournalPeriodType; periodStart: string }[] {
+  return JOURNAL_PERIOD_TYPES.map((periodType) => ({
+    periodType,
+    periodStart: canonicalPeriodStart(periodType, today),
+  }));
+}
+
 export function moveJournalPeriod(
   periodType: JournalPeriodType,
   periodStart: string,

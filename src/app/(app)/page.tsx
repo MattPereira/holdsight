@@ -1,5 +1,7 @@
+import { CurrentJournalEntries } from "@/components/journal/current-journal-entries";
 import { PortfolioPage } from "@/components/portfolio/portfolio-page";
 import { getCurrentUserId } from "@/lib/auth/session";
+import { getCurrentJournalEntries } from "@/lib/journal/investment-entry";
 import {
   emptyPortfolioBalancesPageData,
   getPortfolioBalancesPageData,
@@ -7,9 +9,12 @@ import {
 
 export default async function Home() {
   const userId = await getCurrentUserId();
-  const data = userId
-    ? await getPortfolioBalancesPageData(userId)
-    : emptyPortfolioBalancesPageData();
+  const [data, journalEntries] = userId
+    ? await Promise.all([
+        getPortfolioBalancesPageData(userId),
+        getCurrentJournalEntries(userId),
+      ])
+    : [emptyPortfolioBalancesPageData(), []];
 
   return (
     <PortfolioPage
@@ -17,6 +22,7 @@ export default async function Home() {
         portfolioSummary: data.portfolioSummary,
         accountData: data.accountData,
       }}
+      journalSection={<CurrentJournalEntries entries={journalEntries} />}
     />
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { type ReactNode, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { loadPortfolioPageData } from "@/app/actions";
@@ -27,8 +27,10 @@ export type PortfolioPageData = {
 
 export function PortfolioPage({
   initialData,
+  journalSection,
 }: {
   initialData: PortfolioPageData;
+  journalSection?: ReactNode;
 }) {
   const { groups } = useAssetGroups();
   const [summary, setSummary] = useState<PortfolioAssetSummary>(
@@ -107,6 +109,8 @@ export function PortfolioPage({
             groups={groups}
           />
         </div>
+
+        {journalSection}
 
         <PortfolioAccountsList
           accounts={accounts}

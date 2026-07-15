@@ -1,10 +1,39 @@
 import { describe, expect, it } from "vitest";
 import {
+  currentJournalPeriods,
   JOURNAL_STRIP_MOBILE_SIZE,
   JOURNAL_STRIP_SIZE,
   journalStripDates,
   journalStripMobileVisibleIndices,
 } from "./periods";
+
+describe("currentJournalPeriods", () => {
+  it("returns the daily, weekly, and monthly periods containing a mid-week, mid-month day", () => {
+    // 2026-07-15 is a Wednesday; its Mon–Sun week starts 2026-07-13.
+    expect(currentJournalPeriods("2026-07-15")).toEqual([
+      { periodType: "daily", periodStart: "2026-07-15" },
+      { periodType: "weekly", periodStart: "2026-07-13" },
+      { periodType: "monthly", periodStart: "2026-07-01" },
+    ]);
+  });
+
+  it("anchors the week to Monday when the day is a Sunday", () => {
+    // 2026-07-12 is a Sunday; its week still starts on 2026-07-06.
+    expect(currentJournalPeriods("2026-07-12")).toEqual([
+      { periodType: "daily", periodStart: "2026-07-12" },
+      { periodType: "weekly", periodStart: "2026-07-06" },
+      { periodType: "monthly", periodStart: "2026-07-01" },
+    ]);
+  });
+
+  it("keeps the daily period as the exact day", () => {
+    expect(currentJournalPeriods("2026-01-01")).toEqual([
+      { periodType: "daily", periodStart: "2026-01-01" },
+      { periodType: "weekly", periodStart: "2025-12-29" },
+      { periodType: "monthly", periodStart: "2026-01-01" },
+    ]);
+  });
+});
 
 describe("journalStripDates", () => {
   it("returns the Mon–Sun week containing a mid-week daily selection", () => {
