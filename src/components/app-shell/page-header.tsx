@@ -15,15 +15,22 @@ export function PageHeader({
   refreshBusy,
   refreshLabel,
   refreshBusyLabel,
+  actionPosition = "end",
 }: {
   title: string;
   onRefresh?: () => void;
   refreshBusy: boolean;
   refreshLabel: string;
   refreshBusyLabel: string;
+  actionPosition?: "adjacent" | "end";
 }) {
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div
+      className={cn(
+        "flex items-center gap-2",
+        actionPosition === "end" && "justify-between",
+      )}
+    >
       <h1 className="text-xl font-semibold">{title}</h1>
 
       <Button

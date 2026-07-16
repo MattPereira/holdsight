@@ -24,10 +24,10 @@ import {
 
 const navItems = [
   { label: "Portfolio", href: "/", icon: RiPieChartLine },
-  { label: "Accounts", href: "/accounts", icon: RiBankLine },
   { label: "Theses", href: "/theses", icon: RiLightbulbLine },
   { label: "Journal", href: "/journal", icon: RiBookOpenLine },
   { label: "Trades", href: "/trades", icon: RiArrowLeftRightLine },
+  { label: "Accounts", href: "/accounts", icon: RiBankLine },
 ];
 
 export function AppSidebar({ name, email }: { name: string; email: string }) {

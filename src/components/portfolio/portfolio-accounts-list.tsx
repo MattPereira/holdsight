@@ -68,14 +68,14 @@ function AccountCard({
             aria-label={`View ${label}`}
             className="inline-flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground"
           >
-            View
+            Details
             <RiArrowRightSLine className="size-3.5" />
           </Link>
         ) : null}
       </div>
       <div className="divide-y">{children}</div>
-      <div className="flex items-center justify-between gap-4 border-t px-4 py-2.5">
-        <span className="text-sm font-medium text-muted-foreground">Total</span>
+      <div className="flex items-center justify-between gap-4 border-t bg-muted/50 px-4 py-2.5">
+        <span className="text-sm font-medium">Total</span>
         <span
           className={cn("text-sm font-semibold tabular-nums", valueClassName)}
         >
