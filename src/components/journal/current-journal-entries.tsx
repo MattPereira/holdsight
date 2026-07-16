@@ -60,7 +60,9 @@ export function CurrentJournalEntries({
                   href={`/journal?type=${entry.periodType}&date=${entry.periodStart}`}
                   className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm transition-colors"
                 >
-                  {periodLabel(entry.periodType, entry.periodStart)}
+                  {periodLabel(entry.periodType, entry.periodStart, {
+                    includeYear: false,
+                  })}
                   <RiArrowRightLine className="size-4" />
                 </Link>
               </CardAction>

@@ -1,7 +1,5 @@
 "use client";
 
-import { RiArrowRightSLine } from "@remixicon/react";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { CreditCardAccountRow } from "@/lib/credit-card/accounts";
@@ -32,28 +30,15 @@ function creditCardProvider(account: CreditCardAccountRow): string {
 const LIABILITY_TOTAL_CLASS = "text-red-600 dark:text-red-400";
 const LIABILITY_ROW_CLASS = "text-red-600/90 dark:text-red-400/60";
 
-// Which investment sections have a dedicated detail page, and how they're
-// labelled on this list. Sections without an entry render without a link.
-const INVESTMENT_SECTION_LINKS: Record<
-  string,
-  { label: string; href: string }
-> = {
-  wallets: { label: "Wallets", href: "/wallets" },
-  exchange: { label: "Exchanges", href: "/exchanges" },
-  brokerage: { label: "Brokerages", href: "/brokerages" },
-};
-
-/** One account group as a standalone card: a subheader band (optionally linking
- *  to a detail page) with its member accounts listed as divided rows beneath. */
+/** One account group as a standalone card with its member accounts listed as
+ * divided rows beneath. */
 function AccountCard({
   label,
-  href,
   value,
   valueClassName,
   children,
 }: {
   label: string;
-  href?: string;
   value: number;
   valueClassName?: string;
   children: ReactNode;
@@ -62,16 +47,6 @@ function AccountCard({
     <section className="overflow-hidden rounded-lg border">
       <div className="flex items-center justify-between gap-4 border-b bg-muted/40 px-4 py-2.5">
         <span className="min-w-0 truncate text-sm font-medium">{label}</span>
-        {href ? (
-          <Link
-            href={href}
-            aria-label={`View ${label}`}
-            className="inline-flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground"
-          >
-            Details
-            <RiArrowRightSLine className="size-3.5" />
-          </Link>
-        ) : null}
       </div>
       <div className="divide-y">{children}</div>
       <div className="flex items-center justify-between gap-4 border-t bg-muted/50 px-4 py-2.5">
@@ -175,12 +150,10 @@ export function PortfolioAccountsList({
   return (
     <div className="flex flex-col gap-4">
       {investmentCards.map((section) => {
-        const link = INVESTMENT_SECTION_LINKS[section.id];
         return (
           <AccountCard
             key={section.id}
-            label={link?.label ?? section.label}
-            href={link?.href}
+            label={section.label}
             value={section.valueUsd}
           >
             {section.children.map((child) => (
