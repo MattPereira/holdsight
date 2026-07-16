@@ -24,11 +24,11 @@ function JournalText({ heading, text }: { heading: string; text: string }) {
     <div className="flex flex-col gap-1">
       <h3 className="text-muted-foreground text-sm font-medium">{heading}</h3>
       {trimmed.length === 0 ? (
-        <p className="text-muted-foreground/60 min-h-12 text-sm italic">
+        <p className="text-muted-foreground/60 min-h-48  text-sm italic">
           Nothing yet
         </p>
       ) : (
-        <p className="min-h-12 text-sm whitespace-pre-wrap break-words">
+        <p className="border  min-h-24 rounded-lg p-3 text-sm whitespace-pre-wrap wrap-break-word">
           {trimmed}
         </p>
       )}
@@ -54,7 +54,7 @@ export function CurrentJournalEntries({
         {entries.map((entry) => (
           <Card key={entry.id} size="sm">
             <CardHeader className="bg-muted/50 -mt-(--card-spacing) items-center border-b pt-(--card-spacing)">
-              <CardTitle>{PERIOD_HEADING[entry.periodType]}</CardTitle>
+              <CardTitle>{PERIOD_HEADING[entry.periodType]} Journal</CardTitle>
               <CardAction className="row-span-1 self-center">
                 <Link
                   href={`/journal?type=${entry.periodType}&date=${entry.periodStart}`}
