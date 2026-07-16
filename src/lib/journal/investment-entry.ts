@@ -255,7 +255,7 @@ export async function saveJournalEntry(
   ) {
     return {
       status: "error",
-      message: "Plan and Reflection are limited to 10,000 characters each.",
+      message: "Plan and Notes are limited to 10,000 characters each.",
     };
   }
 

@@ -13,19 +13,25 @@ import { periodLabel } from "@/lib/journal/period-label";
 import type { JournalPeriodType } from "@/lib/journal/periods";
 
 const PERIOD_HEADING: Record<JournalPeriodType, string> = {
-  daily: "Today",
-  weekly: "This week",
-  monthly: "This month",
+  daily: "Daily",
+  weekly: "Weekly",
+  monthly: "Monthly",
 };
 
 function JournalText({ heading, text }: { heading: string; text: string }) {
-  if (text.trim().length === 0) return null;
+  const trimmed = text.trim();
   return (
     <div className="flex flex-col gap-1">
-      <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-        {heading}
-      </h3>
-      <p className="text-sm whitespace-pre-wrap break-words">{text}</p>
+      <h3 className="text-muted-foreground text-sm font-medium">{heading}</h3>
+      {trimmed.length === 0 ? (
+        <p className="text-muted-foreground/60 min-h-12 text-sm italic">
+          Nothing yet
+        </p>
+      ) : (
+        <p className="min-h-12 text-sm whitespace-pre-wrap break-words">
+          {trimmed}
+        </p>
+      )}
     </div>
   );
 }
@@ -44,33 +50,24 @@ export function CurrentJournalEntries({
 
   return (
     <section className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">Journal</h2>
-      <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-2">
         {entries.map((entry) => (
           <Card key={entry.id} size="sm">
-            <CardHeader className="border-b">
-              <CardTitle className="flex flex-wrap items-baseline gap-x-2">
-                <span>{PERIOD_HEADING[entry.periodType]}</span>
-                <span className="text-muted-foreground text-sm font-normal">
-                  <span aria-hidden className="mr-2">
-                    ·
-                  </span>
-                  {periodLabel(entry.periodType, entry.periodStart)}
-                </span>
-              </CardTitle>
-              <CardAction>
+            <CardHeader className="bg-muted/50 -mt-(--card-spacing) items-center border-b pt-(--card-spacing)">
+              <CardTitle>{PERIOD_HEADING[entry.periodType]}</CardTitle>
+              <CardAction className="row-span-1 self-center">
                 <Link
                   href={`/journal?type=${entry.periodType}&date=${entry.periodStart}`}
-                  className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm"
+                  className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm transition-colors"
                 >
-                  Edit in journal
+                  {periodLabel(entry.periodType, entry.periodStart)}
                   <RiArrowRightLine className="size-4" />
                 </Link>
               </CardAction>
             </CardHeader>
-            <CardContent className="flex flex-col gap-4">
+            <CardContent className="flex flex-col gap-3">
               <JournalText heading="Plan" text={entry.plan} />
-              <JournalText heading="Reflection" text={entry.reflection} />
+              <JournalText heading="Notes" text={entry.reflection} />
             </CardContent>
           </Card>
         ))}

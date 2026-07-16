@@ -527,10 +527,10 @@ export function JournalWorkspace({
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <h2 className="font-medium">Reflection</h2>
+                  <h2 className="font-medium">Notes</h2>
                   <Field>
                     <FieldLabel className="sr-only" htmlFor="journal-reflection">
-                      Reflection
+                      Notes
                     </FieldLabel>
                     <Textarea
                       id="journal-reflection"
