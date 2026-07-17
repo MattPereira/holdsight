@@ -3,30 +3,24 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import type {
   TransactionHistoryStatus,
   TransactionsPanel,
+  TransactionsView,
 } from "@/components/accounts/transactions/types";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 
 const TRANSACTION_SYNC_POLL_MS = 4000;
 
-export type TransactionsPanelConfig<TTransactionResult> = {
-  initialTransactions: InvestmentTransactionListItem[];
-  loadTransactions: () => Promise<TTransactionResult>;
+export type TransactionsSource = {
+  /** Server-rendered snapshot the panel seeds from and re-seeds on refresh. */
+  initial: TransactionsView;
+  /** Refreshes the feed — may claim leases and start sync workflows. */
+  refreshAction: () => Promise<TransactionsView>;
   // Read-only counterpart used to poll an in-progress sync. It receives the
-  // rendered count so implementations can avoid returning an unchanged list.
-  // Falls back to loadTransactions when omitted.
-  pollTransactions?: (
+  // rendered count and latest-updated timestamp so implementations can return
+  // an unchanged (null) list. Falls back to refresh when omitted.
+  pollAction?: (
     knownTransactionCount?: number,
     knownLatestTransactionUpdatedAt?: string | null,
-  ) => Promise<TTransactionResult>;
-  getTransactions: (
-    result: TTransactionResult,
-  ) => InvestmentTransactionListItem[] | null;
-  getError?: (result: TTransactionResult) => string | null;
-  getMessage?: (result: TTransactionResult) => string | null;
-  initialIsSyncing?: boolean;
-  getIsSyncing?: (result: TTransactionResult) => boolean;
-  initialHistoryStatus?: TransactionHistoryStatus;
-  getHistoryStatus?: (result: TTransactionResult) => TransactionHistoryStatus;
+  ) => Promise<TransactionsView>;
 };
 
 /**
@@ -36,88 +30,66 @@ export type TransactionsPanelConfig<TTransactionResult> = {
  * account details chrome, or `undefined` when no transactions are configured.
  *
  * A sync runs in durable background workflows, so a single load only captures a
- * snapshot. While more pages remain, this polls so the count climbs live and
- * the status resolves to a terminal state on its own.
+ * snapshot. While `historyStatus.hasMore`, this polls so the count climbs live
+ * and the status resolves to a terminal state on its own.
  */
-export function useTransactionsPanel<TTransactionResult>(
-  config?: TransactionsPanelConfig<TTransactionResult>,
+export function useTransactionsPanel(
+  source?: TransactionsSource,
 ): TransactionsPanel | undefined {
+  const initial = source?.initial;
   const [currentTransactions, setCurrentTransactions] = useState<
     InvestmentTransactionListItem[] | undefined
-  >(config?.initialTransactions);
-  const [syncedInitialTransactions, setSyncedInitialTransactions] = useState(
-    config?.initialTransactions,
-  );
-  const [syncedInitialHistoryStatus, setSyncedInitialHistoryStatus] =
-    useState(config?.initialHistoryStatus);
-  const [syncedInitialIsSyncing, setSyncedInitialIsSyncing] = useState(
-    config?.initialIsSyncing,
-  );
+  >(initial?.transactions ?? undefined);
+  const [syncedInitial, setSyncedInitial] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [historyStatus, setHistoryStatus] = useState<
     TransactionHistoryStatus | undefined
-  >(config?.initialHistoryStatus);
-  const [isSyncing, setSyncing] = useState(config?.initialIsSyncing ?? false);
+  >(initial?.historyStatus);
   const [isPending, startTransition] = useTransition();
 
-  // Re-seed local state whenever the server sends fresh transactions — e.g.
-  // after a router.refresh(). Adjusting state during render keeps the view in
-  // sync with the server without an effect.
-  if (
-    config &&
-    (syncedInitialTransactions !== config.initialTransactions ||
-      syncedInitialHistoryStatus !== config.initialHistoryStatus ||
-      syncedInitialIsSyncing !== config.initialIsSyncing)
-  ) {
-    setSyncedInitialTransactions(config.initialTransactions);
-    setSyncedInitialHistoryStatus(config.initialHistoryStatus);
-    setSyncedInitialIsSyncing(config.initialIsSyncing);
-    setCurrentTransactions(config.initialTransactions);
-    setHistoryStatus(config.initialHistoryStatus);
-    setSyncing(config.initialIsSyncing ?? false);
+  // Re-seed local state whenever the server sends a fresh snapshot — e.g. after
+  // a router.refresh(). Adjusting state during render keeps the view in sync
+  // with the server without an effect.
+  if (initial && syncedInitial !== initial) {
+    setSyncedInitial(initial);
+    setCurrentTransactions(initial.transactions ?? undefined);
+    setHistoryStatus(initial.historyStatus);
     setError(null);
     setMessage(null);
   }
 
-  const applyResult = useCallback(
-    (result: TTransactionResult) => {
-      if (!config) return;
-      const nextTransactions = config.getTransactions(result);
-      if (nextTransactions) setCurrentTransactions(nextTransactions);
-      setError(config.getError?.(result) ?? null);
-      setMessage(config.getMessage?.(result) ?? null);
-      setHistoryStatus(config.getHistoryStatus?.(result));
-      setSyncing(config.getIsSyncing?.(result) ?? false);
-    },
-    [config],
-  );
+  const applyResult = useCallback((result: TransactionsView) => {
+    if (result.transactions) setCurrentTransactions(result.transactions);
+    setError(result.error);
+    setMessage(result.message || null);
+    setHistoryStatus(result.historyStatus);
+  }, []);
 
   const handleRefresh = useCallback(() => {
-    if (!config) return;
+    if (!source) return;
     setError(null);
     setMessage(null);
     startTransition(async () => {
       try {
-        applyResult(await config.loadTransactions());
+        applyResult(await source.refreshAction());
       } catch (error) {
         setError(
           error instanceof Error
             ? error.message
             : "Failed to refresh transactions.",
         );
-        setSyncing(false);
       }
     });
-  }, [config, applyResult]);
+  }, [source, applyResult]);
 
   // An expected provider failure must return control to the user. Polling is
   // intentionally paused while an error is displayed, so keeping `hasMore`
   // active here would leave the refresh button disabled indefinitely.
-  const isSyncActive = !error && (isSyncing || Boolean(historyStatus?.hasMore));
+  const isSyncActive = !error && Boolean(historyStatus?.hasMore);
 
   useEffect(() => {
-    if (!config || !isSyncActive || error || isPending) {
+    if (!source || !isSyncActive || error || isPending) {
       return;
     }
 
@@ -127,12 +99,12 @@ export function useTransactionsPanel<TTransactionResult>(
       if (inFlight) return;
       inFlight = true;
       try {
-        const result = await (config.pollTransactions
-          ? config.pollTransactions(
+        const result = await (source.pollAction
+          ? source.pollAction(
               currentTransactions?.length,
               historyStatus?.latestTransactionUpdatedAt,
             )
-          : config.loadTransactions());
+          : source.refreshAction());
         if (!cancelled) applyResult(result);
       } catch (error) {
         if (!cancelled) {
@@ -141,7 +113,6 @@ export function useTransactionsPanel<TTransactionResult>(
               ? error.message
               : "Failed to check transaction sync status.",
           );
-          setSyncing(false);
         }
       } finally {
         inFlight = false;
@@ -153,7 +124,7 @@ export function useTransactionsPanel<TTransactionResult>(
       clearInterval(interval);
     };
   }, [
-    config,
+    source,
     isSyncActive,
     error,
     isPending,
@@ -163,21 +134,20 @@ export function useTransactionsPanel<TTransactionResult>(
   ]);
 
   return useMemo(() => {
-    if (!config || !currentTransactions) return undefined;
+    if (!source || !currentTransactions) return undefined;
     return {
       transactions: currentTransactions,
       onRefresh: handleRefresh,
-      // Background synchronization is represented by historyStatus.hasMore
-      // and must not prevent the user from submitting another lease-safe
-      // refresh request. Only the request currently crossing the network
-      // disables the control.
+      // Background synchronization is represented by historyStatus.hasMore and
+      // must not prevent the user from submitting another lease-safe refresh.
+      // Only the request currently crossing the network disables the control.
       refreshPending: isPending,
       error,
       message,
       historyStatus,
     };
   }, [
-    config,
+    source,
     currentTransactions,
     handleRefresh,
     isPending,

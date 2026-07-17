@@ -1,4 +1,11 @@
-import { ExchangesDetailsPage } from "@/components/accounts/exchanges-details-page";
+import {
+  loadKrakenBalances,
+  loadKrakenTransactions,
+  pollKrakenTransactions,
+} from "@/app/actions";
+import { AccountDetailsView } from "@/components/accounts/account-details-view";
+import { WALLET_SECONDARY_COLUMN } from "@/components/accounts/balances/groups";
+import { investmentBalancesView } from "@/lib/accounts/balances-view";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { getUserKrakenAccounts } from "@/lib/exchange/kraken/accounts";
 import { getCurrentKrakenBalances } from "@/lib/exchange/kraken/balances";
@@ -15,26 +22,26 @@ export default async function ExchangePage() {
     userId ? getCurrentKrakenTransactions(userId) : [],
     userId
       ? getKrakenTransactionHistoryStatus(userId)
-      : { earliestTransactionAt: null, latestTransactionAt: null, hasMore: false, phase: "up_to_date" as const },
+      : {
+          earliestTransactionAt: null,
+          latestTransactionAt: null,
+          hasMore: false,
+          phase: "up_to_date" as const,
+        },
   ]);
-  const balanceResultsKey = balanceResults
-    .map((result) =>
-      result.status === "ready"
-        ? `${result.address}:${result.balances.length}:${result.balances.reduce(
-            (sum, balance) => sum + balance.valueUsd,
-            0,
-          )}`
-        : `${result.address}:${result.status}`,
-    )
-    .join("|");
 
   return (
     <div className="flex flex-col gap-6">
-      <ExchangesDetailsPage
-        key={balanceResultsKey}
-        initialResults={balanceResults}
-        initialTransactions={transactions}
-        initialHistoryStatus={historyStatus}
+      <AccountDetailsView
+        title="Exchanges"
+        secondaryColumn={WALLET_SECONDARY_COLUMN}
+        initialBalances={investmentBalancesView(balanceResults)}
+        refreshBalancesAction={loadKrakenBalances}
+        transactions={{
+          initial: { transactions, message: "", error: null, historyStatus },
+          refreshAction: loadKrakenTransactions,
+          pollAction: pollKrakenTransactions,
+        }}
       />
     </div>
   );

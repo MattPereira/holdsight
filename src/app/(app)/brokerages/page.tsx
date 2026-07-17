@@ -1,10 +1,17 @@
-import { BrokerageDetailsPage } from "@/components/accounts/brokerage-details-page";
+import {
+  loadBrokerageBalances,
+  loadBrokerageTransactions,
+  pollBrokerageTransactions,
+} from "@/app/actions";
+import { AccountDetailsView } from "@/components/accounts/account-details-view";
+import { BROKERAGE_SECONDARY_COLUMN } from "@/components/accounts/balances/groups";
+import { brokerageBalancesView } from "@/lib/accounts/balances-view";
+import { getCurrentUserId } from "@/lib/auth/session";
 import { getCurrentBrokerageBalances } from "@/lib/brokerage/balances";
 import {
   getBrokerageTransactionImportStatus,
   getCurrentBrokerageTransactions,
 } from "@/lib/brokerage/transactions";
-import { getCurrentUserId } from "@/lib/auth/session";
 
 export default async function BrokeragePage() {
   const userId = await getCurrentUserId();
@@ -18,10 +25,26 @@ export default async function BrokeragePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <BrokerageDetailsPage
-        initialAccounts={accounts}
-        initialTransactions={transactions}
-        initialTransactionsSyncing={transactionImportStatus.isSyncing}
+      <AccountDetailsView
+        title="Brokerages"
+        secondaryColumn={BROKERAGE_SECONDARY_COLUMN}
+        initialBalances={brokerageBalancesView(accounts)}
+        refreshBalancesAction={loadBrokerageBalances}
+        transactions={{
+          initial: {
+            transactions,
+            message: "",
+            error: null,
+            historyStatus: {
+              earliestTransactionAt: null,
+              latestTransactionAt: null,
+              latestTransactionUpdatedAt: null,
+              hasMore: transactionImportStatus.isSyncing,
+            },
+          },
+          refreshAction: loadBrokerageTransactions,
+          pollAction: pollBrokerageTransactions,
+        }}
       />
     </div>
   );
