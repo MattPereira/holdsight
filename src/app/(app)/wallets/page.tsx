@@ -1,4 +1,11 @@
-import { WalletsDetailsPage } from "@/components/accounts/wallets-details-page";
+import {
+  loadWalletBalances,
+  loadWalletTransactions,
+  pollWalletTransactions,
+} from "@/app/actions";
+import { AccountDetailsView } from "@/components/accounts/account-details-view";
+import { WALLET_SECONDARY_COLUMN } from "@/components/accounts/balances/groups";
+import { investmentBalancesView } from "@/lib/accounts/balances-view";
 import { getCurrentUserId } from "@/lib/auth/session";
 import { portfolioProviderRegistry } from "@/lib/portfolio/providers/registry";
 import { getCurrentWalletBalances } from "@/lib/wallets/balances";
@@ -28,10 +35,21 @@ export default async function WalletsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <WalletsDetailsPage
-        initialResults={balanceResults}
-        initialTransactions={transactionsSnapshot.transactions}
-        initialHistoryStatus={toWalletTransactionHistoryStatus(transactionsSnapshot)}
+      <AccountDetailsView
+        title="Wallets"
+        secondaryColumn={WALLET_SECONDARY_COLUMN}
+        initialBalances={investmentBalancesView(balanceResults)}
+        refreshBalancesAction={loadWalletBalances}
+        transactions={{
+          initial: {
+            transactions: transactionsSnapshot.transactions,
+            message: "",
+            error: null,
+            historyStatus: toWalletTransactionHistoryStatus(transactionsSnapshot),
+          },
+          refreshAction: loadWalletTransactions,
+          pollAction: pollWalletTransactions,
+        }}
       />
     </div>
   );

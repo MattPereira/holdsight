@@ -56,6 +56,15 @@ import {
   failInvestmentTransactionSyncLease,
   releaseInvestmentTransactionSyncLease,
 } from "@/lib/investment-transactions/ingestion";
+import {
+  brokerageBalancesView,
+  investmentBalancesView,
+  type BalancesView,
+} from "@/lib/accounts/balances-view";
+import type {
+  TransactionHistoryStatus,
+  TransactionsView,
+} from "@/components/accounts/transactions/types";
 import { withTransactionJournalSummaries } from "@/lib/journal/transaction-entry";
 import {
   addUserEvmAccount,
@@ -101,7 +110,6 @@ import {
 import {
   getCurrentBrokerageTransactions,
   getBrokerageTransactionImportStatus,
-  type CurrentBrokerageTransaction,
 } from "@/lib/brokerage/transactions";
 import { syncBrokerageTransactionHistory } from "@/workflows/brokerage-transaction-sync";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
@@ -274,20 +282,20 @@ export async function loadHyperCoreBalances(): Promise<BalancesResult[]> {
   return getCurrentHyperCoreBalances(hyperCoreAccounts);
 }
 
-export async function loadWalletBalances(): Promise<BalancesResult[]> {
+export async function loadWalletBalances(): Promise<BalancesView> {
   const userId = await getCurrentUserId();
-  if (!userId) return unauthorizedBalancesResult();
+  if (!userId) return investmentBalancesView(unauthorizedBalancesResult());
 
   const walletConfigError = await validateUserEvmAccounts(userId);
   if (walletConfigError) {
-    return [
+    return investmentBalancesView([
       {
         status: "error",
         address: "WALLETS",
         message: walletConfigError,
         httpStatus: 400,
       },
-    ];
+    ]);
   }
 
   const wallets = await getUserEvmAccounts(userId);
@@ -303,7 +311,9 @@ export async function loadWalletBalances(): Promise<BalancesResult[]> {
     getCurrentLighterBalances(lighterAccounts),
   ]);
 
-  return mergeWalletBalanceResults(evmResults, hyperCoreResults, lighterResults);
+  return investmentBalancesView(
+    mergeWalletBalanceResults(evmResults, hyperCoreResults, lighterResults),
+  );
 }
 
 export type WalletTransactionsActionResult = {
@@ -473,14 +483,14 @@ export async function pollWalletTransactions(
   return { transactions, message: "", error: null, historyStatus };
 }
 
-export async function loadKrakenBalances(): Promise<BalancesResult[]> {
+export async function loadKrakenBalances(): Promise<BalancesView> {
   const userId = await getCurrentUserId();
-  if (!userId) return unauthorizedBalancesResult();
+  if (!userId) return investmentBalancesView(unauthorizedBalancesResult());
 
   const krakenAccounts = await ensureUserKrakenAccount(userId);
   await syncKrakenAccounts(userId, krakenAccounts);
 
-  return getCurrentUserKrakenBalances(userId);
+  return investmentBalancesView(await getCurrentUserKrakenBalances(userId));
 }
 
 export type KrakenTransactionsActionResult = {
@@ -705,12 +715,17 @@ export type BrokerageActionResult = {
   error: string | null;
 };
 
-export type BrokerageTransactionsActionResult = {
-  transactions: CurrentBrokerageTransaction[];
-  message: string;
-  error: string | null;
-  isSyncing: boolean;
-};
+// Brokerage reports sync progress as a single boolean, unlike the wallet/Kraken
+// checkpoints. Fold it into a history status so every source speaks the one
+// TransactionsView shape the account details view consumes.
+function brokerageHistoryStatus(isSyncing: boolean): TransactionHistoryStatus {
+  return {
+    earliestTransactionAt: null,
+    latestTransactionAt: null,
+    latestTransactionUpdatedAt: null,
+    hasMore: isSyncing,
+  };
+}
 
 export type DepositoryActionResult = {
   accounts: DepositoryAccountRow[];
@@ -775,15 +790,6 @@ function plaidResultError(
     return "Plaid needs you to finish signing in. Please try linking again.";
   }
   return null;
-}
-
-function brokerageSyncError(accounts: CurrentBrokerageAccount[]): string | null {
-  const messages = accounts
-    .filter((account) => account.syncStatus === "error")
-    .map((account) => account.syncErrorMessage?.trim())
-    .filter((message): message is string => Boolean(message));
-
-  return messages[0] ?? null;
 }
 
 async function createPlaidLinkTokenForFamilies(
@@ -932,10 +938,13 @@ export async function linkPlaidAccounts(
 /**
  * Refresh brokerage holdings for every linked Plaid Item.
  */
-export async function loadBrokerageBalances(): Promise<BrokerageActionResult> {
+export async function loadBrokerageBalances(): Promise<BalancesView> {
   const userId = await getCurrentUserId();
   if (!userId) {
-    return { accounts: [], error: "You must be signed in to view balances." };
+    return {
+      ...brokerageBalancesView([]),
+      error: "You must be signed in to view balances.",
+    };
   }
 
   try {
@@ -943,7 +952,7 @@ export async function loadBrokerageBalances(): Promise<BrokerageActionResult> {
   } catch (error) {
     const accounts = await getCurrentBrokerageBalances(userId);
     return {
-      accounts,
+      ...brokerageBalancesView(accounts),
       error: plaidActionErrorMessage(error, "Failed to refresh brokerage."),
     };
   }
@@ -951,20 +960,20 @@ export async function loadBrokerageBalances(): Promise<BrokerageActionResult> {
   const accounts = await getCurrentBrokerageBalances(userId);
   revalidatePath("/");
   revalidatePath("/brokerages");
-  return { accounts, error: brokerageSyncError(accounts) };
+  return brokerageBalancesView(accounts);
 }
 
 /**
  * Refresh brokerage investment transactions separately from brokerage balances.
  */
-export async function loadBrokerageTransactions(): Promise<BrokerageTransactionsActionResult> {
+export async function loadBrokerageTransactions(): Promise<TransactionsView> {
   const userId = await getCurrentUserId();
   if (!userId) {
     return {
       transactions: [],
       message: "",
       error: "You must be signed in to refresh transactions.",
-      isSyncing: false,
+      historyStatus: brokerageHistoryStatus(false),
     };
   }
 
@@ -1031,7 +1040,7 @@ export async function loadBrokerageTransactions(): Promise<BrokerageTransactions
         ? `Queued transaction history sync for ${queuedItemCount} Plaid ${queuedItemCount === 1 ? "connection" : "connections"}.`
         : "Transaction history sync is already running.",
       error: null,
-      isSyncing: status.isSyncing,
+      historyStatus: brokerageHistoryStatus(status.isSyncing),
     };
   } catch (error) {
     const [transactions, status] = await Promise.all([
@@ -1045,20 +1054,20 @@ export async function loadBrokerageTransactions(): Promise<BrokerageTransactions
         error,
         "Failed to refresh brokerage transactions.",
       ),
-      isSyncing: status.isSyncing,
+      historyStatus: brokerageHistoryStatus(status.isSyncing),
     };
   }
 }
 
 /** Read-only snapshot of brokerage transactions for polling an in-progress sync. */
-export async function pollBrokerageTransactions(): Promise<BrokerageTransactionsActionResult> {
+export async function pollBrokerageTransactions(): Promise<TransactionsView> {
   const userId = await getCurrentUserId();
   if (!userId) {
     return {
       transactions: [],
       message: "",
       error: "You must be signed in to refresh transactions.",
-      isSyncing: false,
+      historyStatus: brokerageHistoryStatus(false),
     };
   }
 
@@ -1066,7 +1075,12 @@ export async function pollBrokerageTransactions(): Promise<BrokerageTransactions
     getCurrentBrokerageTransactions(userId),
     getBrokerageTransactionImportStatus(userId),
   ]);
-  return { transactions, message: "", error: null, isSyncing: status.isSyncing };
+  return {
+    transactions,
+    message: "",
+    error: null,
+    historyStatus: brokerageHistoryStatus(status.isSyncing),
+  };
 }
 
 export type PortfolioTransactionsActionResult = {
@@ -1103,13 +1117,13 @@ function activePortfolioTransactionMessage(
 function combinePortfolioTransactionResults(
   wallet: WalletTransactionsActionResult,
   kraken: KrakenTransactionsActionResult,
-  brokerage: BrokerageTransactionsActionResult,
+  brokerage: TransactionsView,
 ): PortfolioTransactionsActionResult {
   const snapshot = mergePortfolioTransactions(
     [
       wallet.transactions ?? [],
       kraken.transactions,
-      brokerage.transactions,
+      brokerage.transactions ?? [],
     ],
     {
       walletPhase: wallet.historyStatus.phase,
@@ -1118,7 +1132,7 @@ function combinePortfolioTransactionResults(
         wallet.historyStatus.latestTransactionUpdatedAt,
       krakenPhase: kraken.historyStatus.phase,
       krakenHasMore: kraken.historyStatus.hasMore,
-      brokerageIsSyncing: brokerage.isSyncing,
+      brokerageIsSyncing: brokerage.historyStatus.hasMore,
     },
   );
 
@@ -1131,7 +1145,10 @@ function combinePortfolioTransactionResults(
       kraken.message,
       kraken.historyStatus.hasMore,
     ),
-    activePortfolioTransactionMessage(brokerage.message, brokerage.isSyncing),
+    activePortfolioTransactionMessage(
+      brokerage.message,
+      brokerage.historyStatus.hasMore,
+    ),
   ].filter((message): message is string => Boolean(message));
   const errors = [
     portfolioTransactionError(wallet.error),

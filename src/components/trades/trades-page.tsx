@@ -5,7 +5,6 @@ import { useMemo } from "react";
 import {
   loadPortfolioTransactions,
   pollPortfolioTransactions,
-  type PortfolioTransactionsActionResult,
 } from "@/app/actions";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { TransactionsTabContent } from "@/components/accounts/transactions/transactions-tab-content";
@@ -19,27 +18,21 @@ export type TradesPageData = {
 };
 
 export function TradesPage({ initialData }: { initialData: TradesPageData }) {
-  const transactionsConfig = useMemo(
+  const transactionsSource = useMemo(
     () => ({
-      initialTransactions: initialData.transactions,
-      loadTransactions: loadPortfolioTransactions,
-      pollTransactions: pollPortfolioTransactions,
-      getTransactions: (result: PortfolioTransactionsActionResult) =>
-        result.transactions,
-      getError: (result: PortfolioTransactionsActionResult) => result.error,
-      getMessage: (result: PortfolioTransactionsActionResult) =>
-        result.message || null,
-      initialHistoryStatus: initialData.transactionHistoryStatus,
-      getHistoryStatus: (result: PortfolioTransactionsActionResult) =>
-        result.historyStatus,
-      initialIsSyncing: initialData.transactionHistoryStatus.hasMore,
-      getIsSyncing: (result: PortfolioTransactionsActionResult) =>
-        result.isSyncing,
+      initial: {
+        transactions: initialData.transactions,
+        message: "",
+        error: null,
+        historyStatus: initialData.transactionHistoryStatus,
+      },
+      refreshAction: loadPortfolioTransactions,
+      pollAction: pollPortfolioTransactions,
     }),
     [initialData.transactions, initialData.transactionHistoryStatus],
   );
 
-  const panel = useTransactionsPanel(transactionsConfig);
+  const panel = useTransactionsPanel(transactionsSource);
   const refreshBusy = panel?.refreshPending ?? false;
 
   return (
