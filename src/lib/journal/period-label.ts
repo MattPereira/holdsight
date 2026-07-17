@@ -13,9 +13,13 @@ function formatDate(
 export function periodLabel(
   periodType: JournalPeriodType,
   periodStart: string,
+  { includeYear = true }: { includeYear?: boolean } = {},
 ) {
   if (periodType === "monthly") {
-    return formatDate(periodStart, { month: "long", year: "numeric" });
+    return formatDate(periodStart, {
+      month: "long",
+      ...(includeYear ? { year: "numeric" } : {}),
+    });
   }
   if (periodType === "weekly") {
     const periodEnd = moveJournalPeriod("daily", periodStart, 6);
@@ -23,7 +27,7 @@ export function periodLabel(
     const end = formatDate(periodEnd, {
       month: "short",
       day: "numeric",
-      year: "numeric",
+      ...(includeYear ? { year: "numeric" } : {}),
     });
     return `${start}–${end}`;
   }
@@ -31,7 +35,7 @@ export function periodLabel(
     weekday: "short",
     month: "short",
     day: "numeric",
-    year: "numeric",
+    ...(includeYear ? { year: "numeric" } : {}),
   });
 }
 

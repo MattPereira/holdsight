@@ -107,18 +107,12 @@ describe("PortfolioAccountsList", () => {
     cleanup();
   });
 
-  it("links the investment subheaders to their detail pages", () => {
+  it("does not link the investment subheaders to detail pages", () => {
     renderFull();
 
-    expect(
-      screen.getByRole("link", { name: /wallets/i }).getAttribute("href"),
-    ).toBe("/wallets");
-    expect(
-      screen.getByRole("link", { name: /exchanges/i }).getAttribute("href"),
-    ).toBe("/exchanges");
-    expect(
-      screen.getByRole("link", { name: /brokerages/i }).getAttribute("href"),
-    ).toBe("/brokerages");
+    expect(screen.queryByRole("link", { name: /view wallets/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /view exchanges/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /view brokerages/i })).toBeNull();
   });
 
   it("shows every child account inline without any expand interaction", () => {
@@ -215,8 +209,7 @@ describe("PortfolioAccountsList", () => {
   it("scopes each investment section's children beneath its own subheader", () => {
     renderFull();
 
-    const walletsLink = screen.getByRole("link", { name: /wallets/i });
-    const walletsSection = walletsLink.closest("section");
+    const walletsSection = screen.getByText("Wallets").closest("section");
     expect(walletsSection).not.toBeNull();
     expect(within(walletsSection as HTMLElement).getByText("0xabc")).toBeTruthy();
     expect(within(walletsSection as HTMLElement).queryByText("kraken")).toBeNull();

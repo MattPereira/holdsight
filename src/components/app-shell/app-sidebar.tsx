@@ -20,6 +20,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 
 const navItems = [
@@ -27,7 +30,12 @@ const navItems = [
   { label: "Theses", href: "/theses", icon: RiLightbulbLine },
   { label: "Journal", href: "/journal", icon: RiBookOpenLine },
   { label: "Trades", href: "/trades", icon: RiArrowLeftRightLine },
-  { label: "Accounts", href: "/accounts", icon: RiBankLine },
+];
+
+const accountNavItems = [
+  { label: "Wallets", href: "/wallets" },
+  { label: "Brokerages", href: "/brokerages" },
+  { label: "Exchanges", href: "/exchanges" },
 ];
 
 export function AppSidebar({ name, email }: { name: string; email: string }) {
@@ -62,6 +70,31 @@ export function AppSidebar({ name, email }: { name: string; email: string }) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  size="lg"
+                  tooltip="Accounts"
+                  className="text-base [&>svg]:size-5"
+                >
+                  <Link href="/accounts">
+                    <RiBankLine />
+                    <span>Accounts</span>
+                  </Link>
+                </SidebarMenuButton>
+                <SidebarMenuSub>
+                  {accountNavItems.map((item) => (
+                    <SidebarMenuSubItem key={item.label}>
+                      <SidebarMenuSubButton
+                        asChild
+                        className="h-9 !text-base"
+                      >
+                        <Link href={item.href}>{item.label}</Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  ))}
+                </SidebarMenuSub>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

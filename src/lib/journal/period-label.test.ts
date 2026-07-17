@@ -4,10 +4,16 @@ import { journalStripLabel, periodLabel } from "./period-label";
 describe("periodLabel", () => {
   it("labels a daily period with weekday, month, day, and year", () => {
     expect(periodLabel("daily", "2026-07-08")).toBe("Wed, Jul 8, 2026");
+    expect(periodLabel("daily", "2026-07-08", { includeYear: false })).toBe(
+      "Wed, Jul 8",
+    );
   });
 
   it("labels a weekly period as a date range", () => {
     expect(periodLabel("weekly", "2026-07-06")).toBe("Jul 6–Jul 12, 2026");
+    expect(periodLabel("weekly", "2026-07-06", { includeYear: false })).toBe(
+      "Jul 6–Jul 12",
+    );
   });
 
   it("labels a monthly period with month and year", () => {
