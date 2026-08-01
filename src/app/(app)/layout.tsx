@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
 import { LoginForm } from "@/components/auth/login-form";
 import { AssetGroupsProvider } from "@/components/portfolio/asset-groups-context";
@@ -38,14 +36,8 @@ export default async function AppLayout({
       <AssetGroupsProvider initialGroups={groups}>
         <AppSidebar name={session.user.name} email={session.user.email} />
         <SidebarInset>
-          <header className="relative flex h-14 items-center gap-2 border-b px-4">
+          <header className="flex h-14 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
-            <Link
-              href="/"
-              className="absolute left-1/2 -translate-x-1/2 font-anta text-xl font-medium"
-            >
-              Holdsight
-            </Link>
             <div className="ml-auto">
               <ThemeToggle />
             </div>
