@@ -107,14 +107,14 @@ export function investmentAccountSections({
     },
     {
       id: "exchange",
-      label: "Exchange",
+      label: "Exchanges",
       description: "Exchange assets",
       valueUsd: balancesTotal(exchangeResults),
       children: resultRows(exchangeResults, "Centralized exchange"),
     },
     {
       id: "brokerage",
-      label: "Brokerage",
+      label: "Brokerages",
       description: "Brokerage assets",
       valueUsd: brokerageTotal(brokerageAccounts),
       children: brokerageRows(brokerageAccounts),

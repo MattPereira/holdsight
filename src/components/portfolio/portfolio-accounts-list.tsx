@@ -30,8 +30,8 @@ function creditCardProvider(account: CreditCardAccountRow): string {
 const LIABILITY_TOTAL_CLASS = "text-red-600 dark:text-red-400";
 const LIABILITY_ROW_CLASS = "text-red-600/90 dark:text-red-400/60";
 
-/** One account group as a standalone card with its member accounts listed as
- * divided rows beneath. */
+/** One account group: a plain section heading above a card of its member
+ * accounts as divided rows. */
 function AccountCard({
   label,
   value,
@@ -44,18 +44,18 @@ function AccountCard({
   children: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-lg border">
-      <div className="flex items-center justify-between gap-4 border-b bg-muted/40 px-4 py-2.5">
-        <span className="min-w-0 truncate text-sm font-medium">{label}</span>
-      </div>
-      <div className="divide-y">{children}</div>
-      <div className="flex items-center justify-between gap-4 border-t bg-muted/50 px-4 py-2.5">
-        <span className="text-sm font-medium">Total</span>
-        <span
-          className={cn("text-sm font-semibold tabular-nums", valueClassName)}
-        >
-          {usdFormat.format(value)}
-        </span>
+    <section className="flex flex-col gap-2">
+      <h2 className="min-w-0 truncate px-4 text-base font-medium">{label}</h2>
+      <div className="overflow-hidden rounded-lg border">
+        <div className="divide-y">{children}</div>
+        <div className="flex items-center justify-between gap-4 border-t bg-muted/50 px-4 py-2.5">
+          <span className="text-sm font-medium">Total</span>
+          <span
+            className={cn("text-sm font-semibold tabular-nums", valueClassName)}
+          >
+            {usdFormat.format(value)}
+          </span>
+        </div>
       </div>
     </section>
   );
@@ -148,7 +148,7 @@ export function PortfolioAccountsList({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       {investmentCards.map((section) => {
         return (
           <AccountCard
