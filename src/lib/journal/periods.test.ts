@@ -33,6 +33,17 @@ describe("currentJournalPeriods", () => {
       { periodType: "monthly", periodStart: "2026-01-01" },
     ]);
   });
+
+  it("returns only the requested period types, in the order asked for", () => {
+    expect(currentJournalPeriods("2026-07-15", ["daily", "weekly"])).toEqual([
+      { periodType: "daily", periodStart: "2026-07-15" },
+      { periodType: "weekly", periodStart: "2026-07-13" },
+    ]);
+    expect(currentJournalPeriods("2026-07-15", ["weekly", "daily"])).toEqual([
+      { periodType: "weekly", periodStart: "2026-07-13" },
+      { periodType: "daily", periodStart: "2026-07-15" },
+    ]);
+  });
 });
 
 describe("journalStripDates", () => {

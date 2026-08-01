@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gte, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, lte, or } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -13,6 +13,7 @@ import {
   isCalendarDate,
   isJournalPeriodType,
   journalPeriodUtcRange,
+  todayInTimezone,
   type JournalPeriodType,
 } from "@/lib/journal/periods";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
@@ -34,6 +35,19 @@ export type JournalWorkspace = {
   timezoneLocked: boolean;
   entry: InvestmentJournalEntry | null;
   transactions: InvestmentTransactionListItem[];
+};
+
+/** A Journal Period the user can write into right now, with its entry if one
+ * has been created. `entry` is null until the first save materializes a row. */
+export type JournalSlot = {
+  periodType: JournalPeriodType;
+  periodStart: string;
+  entry: InvestmentJournalEntry | null;
+};
+
+export type CurrentJournalSlots = {
+  homeTimezone: string | null;
+  slots: JournalSlot[];
 };
 
 export type SaveJournalResult =
@@ -63,16 +77,7 @@ export function isIanaTimezone(value: string): boolean {
   }
 }
 
-export function todayInTimezone(timeZone: string): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
-}
+export { todayInTimezone };
 
 export async function getJournalWorkspace(
   userId: string,
@@ -115,27 +120,30 @@ export async function getJournalWorkspace(
 }
 
 /**
- * The current daily, weekly, and monthly Investment Journal Entries for the
- * home page — only those with written Plan or Reflection text. Returns nothing
- * until the user has set a home timezone, since "current" is undefined without
- * it. Ordered daily → weekly → monthly.
+ * One slot per requested Journal Period type, each resolved to the period
+ * containing today in the user's home timezone. Unlike a plain entry list this
+ * always returns a slot for every requested type — the Portfolio page edits
+ * these periods in place, so it needs the `periodStart` to write to even when
+ * no row exists yet. `homeTimezone` comes back too: "current" is undefined
+ * without it, and the client uses it to notice a period rollover.
  */
-export async function getCurrentJournalEntries(
+export async function getCurrentJournalSlots(
   userId: string,
-): Promise<InvestmentJournalEntry[]> {
+  periodTypes: readonly JournalPeriodType[],
+): Promise<CurrentJournalSlots> {
   const preferences = await db.query.userPreferences.findFirst({
     where: eq(userPreferences.userId, userId),
     columns: { homeTimezone: true },
   });
-  if (!preferences?.homeTimezone) return [];
+  if (!preferences?.homeTimezone) return { homeTimezone: null, slots: [] };
 
   const periods = currentJournalPeriods(
     todayInTimezone(preferences.homeTimezone),
+    periodTypes,
   );
-  const hasText = sql`(
-    char_length(trim(coalesce(${investmentJournalEntries.plan}, ''))) > 0
-    or char_length(trim(coalesce(${investmentJournalEntries.reflection}, ''))) > 0
-  )`;
+  if (periods.length === 0) {
+    return { homeTimezone: preferences.homeTimezone, slots: [] };
+  }
 
   const rows = await db
     .select()
@@ -151,17 +159,23 @@ export async function getCurrentJournalEntries(
             ),
           ),
         ),
-        hasText,
       ),
     );
 
   const byKey = new Map(
     rows.map((row) => [`${row.periodType}:${row.periodStart}`, row]),
   );
-  return periods
-    .map((period) => byKey.get(`${period.periodType}:${period.periodStart}`))
-    .filter((row) => row !== undefined)
-    .map(serializeEntry);
+  return {
+    homeTimezone: preferences.homeTimezone,
+    slots: periods.map((period) => {
+      const row = byKey.get(`${period.periodType}:${period.periodStart}`);
+      return {
+        periodType: period.periodType,
+        periodStart: period.periodStart,
+        entry: row ? serializeEntry(row) : null,
+      };
+    }),
+  };
 }
 
 /** Period starts (canonical dates) that already have an entry within [rangeStart, rangeEnd]. */

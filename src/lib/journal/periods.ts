@@ -55,15 +55,32 @@ export function canonicalPeriodStart(
   return formatCalendarDate(date);
 }
 
+/** Today's calendar date in `timeZone` (the browser's zone when omitted). */
+export function todayInTimezone(timeZone?: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 /**
- * The daily, weekly, and monthly Journal Periods that contain `today` (a
- * calendar date already resolved in the user's home timezone), each as its
- * canonical period start. Ordered daily → weekly → monthly.
+ * The Journal Periods that contain `today` (a calendar date already resolved
+ * in the user's home timezone), each as its canonical period start. Defaults
+ * to all three types, ordered daily → weekly → monthly; callers that only care
+ * about some of them (the Portfolio page shows daily and weekly) pass their
+ * own list and get it back in that order.
  */
 export function currentJournalPeriods(
   today: string,
+  periodTypes: readonly JournalPeriodType[] = JOURNAL_PERIOD_TYPES,
 ): { periodType: JournalPeriodType; periodStart: string }[] {
-  return JOURNAL_PERIOD_TYPES.map((periodType) => ({
+  return periodTypes.map((periodType) => ({
     periodType,
     periodStart: canonicalPeriodStart(periodType, today),
   }));

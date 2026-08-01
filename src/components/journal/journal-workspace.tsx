@@ -7,7 +7,6 @@ import {
   RiArrowRightSLine,
   RiCalendarLine,
   RiDeleteBinLine,
-  RiRefreshLine,
 } from "@remixicon/react";
 import { toast } from "sonner";
 
@@ -16,6 +15,10 @@ import {
   deleteJournalEntry,
   saveJournalEntry,
 } from "@/app/(app)/journal/actions";
+import {
+  JournalEntryFields,
+  type JournalDraft,
+} from "@/components/journal/journal-entry-fields";
 import { JournalImagesSection } from "@/components/journal/journal-images-section";
 import { JournalTransactionContext } from "@/components/journal/journal-transaction-context";
 import { SaveIndicator } from "@/components/journal/save-indicator";
@@ -47,7 +50,6 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
 import type {
   InvestmentJournalEntry,
   JournalWorkspace as JournalWorkspaceData,
@@ -59,16 +61,16 @@ import {
   JOURNAL_STRIP_SIZE,
   journalStripMobileVisibleIndices,
   moveJournalPeriod,
+  todayInTimezone,
   type JournalPeriodType,
 } from "@/lib/journal/periods";
 import { useAutosaveEntry } from "@/lib/journal/use-autosave-entry";
 import { useUnsavedChangesGuard } from "@/lib/journal/use-unsaved-changes-guard";
 import { cn } from "@/lib/utils";
 
-type Draft = { plan: string; reflection: string };
+type Draft = JournalDraft;
 type JournalView = "write" | "transactions";
 
-const MAX_LENGTH = 10_000;
 const UNSAVED_CHANGES_MESSAGE =
   "Your latest journal changes have not been saved. Leave anyway?";
 
@@ -77,19 +79,6 @@ const PERIOD_UNIT: Record<JournalPeriodType, string> = {
   weekly: "week",
   monthly: "month",
 };
-
-function todayInTimezone(timeZone?: string): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const values = Object.fromEntries(
-    parts.map((part) => [part.type, part.value]),
-  );
-  return `${values.year}-${values.month}-${values.day}`;
-}
 
 function draftFromEntry(entry: InvestmentJournalEntry | null): Draft {
   return { plan: entry?.plan ?? "", reflection: entry?.reflection ?? "" };
@@ -497,102 +486,28 @@ export function JournalWorkspace({
           </div>
 
           <div className="flex flex-col gap-6">
-            <div
-              className={cn(
-                "flex min-w-0 flex-col gap-6",
-                view !== "write" && "hidden",
-              )}
-            >
-              <div className="grid gap-6 xl:grid-cols-2">
-                <div className="flex flex-col gap-2">
-                  <h2 className="font-medium">Plan</h2>
-                  <Field>
-                    <FieldLabel className="sr-only" htmlFor="journal-plan">
-                      Plan
-                    </FieldLabel>
-                    <Textarea
-                      id="journal-plan"
-                      className="min-h-72 resize-y"
-                      maxLength={MAX_LENGTH}
-                      value={draft.plan}
-                      placeholder="What is your plan for this period?"
-                      onChange={(event) => {
-                        autosave.setDraft((current) => ({
-                          ...current,
-                          plan: event.target.value,
-                        }));
-                      }}
-                    />
-                  </Field>
-                </div>
-
-                <div className="flex flex-col gap-2">
-                  <h2 className="font-medium">Notes</h2>
-                  <Field>
-                    <FieldLabel className="sr-only" htmlFor="journal-reflection">
-                      Notes
-                    </FieldLabel>
-                    <Textarea
-                      id="journal-reflection"
-                      className="min-h-72 resize-y"
-                      maxLength={MAX_LENGTH}
-                      value={draft.reflection}
-                      placeholder="What happened and what did you learn?"
-                      onChange={(event) => {
-                        autosave.setDraft((current) => ({
-                          ...current,
-                          reflection: event.target.value,
-                        }));
-                      }}
-                    />
-                  </Field>
-                </div>
-              </div>
-
-              <JournalImagesSection
-                key={`${periodType}:${selectedDate}:${imageRevision}`}
-                endpoint={imageEndpoint}
-                open
-                disabled={
-                  deleting || status === "error" || status === "conflict"
-                }
-                beforeMutation={autosave.flushBeforeMutation}
-                onEntryVersionChanged={handleEntryVersionChanged}
-                onPendingChange={setImageMutationPending}
-              />
-
-              {status === "error" ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Save failed</CardTitle>
-                <CardDescription>
-                  {saveError} Your visible edits are preserved and the save will
-                  retry while this page remains open.
-                </CardDescription>
-              </CardHeader>
-            </Card>
-              ) : null}
-
-              {status === "conflict" ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>This entry changed elsewhere</CardTitle>
-                <CardDescription>
-                  Autosave is paused. Your local edits remain visible until you
-                  choose a version.
-                </CardDescription>
-              </CardHeader>
-              <CardFooter className="flex-wrap">
-                <Button variant="outline" onClick={autosave.reloadServerVersion}>
-                  <RiRefreshLine data-icon="inline-start" />
-                  Reload server version
-                </Button>
-                <Button onClick={autosave.overwriteServerVersion}>
-                  Overwrite with my edits
-                </Button>
-              </CardFooter>
-            </Card>
-              ) : null}
+            <div className={cn(view !== "write" && "hidden")}>
+              <JournalEntryFields
+                idPrefix="journal"
+                draft={draft}
+                onDraftChange={autosave.setDraft}
+                status={status}
+                saveError={saveError}
+                onReloadServerVersion={autosave.reloadServerVersion}
+                onOverwriteServerVersion={autosave.overwriteServerVersion}
+              >
+                <JournalImagesSection
+                  key={`${periodType}:${selectedDate}:${imageRevision}`}
+                  endpoint={imageEndpoint}
+                  open
+                  disabled={
+                    deleting || status === "error" || status === "conflict"
+                  }
+                  beforeMutation={autosave.flushBeforeMutation}
+                  onEntryVersionChanged={handleEntryVersionChanged}
+                  onPendingChange={setImageMutationPending}
+                />
+              </JournalEntryFields>
             </div>
 
             {view === "transactions" ? (
