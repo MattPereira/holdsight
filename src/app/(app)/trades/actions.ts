@@ -108,9 +108,9 @@ function combinePortfolioTransactionResults(
 }
 
 /**
- * Sync every investment transaction source (wallets, exchanges, brokerages) and
+ * Sync every Investment Provider (wallets, exchanges, brokerages) and
  * return the merged feed for the Trades page. Fans out to the
- * per-source loaders so each still claims its own leases and starts its own
+ * per-provider loaders so each still claims its own leases and starts its own
  * workflows.
  */
 async function attachJournalSummaries(

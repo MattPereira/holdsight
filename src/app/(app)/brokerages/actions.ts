@@ -26,16 +26,6 @@ import {
   getCurrentBrokerageTransactions,
 } from "@/lib/brokerage/transactions";
 import {
-  getUserCreditCardAccounts,
-  type CreditCardAccountRow
-} from "@/lib/credit-card/accounts";
-import { syncUserCreditCardAccounts } from "@/lib/credit-card/balances";
-import {
-  getUserDepositoryAccounts,
-  type DepositoryAccountRow
-} from "@/lib/depository/accounts";
-import { syncUserDepositoryBalances } from "@/lib/depository/balances";
-import {
   claimInvestmentTransactionSyncLease,
   failInvestmentTransactionSyncLease
 } from "@/lib/investment-transactions/ingestion";
@@ -44,9 +34,7 @@ import {
   readPlaidError
 } from "@/lib/plaid/client";
 import {
-  getUserBrokeragePlaidItems,
-  PlaidRevokeError,
-  removeUserPlaidItem
+  getUserBrokeragePlaidItems
 } from "@/lib/plaid/items";
 import { syncBrokerageTransactionHistory } from "@/workflows/brokerage-transaction-sync";
 
@@ -67,17 +55,6 @@ function brokerageHistoryStatus(isSyncing: boolean): TransactionHistoryStatus {
     hasMore: isSyncing,
   };
 }
-
-export type DepositoryActionResult = {
-  accounts: DepositoryAccountRow[];
-  error: string | null;
-};
-
-export type CreditCardActionResult = {
-  accounts: CreditCardAccountRow[];
-  error: string | null;
-};
-
 
 function plaidActionErrorMessage(error: unknown, fallback: string): string {
   const { code, message } = readPlaidError(error);
@@ -245,129 +222,3 @@ export async function pollBrokerageTransactions(): Promise<TransactionsView> {
     historyStatus: brokerageHistoryStatus(status.isSyncing),
   };
 }
-
-
-/**
- * Refresh depository (checking/savings) balances for every linked Plaid Item.
- */
-export async function loadDepositoryBalances(): Promise<DepositoryActionResult> {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return { accounts: [], error: "You must be signed in to view balances." };
-  }
-
-  await syncUserDepositoryBalances(userId);
-  revalidatePath("/");
-  return { accounts: await getUserDepositoryAccounts(userId), error: null };
-}
-
-/**
- * Refresh credit-card balances and liability details for every linked Plaid Item.
- */
-export async function loadCreditCardAccounts(): Promise<CreditCardActionResult> {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return { accounts: [], error: "You must be signed in to view balances." };
-  }
-
-  await syncUserCreditCardAccounts(userId);
-  revalidatePath("/");
-  return { accounts: await getUserCreditCardAccounts(userId), error: null };
-}
-
-// Shown when revoking the Item at Plaid fails transiently and we deliberately
-// leave the local rows intact so the user can retry rather than orphaning a
-// still-live authorization.
-const PLAID_REVOKE_RETRY_MESSAGE =
-  "Couldn't reach the institution to disconnect. Please try again.";
-
-/**
- * Unlink a Plaid Item and delete all of its accounts.
- * Returns the user's remaining brokerage accounts (called from that page).
- */
-export async function removeBrokerage(
-  plaidItemId: string,
-): Promise<BrokerageActionResult> {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return {
-      accounts: [],
-      error: "You must be signed in to remove an account.",
-    };
-  }
-
-  try {
-    await removeUserPlaidItem(userId, plaidItemId);
-  } catch (error) {
-    if (error instanceof PlaidRevokeError) {
-      return {
-        accounts: await getCurrentBrokerageBalances(userId),
-        error: PLAID_REVOKE_RETRY_MESSAGE,
-      };
-    }
-    throw error;
-  }
-  revalidatePath("/");
-  return { accounts: await getCurrentBrokerageBalances(userId), error: null };
-}
-
-/**
- * Unlink a Plaid Item and delete all of its accounts.
- * Returns the user's remaining depository accounts (called from that page).
- */
-export async function removeDepository(
-  plaidItemId: string,
-): Promise<DepositoryActionResult> {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return {
-      accounts: [],
-      error: "You must be signed in to remove an account.",
-    };
-  }
-
-  try {
-    await removeUserPlaidItem(userId, plaidItemId);
-  } catch (error) {
-    if (error instanceof PlaidRevokeError) {
-      return {
-        accounts: await getUserDepositoryAccounts(userId),
-        error: PLAID_REVOKE_RETRY_MESSAGE,
-      };
-    }
-    throw error;
-  }
-  revalidatePath("/");
-  return { accounts: await getUserDepositoryAccounts(userId), error: null };
-}
-
-/**
- * Unlink a Plaid Item and delete all of its accounts.
- * Returns the user's remaining credit-card accounts.
- */
-export async function removeCreditCard(
-  plaidItemId: string,
-): Promise<CreditCardActionResult> {
-  const userId = await getCurrentUserId();
-  if (!userId) {
-    return {
-      accounts: [],
-      error: "You must be signed in to remove an account.",
-    };
-  }
-
-  try {
-    await removeUserPlaidItem(userId, plaidItemId);
-  } catch (error) {
-    if (error instanceof PlaidRevokeError) {
-      return {
-        accounts: await getUserCreditCardAccounts(userId),
-        error: PLAID_REVOKE_RETRY_MESSAGE,
-      };
-    }
-    throw error;
-  }
-  revalidatePath("/");
-  return { accounts: await getUserCreditCardAccounts(userId), error: null };
-}
-

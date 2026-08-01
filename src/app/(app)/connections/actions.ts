@@ -154,15 +154,6 @@ export async function removeWallet(
   };
 }
 
-/**
- * Fetch EVM balances for every tracked wallet. Called from the client only on
- * a button click, so this is the single place a Zerion request is triggered.
- *
- * Wallets are fetched sequentially (not in parallel) so we never burst past the
- * per-second rate limit. If we get rate limited, we stop immediately rather than
- * spending more of the limited daily quota on calls that would also fail.
- */
-
 export type KrakenCredentialsActionResult = {
   message: string;
   error: string | null;
@@ -493,12 +484,6 @@ export async function linkPlaidAccounts(
  * Refresh brokerage holdings for every linked Plaid Item.
  */
 
-// Shown when revoking the Item at Plaid fails transiently and we deliberately
-// leave the local rows intact so the user can retry rather than orphaning a
-// still-live authorization.
-const PLAID_REVOKE_RETRY_MESSAGE =
-  "Couldn't reach the institution to disconnect. Please try again.";
-
 /* ----------------------- account connections hub ----------------------- */
 
 export type AccountConnectionsResult = {
@@ -706,4 +691,100 @@ export async function removeManualBalanceItem(
 
   revalidatePath("/");
   return { items, error: null };
+}
+
+// Shown when revoking the Item at Plaid fails transiently and we deliberately
+// leave the local rows intact so the user can retry rather than orphaning a
+// still-live authorization.
+const PLAID_REVOKE_RETRY_MESSAGE =
+  "Couldn't reach the institution to disconnect. Please try again.";
+
+/**
+ * Unlink a Plaid Item and delete all of its accounts.
+ * Returns the user's remaining brokerage accounts (called from that page).
+ */
+export async function removeBrokerage(
+  plaidItemId: string,
+): Promise<BrokerageActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      accounts: [],
+      error: "You must be signed in to remove an account.",
+    };
+  }
+
+  try {
+    await removeUserPlaidItem(userId, plaidItemId);
+  } catch (error) {
+    if (error instanceof PlaidRevokeError) {
+      return {
+        accounts: await getCurrentBrokerageBalances(userId),
+        error: PLAID_REVOKE_RETRY_MESSAGE,
+      };
+    }
+    throw error;
+  }
+  revalidatePath("/");
+  return { accounts: await getCurrentBrokerageBalances(userId), error: null };
+}
+
+/**
+ * Unlink a Plaid Item and delete all of its accounts.
+ * Returns the user's remaining depository accounts (called from that page).
+ */
+export async function removeDepository(
+  plaidItemId: string,
+): Promise<DepositoryActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      accounts: [],
+      error: "You must be signed in to remove an account.",
+    };
+  }
+
+  try {
+    await removeUserPlaidItem(userId, plaidItemId);
+  } catch (error) {
+    if (error instanceof PlaidRevokeError) {
+      return {
+        accounts: await getUserDepositoryAccounts(userId),
+        error: PLAID_REVOKE_RETRY_MESSAGE,
+      };
+    }
+    throw error;
+  }
+  revalidatePath("/");
+  return { accounts: await getUserDepositoryAccounts(userId), error: null };
+}
+
+/**
+ * Unlink a Plaid Item and delete all of its accounts.
+ * Returns the user's remaining credit-card accounts.
+ */
+export async function removeCreditCard(
+  plaidItemId: string,
+): Promise<CreditCardActionResult> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    return {
+      accounts: [],
+      error: "You must be signed in to remove an account.",
+    };
+  }
+
+  try {
+    await removeUserPlaidItem(userId, plaidItemId);
+  } catch (error) {
+    if (error instanceof PlaidRevokeError) {
+      return {
+        accounts: await getUserCreditCardAccounts(userId),
+        error: PLAID_REVOKE_RETRY_MESSAGE,
+      };
+    }
+    throw error;
+  }
+  revalidatePath("/");
+  return { accounts: await getUserCreditCardAccounts(userId), error: null };
 }
