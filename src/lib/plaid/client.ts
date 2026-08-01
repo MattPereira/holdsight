@@ -31,6 +31,16 @@ function getPlaidEnv(): PlaidEnv {
   return process.env.VERCEL_ENV === "production" ? "production" : "sandbox";
 }
 
+/**
+ * Plaid is only integrated against its production environment. The sandbox
+ * implementation is deliberately not maintained, and production access tokens
+ * are rejected by the sandbox host, so outside production deployments every
+ * Plaid-backed sync is skipped rather than attempted and recorded as an error.
+ */
+export function isPlaidEnabled(): boolean {
+  return getPlaidEnv() === "production";
+}
+
 let cachedClient: PlaidApi | null = null;
 
 /**

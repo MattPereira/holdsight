@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getDepositoryAccounts } from "@/lib/plaid/client";
+import { getDepositoryAccounts, isPlaidEnabled } from "@/lib/plaid/client";
 import { decrypt } from "@/lib/plaid/crypto";
 import { getUserDepositoryPlaidItems } from "@/lib/plaid/items";
 import { saveDepositoryAccounts } from "@/lib/depository/accounts";
@@ -11,6 +11,8 @@ import { saveDepositoryAccounts } from "@/lib/depository/accounts";
  * independent logins, so one failing doesn't stop the others.
  */
 export async function syncUserDepositoryBalances(userId: string): Promise<void> {
+  if (!isPlaidEnabled()) return;
+
   const items = await getUserDepositoryPlaidItems(userId);
 
   for (const item of items) {

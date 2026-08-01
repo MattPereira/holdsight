@@ -130,6 +130,10 @@ async function renewLease(
 export async function runSingleAccountTransactionSync(
   input: RunSingleAccountTransactionSyncInput,
 ) {
+  // Call the step as a bare identifier: invoking it as `input.processPage()`
+  // makes the runtime capture `input` as the step's `this`, which fails to
+  // serialize because `input.httpStatus` is a plain function.
+  const { processPage } = input;
   let totalTransactions = 0;
 
   try {
@@ -144,7 +148,7 @@ export async function runSingleAccountTransactionSync(
         throw new Error(`${input.provider} transaction sync lease was lost.`);
       }
 
-      const result = await input.processPage(
+      const result = await processPage(
         input.userId,
         input.accountId,
         input.providerContext,
@@ -196,6 +200,8 @@ export async function runSingleAccountTransactionSync(
 export async function runSequentialAccountTransactionSync(
   input: RunSequentialAccountTransactionSyncInput,
 ) {
+  // See runSingleAccountTransactionSync: the step must not be called as a method.
+  const { processPage } = input;
   let totalTransactions = 0;
   let hasFetchedPage = false;
   const pendingAccounts = [...input.accounts];
@@ -217,7 +223,7 @@ export async function runSequentialAccountTransactionSync(
           throw new Error(`${input.provider} transaction sync lease was lost.`);
         }
 
-        const result = await input.processPage(
+        const result = await processPage(
           input.userId,
           account.id,
           input.providerContext,

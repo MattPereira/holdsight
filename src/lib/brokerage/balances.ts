@@ -27,6 +27,7 @@ import {
   decryptBrokerageToken,
   encryptBrokerageToken,
 } from "@/lib/brokerage/crypto";
+import { isPlaidEnabled } from "@/lib/plaid/client";
 import { decrypt } from "@/lib/plaid/crypto";
 import {
   getUserBrokeragePlaidItems,
@@ -323,8 +324,9 @@ async function getUsableSchwabAccessToken(
  * failure on one doesn't stop the others.
  */
 export async function syncUserBrokerageBalances(userId: string): Promise<void> {
+  // Schwab connects directly, so it still syncs when Plaid is unavailable.
   const [items, schwabConnections] = await Promise.all([
-    getUserBrokeragePlaidItems(userId),
+    isPlaidEnabled() ? getUserBrokeragePlaidItems(userId) : [],
     getUserSchwabConnections(userId),
   ]);
 

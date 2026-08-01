@@ -2,6 +2,7 @@ import "server-only";
 
 import { saveCreditCardAccounts } from "@/lib/credit-card/accounts";
 import { getCreditCardAccounts } from "@/lib/credit-card/client";
+import { isPlaidEnabled } from "@/lib/plaid/client";
 import { decrypt } from "@/lib/plaid/crypto";
 import { getUserCreditCardPlaidItems } from "@/lib/plaid/items";
 
@@ -11,6 +12,8 @@ import { getUserCreditCardPlaidItems } from "@/lib/plaid/items";
  * Item does not stop the rest.
  */
 export async function syncUserCreditCardAccounts(userId: string): Promise<void> {
+  if (!isPlaidEnabled()) return;
+
   const items = await getUserCreditCardPlaidItems(userId);
 
   for (const item of items) {

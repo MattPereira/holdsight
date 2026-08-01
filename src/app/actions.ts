@@ -79,6 +79,7 @@ import {
   exchangePublicToken,
   getDepositoryAccounts,
   getInstitution,
+  isPlaidEnabled,
   normalizePlaidAccountFamilies,
   readPlaidError,
   type PlaidAccountFamily,
@@ -974,6 +975,19 @@ export async function loadBrokerageTransactions(): Promise<TransactionsView> {
       message: "",
       error: "You must be signed in to refresh transactions.",
       historyStatus: brokerageHistoryStatus(false),
+    };
+  }
+
+  if (!isPlaidEnabled()) {
+    const [transactions, status] = await Promise.all([
+      getCurrentBrokerageTransactions(userId),
+      getBrokerageTransactionImportStatus(userId),
+    ]);
+    return {
+      transactions,
+      message: "",
+      error: null,
+      historyStatus: brokerageHistoryStatus(status.isSyncing),
     };
   }
 
