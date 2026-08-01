@@ -4,7 +4,10 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { RiDeleteBinLine, RiLineChartLine } from "@remixicon/react";
 
-import { removeSchwabConnection } from "@/app/actions";
+import {
+  removeSchwabConnection,
+  type SchwabConnectionSummary,
+} from "@/app/actions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,9 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FieldDescription, FieldError } from "@/components/ui/field";
-import type { SavedBrokerageConnection } from "@/lib/brokerage/connections";
-
-const statusLabel: Record<SavedBrokerageConnection["status"], string> = {
+const statusLabel: Record<SchwabConnectionSummary["status"], string> = {
   active: "Connected",
   login_required: "Reconnect required",
   error: "Sync error",
@@ -33,7 +34,7 @@ export function SchwabConnectPanel({
   configured,
   view = "add",
 }: {
-  initialConnections: SavedBrokerageConnection[];
+  initialConnections: SchwabConnectionSummary[];
   configured: boolean;
   view?: "add" | "remove";
 }) {

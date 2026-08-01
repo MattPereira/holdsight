@@ -90,7 +90,6 @@ import {
   PlaidRevokeError,
   removeUserPlaidItem,
   upsertPlaidItem,
-  type SavedPlaidItem,
 } from "@/lib/plaid/items";
 import { getPlaidHoldings } from "@/lib/brokerage/providers/plaid/client";
 import {
@@ -100,7 +99,6 @@ import {
 import {
   getUserSchwabConnections,
   removeUserSchwabConnection,
-  type SavedBrokerageConnection,
 } from "@/lib/brokerage/connections";
 import {
   applyItemHoldings,
@@ -1354,12 +1352,46 @@ export type AccountConnectionsResult = {
   wallets: SavedEvmAccount[];
   lighterAccounts: SavedLighterAccount[];
   krakenAccounts: SavedKrakenAccount[];
-  plaidItems: SavedPlaidItem[];
-  schwabConnections: SavedBrokerageConnection[];
+  plaidItems: PlaidConnectionSummary[];
+  schwabConnections: SchwabConnectionSummary[];
   schwabConfigured: boolean;
   manualItems: ManualBalanceItemRow[];
   error: string | null;
 };
+
+export type PlaidConnectionSummary = {
+  id: string;
+  institutionName: string | null;
+  status: "active" | "login_required" | "error" | "disabled";
+  accountNames?: string[];
+};
+
+export type SchwabConnectionSummary = {
+  id: string;
+  institutionName: string | null;
+  status: "active" | "login_required" | "error" | "disabled";
+};
+
+function plaidConnectionSummary(
+  item: Awaited<ReturnType<typeof getUserPlaidItems>>[number],
+): PlaidConnectionSummary {
+  return {
+    id: item.id,
+    institutionName: item.institutionName,
+    status: item.status,
+    accountNames: item.accountNames,
+  };
+}
+
+function schwabConnectionSummary(
+  connection: Awaited<ReturnType<typeof getUserSchwabConnections>>[number],
+): SchwabConnectionSummary {
+  return {
+    id: connection.id,
+    institutionName: connection.institutionName,
+    status: connection.status,
+  };
+}
 
 /**
  * Load every connection the user manages, for the centralized connect sheet.
@@ -1400,8 +1432,8 @@ export async function getAccountConnections(): Promise<AccountConnectionsResult>
     wallets,
     lighterAccounts,
     krakenAccounts,
-    plaidItems,
-    schwabConnections,
+    plaidItems: plaidItems.map(plaidConnectionSummary),
+    schwabConnections: schwabConnections.map(schwabConnectionSummary),
     schwabConfigured: isSchwabConfigured(),
     manualItems,
     error: null,
@@ -1415,7 +1447,7 @@ export async function getAccountConnections(): Promise<AccountConnectionsResult>
  */
 export async function removePlaidItem(
   plaidItemId: string,
-): Promise<{ plaidItems: SavedPlaidItem[]; error: string | null }> {
+): Promise<{ plaidItems: PlaidConnectionSummary[]; error: string | null }> {
   const userId = await getCurrentUserId();
   if (!userId) {
     return {
@@ -1429,20 +1461,23 @@ export async function removePlaidItem(
   } catch (error) {
     if (error instanceof PlaidRevokeError) {
       return {
-        plaidItems: await getUserPlaidItems(userId),
+        plaidItems: (await getUserPlaidItems(userId)).map(plaidConnectionSummary),
         error: PLAID_REVOKE_RETRY_MESSAGE,
       };
     }
     throw error;
   }
   revalidatePath("/");
-  return { plaidItems: await getUserPlaidItems(userId), error: null };
+  return {
+    plaidItems: (await getUserPlaidItems(userId)).map(plaidConnectionSummary),
+    error: null,
+  };
 }
 
 export async function removeSchwabConnection(
   connectionId: string,
 ): Promise<{
-  schwabConnections: SavedBrokerageConnection[];
+  schwabConnections: SchwabConnectionSummary[];
   error: string | null;
 }> {
   const userId = await getCurrentUserId();
@@ -1457,7 +1492,9 @@ export async function removeSchwabConnection(
   revalidatePath("/");
   revalidatePath("/connections");
   return {
-    schwabConnections: await getUserSchwabConnections(userId),
+    schwabConnections: (await getUserSchwabConnections(userId)).map(
+      schwabConnectionSummary,
+    ),
     error: null,
   };
 }

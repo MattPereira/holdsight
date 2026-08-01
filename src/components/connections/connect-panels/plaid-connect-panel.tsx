@@ -38,11 +38,11 @@ import {
   FieldTitle,
 } from "@/components/ui/field";
 import { usePlaidConnect } from "@/components/connections/use-plaid-connect";
-import type { SavedPlaidItem } from "@/lib/plaid/items";
+import type { PlaidConnectionSummary } from "@/app/actions";
 
 type AccountFamily = "checking" | "savings" | "credit_card" | "brokerage";
 
-const statusLabel: Record<SavedPlaidItem["status"], string | null> = {
+const statusLabel: Record<PlaidConnectionSummary["status"], string | null> = {
   active: "Syncing",
   login_required: "Reconnect required",
   error: "Sync error",
@@ -81,7 +81,7 @@ export function PlaidConnectPanel({
   onConnected,
   view = "add",
 }: {
-  initialItems: SavedPlaidItem[];
+  initialItems: PlaidConnectionSummary[];
   onConnected: () => void;
   view?: "add" | "remove";
 }) {
