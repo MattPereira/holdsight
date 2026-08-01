@@ -51,7 +51,7 @@ export function PortfolioPage({
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <PageHeader
         title="Portfolio"
         onRefresh={handleRefresh}

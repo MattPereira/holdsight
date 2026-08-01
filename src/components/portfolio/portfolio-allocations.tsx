@@ -145,7 +145,8 @@ function AllocationDonutChart({
           data={chartData}
           dataKey="value"
           nameKey="asset"
-          innerRadius="50%"
+          innerRadius="57%"
+          outerRadius="92%"
           strokeWidth={2}
           stroke="var(--background)"
         >
@@ -195,9 +196,6 @@ function HoldingsRows({
 }) {
   return (
     <LineItemGroup type="multiple">
-      <div className="flex items-center justify-between gap-3 border-b bg-muted/50 px-4 py-3 font-medium">
-        <span>Allocations</span>
-      </div>
       {rows.map((row) => {
         const fields = {
           leading: (
@@ -291,7 +289,7 @@ export function PortfolioAllocations({
   }
 
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-2 lg:items-center">
+    <section className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-center">
       <AllocationDonutChart
         grandTotalValue={grandTotalValue}
         totals={visibleTotals}
