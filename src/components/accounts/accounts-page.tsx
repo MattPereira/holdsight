@@ -1,11 +1,12 @@
 "use client";
 
-import { RiRefreshLine, RiSettings3Line } from "@remixicon/react";
+import { RiSettings3Line } from "@remixicon/react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { loadAccountsPageData } from "@/app/(app)/accounts/actions";
+import { PageHeader } from "@/components/app-shell/page-header";
 import { Button } from "@/components/ui/button";
 import { PortfolioAccountsList } from "@/components/portfolio/portfolio-accounts-list";
 import type { PortfolioAccountsData } from "@/lib/portfolio/page-data";
@@ -57,27 +58,25 @@ export function AccountsPage({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold">Accounts</h1>
+      <PageHeader
+        title="Accounts"
+        adjacent={
           <Button
-            type="button"
-            variant="outline"
+            asChild
+            variant="secondary"
             size="icon-sm"
-            onClick={handleRefresh}
-            disabled={isPending}
-            aria-label={isPending ? "Refreshing" : "Refresh"}
+            aria-label="Settings"
           >
-            <RiRefreshLine className={cn(isPending && "animate-spin")} />
+            <Link href="/connections">
+              <RiSettings3Line />
+            </Link>
           </Button>
-        </div>
-        <Button asChild variant="outline">
-          <Link href="/connections">
-            <RiSettings3Line data-icon="inline-start" />
-            Settings
-          </Link>
-        </Button>
-      </div>
+        }
+        onRefresh={handleRefresh}
+        refreshBusy={isPending}
+        refreshLabel="Refresh"
+        refreshBusyLabel="Refreshing"
+      />
 
       <div
         aria-busy={isPending}

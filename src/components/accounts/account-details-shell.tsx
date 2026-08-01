@@ -1,8 +1,8 @@
 "use client";
 
-import { RiRefreshLine } from "@remixicon/react";
 import { useState } from "react";
 
+import { PageHeader } from "@/components/app-shell/page-header";
 import { BalancesTabContent } from "@/components/accounts/balances/balances-tab-content";
 import type { TransactionsPanel } from "@/components/accounts/transactions/types";
 import { TransactionsTabContent } from "@/components/accounts/transactions/transactions-tab-content";
@@ -10,7 +10,6 @@ import type {
   BalanceGroup,
   SecondaryColumn,
 } from "@/components/accounts/types";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { PortfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 
@@ -81,11 +80,10 @@ export function AccountDetailsShell({
           onValueChange={setActiveTab}
           className="flex flex-col gap-4"
         >
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold">{title}</h1>
-
-              {hasTransactions ? (
+          <PageHeader
+            title={title}
+            adjacent={
+              hasTransactions ? (
                 <TabsList>
                   <TabsTrigger value="balances" className="w-24">
                     Balances
@@ -94,28 +92,13 @@ export function AccountDetailsShell({
                     Trades
                   </TabsTrigger>
                 </TabsList>
-              ) : null}
-            </div>
-
-            <Button
-              type="button"
-              variant="outline"
-              size="icon-sm"
-              onClick={refresh}
-              disabled={refreshBusy}
-              aria-label={
-                onTransactionsTab
-                  ? refreshBusy
-                    ? "Refreshing transactions"
-                    : "Refresh transactions"
-                  : refreshBusy
-                    ? "Refreshing"
-                    : "Refresh"
-              }
-            >
-              <RiRefreshLine />
-            </Button>
-          </div>
+              ) : null
+            }
+            onRefresh={refresh}
+            refreshBusy={refreshBusy}
+            refreshLabel={onTransactionsTab ? "Sync" : "Refresh"}
+            refreshBusyLabel={onTransactionsTab ? "Syncing" : "Refreshing"}
+          />
 
           <TabsContent value="balances">
             <BalancesTabContent

@@ -58,7 +58,6 @@ export function PortfolioPage({
         refreshBusy={isPending}
         refreshLabel="Refresh"
         refreshBusyLabel="Refreshing"
-        actionPosition="adjacent"
       />
 
       <div className="flex flex-col gap-10">
