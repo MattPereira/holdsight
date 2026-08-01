@@ -28,6 +28,10 @@ _Avoid_: Transaction fetch, transaction import, refresh transactions
 The external source — an EVM wallet indexer, HyperCore, Lighter, Kraken, or a brokerage connection — that an Investment Account's balances and transactions are synced from.
 _Avoid_: Source, integration, data source
 
+**Provider Group**:
+A user-facing aggregation of one or more Investment Providers: wallet, exchange, or brokerage. A Provider Group is the scope presented by portfolio views and may contain multiple Investment Providers.
+_Avoid_: Investment Provider (for the group), source group
+
 **Journal Period**:
 The calendar day, Monday–Sunday week, or calendar month covered by an Investment Journal Entry, interpreted in the user's home timezone.
 _Avoid_: Entry type, date range
