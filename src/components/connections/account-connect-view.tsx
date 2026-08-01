@@ -14,7 +14,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 
-import type { AccountConnectionsResult } from "@/app/actions";
+import type { AccountConnectionsResult } from "@/app/(app)/connections/actions";
 import { KrakenConnectPanel } from "@/components/connections/connect-panels/kraken-connect-panel";
 import { LighterConnectPanel } from "@/components/connections/connect-panels/lighter-connect-panel";
 import { ManualConnectPanel } from "@/components/connections/connect-panels/manual-connect-panel";

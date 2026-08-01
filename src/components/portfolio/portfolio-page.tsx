@@ -3,7 +3,7 @@
 import { type ReactNode, useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { loadPortfolioPageData } from "@/app/actions";
+import { loadPortfolioPageData } from "@/app/(app)/portfolio/actions";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { useAssetGroups } from "@/components/portfolio/asset-groups-context";
 import { PortfolioAllocations } from "@/components/portfolio/portfolio-allocations";

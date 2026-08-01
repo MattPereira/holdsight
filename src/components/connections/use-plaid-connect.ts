@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { usePlaidLink, type PlaidLinkOnSuccess } from "react-plaid-link";
 
-import type { PlaidLinkTokenActionResult } from "@/app/actions";
+import type { PlaidLinkTokenActionResult } from "@/app/(app)/connections/actions";
 
 const PLAID_LINK_SESSION_STORAGE_KEY = "plaid_link_session";
 const PLAID_LINK_ERROR_STORAGE_KEY = "plaid_link_error";

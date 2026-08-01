@@ -7,7 +7,7 @@ import { RiDeleteBinLine, RiLineChartLine } from "@remixicon/react";
 import {
   removeSchwabConnection,
   type SchwabConnectionSummary,
-} from "@/app/actions";
+} from "@/app/(app)/connections/actions";
 import {
   AlertDialog,
   AlertDialogAction,

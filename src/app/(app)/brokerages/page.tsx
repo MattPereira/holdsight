@@ -2,7 +2,7 @@ import {
   loadBrokerageBalances,
   loadBrokerageTransactions,
   pollBrokerageTransactions,
-} from "@/app/actions";
+} from "@/app/(app)/brokerages/actions";
 import { AccountDetailsView } from "@/components/accounts/account-details-view";
 import { BROKERAGE_SECONDARY_COLUMN } from "@/components/accounts/balances/groups";
 import { brokerageBalancesView } from "@/lib/accounts/balances-view";

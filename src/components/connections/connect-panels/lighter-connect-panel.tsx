@@ -4,7 +4,7 @@ import { RiDeleteBinLine, RiKey2Line } from "@remixicon/react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { removeLighterConnection, saveLighterConnection } from "@/app/actions";
+import { removeLighterConnection, saveLighterConnection } from "@/app/(app)/connections/actions";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,

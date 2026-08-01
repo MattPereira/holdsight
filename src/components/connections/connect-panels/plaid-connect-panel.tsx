@@ -13,7 +13,7 @@ import {
   createPlaidAccountsLinkToken,
   linkPlaidAccounts,
   removePlaidItem,
-} from "@/app/actions";
+} from "@/app/(app)/connections/actions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,7 +38,7 @@ import {
   FieldTitle,
 } from "@/components/ui/field";
 import { usePlaidConnect } from "@/components/connections/use-plaid-connect";
-import type { PlaidConnectionSummary } from "@/app/actions";
+import type { PlaidConnectionSummary } from "@/app/(app)/connections/actions";
 
 type AccountFamily = "checking" | "savings" | "credit_card" | "brokerage";
 

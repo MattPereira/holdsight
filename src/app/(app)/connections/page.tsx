@@ -1,4 +1,4 @@
-import { getAccountConnections } from "@/app/actions";
+import { getAccountConnections } from "@/app/(app)/connections/actions";
 import { AccountConnectView } from "@/components/connections/account-connect-view";
 
 export default async function ConnectPage() {

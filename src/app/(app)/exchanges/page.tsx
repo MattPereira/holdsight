@@ -2,7 +2,7 @@ import {
   loadKrakenBalances,
   loadKrakenTransactions,
   pollKrakenTransactions,
-} from "@/app/actions";
+} from "@/app/(app)/exchanges/actions";
 import { AccountDetailsView } from "@/components/accounts/account-details-view";
 import { WALLET_SECONDARY_COLUMN } from "@/components/accounts/balances/groups";
 import { investmentBalancesView } from "@/lib/accounts/balances-view";

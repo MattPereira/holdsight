@@ -4,7 +4,7 @@ import { RiDeleteBinLine, RiKey2Line } from "@remixicon/react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { removeKrakenAccount, saveKrakenCredentials } from "@/app/actions";
+import { removeKrakenAccount, saveKrakenCredentials } from "@/app/(app)/connections/actions";
 import {
   AlertDialog,
   AlertDialogAction,

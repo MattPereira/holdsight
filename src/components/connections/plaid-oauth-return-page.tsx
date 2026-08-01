@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { usePlaidLink, type PlaidLinkOnSuccess } from "react-plaid-link";
 
-import { linkPlaidAccounts, type PlaidAccountsActionResult } from "@/app/actions";
+import { linkPlaidAccounts, type PlaidAccountsActionResult } from "@/app/(app)/connections/actions";
 import {
   clearPlaidLinkSession,
   readPlaidLinkSession,

@@ -8,7 +8,7 @@ import {
   addManualBalanceItem,
   removeManualBalanceItem,
   updateManualBalanceItem,
-} from "@/app/actions";
+} from "@/app/(app)/connections/actions";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";

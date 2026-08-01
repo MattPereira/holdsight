@@ -10,7 +10,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { addWallets, removeWallet, renameWallet } from "@/app/actions";
+import { addWallets, removeWallet, renameWallet } from "@/app/(app)/connections/actions";
 import { Button } from "@/components/ui/button";
 import {
   Field,

@@ -2,7 +2,7 @@ import {
   loadWalletBalances,
   loadWalletTransactions,
   pollWalletTransactions,
-} from "@/app/actions";
+} from "@/app/(app)/wallets/actions";
 import { AccountDetailsView } from "@/components/accounts/account-details-view";
 import { WALLET_SECONDARY_COLUMN } from "@/components/accounts/balances/groups";
 import { investmentBalancesView } from "@/lib/accounts/balances-view";

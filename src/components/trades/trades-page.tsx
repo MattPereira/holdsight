@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import {
   loadPortfolioTransactions,
   pollPortfolioTransactions,
-} from "@/app/actions";
+} from "@/app/(app)/trades/actions";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { TransactionsTabContent } from "@/components/accounts/transactions/transactions-tab-content";
 import type { TransactionHistoryStatus } from "@/components/accounts/transactions/types";

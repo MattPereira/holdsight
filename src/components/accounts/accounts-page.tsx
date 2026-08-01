@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
-import { loadAccountsPageData } from "@/app/actions";
+import { loadAccountsPageData } from "@/app/(app)/accounts/actions";
 import { Button } from "@/components/ui/button";
 import { PortfolioAccountsList } from "@/components/portfolio/portfolio-accounts-list";
 import type { PortfolioAccountsData } from "@/lib/portfolio/page-data";
