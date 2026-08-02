@@ -63,12 +63,12 @@ export function NavUser({ name, email }: { name: string; email: string }) {
                   {initials(name)}
                 </AvatarFallback>
               </Avatar>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{name}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {email}
-                </span>
-              </div>
+              {/* The email is deliberately absent here: this row is on screen
+                  in every screenshot, and it identifies the user. It stays in
+                  the dropdown below, which is only open on purpose. */}
+              <span className="flex-1 truncate text-left text-sm font-medium">
+                {name}
+              </span>
               <RiExpandUpDownLine className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
