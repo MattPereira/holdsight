@@ -9,6 +9,7 @@ const MCP_AUTHORIZATION_SERVER_METADATA_PATH =
   "/.well-known/oauth-authorization-server";
 const MCP_PROTECTED_RESOURCE_METADATA_PREFIX =
   "/.well-known/oauth-protected-resource";
+const AUTH_ERROR_PATH = "/auth/error";
 const SIGN_IN_PATH = "/";
 
 function isAuthApiRoute(pathname: string): boolean {
@@ -23,6 +24,10 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isAuthApiRoute(pathname)) {
+    return NextResponse.next();
+  }
+
+  if (pathname === AUTH_ERROR_PATH) {
     return NextResponse.next();
   }
 
