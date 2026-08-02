@@ -6,12 +6,8 @@ import type { CreditCardAccountRow } from "@/lib/credit-card/accounts";
 import type { DepositoryAccountRow } from "@/lib/depository/accounts";
 import type { ManualBalanceItemRow } from "@/lib/manual-balance/items";
 import type { InvestmentAccountSection } from "@/lib/portfolio/account-asset-rows";
+import { formatUsd } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-const usdFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
 
 function accountLabel(account: DepositoryAccountRow): string {
   const name = account.institutionName ?? account.label ?? "Account";
@@ -53,7 +49,7 @@ function AccountCard({
           <span
             className={cn("text-sm font-semibold tabular-nums", valueClassName)}
           >
-            {usdFormat.format(value)}
+            {formatUsd(value)}
           </span>
         </div>
       </div>
@@ -89,7 +85,7 @@ function AccountRow({
         ) : null}
       </div>
       <span className={cn("text-sm tabular-nums", valueClassName)}>
-        {usdFormat.format(value)}
+        {formatUsd(value)}
       </span>
     </div>
   );

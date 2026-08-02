@@ -17,6 +17,7 @@ import {
   NestedLineItems,
 } from "@/components/ui/line-item";
 import { cn } from "@/lib/utils";
+import { formatCompactUsd, formatPercent, formatUsd } from "@/lib/format";
 import { buildPortfolioAllocations } from "@/lib/portfolio/allocations";
 import {
   applyAssetGroups,
@@ -25,28 +26,6 @@ import {
   type AssetGroup,
   type AssetTotal,
 } from "@/lib/portfolio/asset-totals";
-
-const usdFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
-const percentFormat = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 2,
-  style: "percent",
-});
-
-// Compact form for the donut center, where space is tight (e.g. "$182.1K").
-const compactUsdFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-
-function formatUsd(value: number) {
-  return usdFormat.format(value);
-}
 
 // Recharts/shadcn keys must be safe CSS-identifier-ish tokens; symbols can
 // contain "+" and spaces (e.g. "HYPE + sHYPE"), so slugify them.
@@ -131,7 +110,7 @@ function AllocationDonutChart({
                     {item.payload.label}
                   </span>
                   <span className="font-medium tabular-nums">
-                    {usdFormat.format(Number(value))}
+                    {formatUsd(Number(value))}
                     {grandTotalValue > 0
                       ? ` (${((Number(value) / grandTotalValue) * 100).toFixed(2)}%)`
                       : ""}
@@ -168,7 +147,7 @@ function AllocationDonutChart({
                     y={(cy ?? 0) - 8}
                     className="fill-foreground text-xl md:text-2xl font-semibold tabular-nums"
                   >
-                    {compactUsdFormat.format(grandTotalValue)}
+                    {formatCompactUsd(grandTotalValue)}
                   </tspan>
                   <tspan
                     x={cx}
@@ -208,7 +187,7 @@ function HoldingsRows({
           labelTitle: row.symbol,
           sublabel: row.name,
           sublabelTitle: row.name,
-          value: percentFormat.format(row.weight),
+          value: formatPercent(row.weight),
           secondaryValue: formatUsd(row.valueUsd),
         };
 
@@ -226,7 +205,7 @@ function HoldingsRows({
                   labelTitle={member.symbol}
                   sublabel={member.name}
                   sublabelTitle={member.name}
-                  value={percentFormat.format(member.weight)}
+                  value={formatPercent(member.weight)}
                   secondaryValue={formatUsd(member.valueUsd)}
                 />
               ))}

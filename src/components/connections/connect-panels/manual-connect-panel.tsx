@@ -12,15 +12,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { formatUsd } from "@/lib/format";
 import type {
   ManualBalanceItemKind,
   ManualBalanceItemRow,
 } from "@/lib/manual-balance/items";
-
-const usdFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
 
 const emptyForm = {
   kind: "asset" as ManualBalanceItemKind,
@@ -219,7 +215,7 @@ export function ManualConnectPanel({
                   {item.name} {item.symbol}
                 </span>
                 <span className="text-xs text-muted-foreground capitalize">
-                  {item.kind} · {usdFormat.format(item.amount)}
+                  {item.kind} · {formatUsd(item.amount)}
                 </span>
               </button>
               <Button

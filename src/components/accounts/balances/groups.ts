@@ -5,13 +5,9 @@ import type {
 } from "@/components/accounts/types";
 import type { CurrentBrokerageAccount } from "@/lib/brokerage/balances";
 import type { BrokerageBalance } from "@/lib/brokerage/types";
+import { formatUsd } from "@/lib/format";
 import { walletTotal } from "@/lib/portfolio/asset-totals";
 import type { BalancesResult, InvestmentBalance } from "@/lib/portfolio/types";
-
-const usdFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
 
 export const WALLET_SECONDARY_COLUMN: SecondaryColumn = {
   header: "Chain",
@@ -53,7 +49,7 @@ function brokerageRowKey(balance: BrokerageBalance, i: number): string {
 }
 
 function formatCostBasis(value: number | undefined): string {
-  return value === undefined ? "—" : usdFormat.format(value);
+  return value === undefined ? "—" : formatUsd(value);
 }
 
 // Closed positions are still reported by some sources (e.g. Schwab) with a zero

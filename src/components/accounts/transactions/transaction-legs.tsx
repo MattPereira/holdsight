@@ -1,14 +1,6 @@
 import { cn } from "@/lib/utils";
+import { formatExactQuantity, formatSignedUsd, formatUsd } from "@/lib/format";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
-
-const usdFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
-const amountFormat = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 6,
-});
 
 export type LegDirection = "in" | "out" | "neutral";
 
@@ -46,7 +38,7 @@ export function formatAsset(
   if (transaction.baseAmount === null || !transaction.baseAssetSymbol) {
     return null;
   }
-  return `${amountFormat.format(Math.abs(transaction.baseAmount))} ${transaction.baseAssetSymbol}`;
+  return `${formatExactQuantity(Math.abs(transaction.baseAmount))} ${transaction.baseAssetSymbol}`;
 }
 
 function formatQuoteAsset(
@@ -55,18 +47,13 @@ function formatQuoteAsset(
   if (transaction.quoteAmount === null || !transaction.quoteAssetSymbol) {
     return null;
   }
-  return `${amountFormat.format(Math.abs(transaction.quoteAmount))} ${transaction.quoteAssetSymbol}`;
+  return `${formatExactQuantity(Math.abs(transaction.quoteAmount))} ${transaction.quoteAssetSymbol}`;
 }
 
 function formatCash(transaction: InvestmentTransactionListItem): string | null {
   return transaction.valueUsd === null
     ? null
-    : usdFormat.format(Math.abs(transaction.valueUsd));
-}
-
-export function formatSignedUsd(value: number): string {
-  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
-  return `${sign}${usdFormat.format(Math.abs(value))}`;
+    : formatUsd(Math.abs(transaction.valueUsd));
 }
 
 function perpPrimaryValue(
@@ -81,7 +68,7 @@ function perpPrimaryValue(
       : [
           {
             direction: "in",
-            label: usdFormat.format(Math.abs(transaction.valueUsd)),
+            label: formatUsd(Math.abs(transaction.valueUsd)),
           },
         ];
   }

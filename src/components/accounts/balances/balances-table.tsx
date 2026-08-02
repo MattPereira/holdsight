@@ -12,40 +12,7 @@ import type {
   BalanceRow,
   SecondaryColumn,
 } from "@/components/accounts/types";
-
-const usdFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
-const priceFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-// Sub-dollar prices keep enough significant digits that cheap tokens
-// don't collapse to $0.00.
-const subDollarPriceFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumSignificantDigits: 4,
-});
-
-const amountFormat = new Intl.NumberFormat("en-US", {
-  maximumFractionDigits: 4,
-});
-
-function formatUsd(value: number) {
-  return usdFormat.format(value);
-}
-
-function formatPrice(price: number) {
-  return price !== 0 && Math.abs(price) < 1
-    ? subDollarPriceFormat.format(price)
-    : priceFormat.format(price);
-}
+import { formatPrice, formatQuantity, formatUsd } from "@/lib/format";
 
 function DesktopTable({
   rows,
@@ -91,7 +58,7 @@ function DesktopTable({
                 {row.secondary}
               </TableCell>
               <TableCell className="text-right tabular-nums">
-                {amountFormat.format(row.amount)}
+                {formatQuantity(row.amount)}
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {formatPrice(row.priceUsd)}
@@ -141,7 +108,7 @@ function MobileList({
                 : row.secondary}
             </span>
             <span className="tabular-nums">
-              {amountFormat.format(row.amount)} @ {formatPrice(row.priceUsd)}
+              {formatQuantity(row.amount)} @ {formatPrice(row.priceUsd)}
             </span>
           </div>
         </li>

@@ -1,21 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import {
   formatAsset,
-  formatSignedUsd,
   Leg,
   transactionLegs,
 } from "@/components/accounts/transactions/transaction-legs";
+import { formatPrice, formatSignedUsd, formatUsd } from "@/lib/format";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import { TRADE_JOURNAL_REASON_LABELS } from "@/lib/journal/transaction-entry-labels";
-
-const usdFormat = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-});
-
-function formatPrice(value: number): string {
-  return usdFormat.format(value);
-}
 
 function perpActionLabel(
   transaction: InvestmentTransactionListItem,
@@ -40,7 +31,7 @@ function perpSecondaryLabel(
   const amount = formatAsset(transaction);
   const fee = transaction.feeAmount === null
     ? null
-    : `fee ${usdFormat.format(Math.abs(transaction.feeAmount))}`;
+    : `fee ${formatUsd(Math.abs(transaction.feeAmount))}`;
 
   if (
     transaction.perpEventType === "open" ||
