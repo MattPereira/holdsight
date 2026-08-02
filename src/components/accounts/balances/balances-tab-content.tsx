@@ -23,6 +23,7 @@ export function BalancesTabContent({
           grandTotalValue={summary.grandTotalValue}
           totals={summary.totals}
           groups={assetGroups}
+          totalLabel="Total Assets"
         />
       ) : null}
 
