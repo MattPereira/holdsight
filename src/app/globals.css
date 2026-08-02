@@ -154,9 +154,25 @@
  * accessibility to buy nothing. Anyone with devtools open can still read them;
  * that is accepted, not overlooked.
  *
- * The radius is in em so it scales with the text it covers, from 12px table
- * rows up to the allocation donut's heading.
+ * The width is fixed rather than fitted to the text so that a masked figure
+ * gives away nothing by its size — otherwise a wide blur still reports six
+ * digits rather than four.
  */
 .hidden-amounts [data-sensitive] {
-  filter: blur(0.35em);
+  display: inline-block;
+  width: 5.5em;
+  overflow: hidden;
+  border-radius: 0.25rem;
+  background-color: color-mix(
+    in oklch,
+    var(--muted-foreground) 22%,
+    transparent
+  );
+  color: transparent;
+}
+
+/* SVG has no box to fill, so the donut's centre figure is simply withheld and
+   its "Net Worth" caption carries the meaning on its own. */
+.hidden-amounts tspan[data-sensitive] {
+  display: none;
 }
