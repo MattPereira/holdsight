@@ -171,8 +171,10 @@
   color: transparent;
 }
 
-/* SVG has no box to fill, so the donut's centre figure is simply withheld and
-   its "Net Worth" caption carries the meaning on its own. */
+/* SVG text takes none of the box properties above, so a marked SVG node would
+   otherwise render completely unmasked. Nothing marked is SVG today; this is a
+   guard so that if something ever is, it fails closed rather than leaking. */
+.hidden-amounts text[data-sensitive],
 .hidden-amounts tspan[data-sensitive] {
   display: none;
 }

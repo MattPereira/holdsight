@@ -9,10 +9,13 @@ import { cn } from "@/lib/utils";
  * they reveal nothing absolute, and hiding them makes a shared screenshot
  * useless without making it safer.
  *
- * Wrapping is all this does. The blur lives in one CSS rule keyed off
+ * Wrapping is all this does. The mask lives in one CSS rule keyed off
  * `data-sensitive`, which is why this works unchanged in server components,
- * client components, and around strings that were formatted elsewhere. In SVG,
- * where a <span> is invalid, put `data-sensitive` on the SVG node directly.
+ * client components, and around strings that were formatted elsewhere.
+ *
+ * It does need a real box to fill, so it belongs in HTML. SVG text cannot be
+ * masked this way — prefer overlaying HTML on the graphic, as the allocation
+ * donut's centre figure does.
  */
 export function Sensitive({
   children,

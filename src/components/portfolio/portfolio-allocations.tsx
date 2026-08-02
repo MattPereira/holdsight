@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Label, Pie, PieChart } from "recharts";
+import { Pie, PieChart } from "recharts";
 
 import {
   ChartContainer,
@@ -72,10 +72,12 @@ function AllocationDonutChart({
   grandTotalValue,
   totals,
   groups,
+  totalLabel,
 }: {
   grandTotalValue: number;
   totals: AssetTotal[];
   groups: AssetGroup[];
+  totalLabel: string;
 }) {
   const { chartData, chartConfig } = useMemo(() => {
     const rows = applyAssetGroups(totals, groups);
@@ -96,77 +98,57 @@ function AllocationDonutChart({
   }, [totals, groups]);
 
   return (
-    <ChartContainer
-      config={chartConfig}
-      className="mx-auto aspect-square h-auto w-full max-w-95 sm:max-w-75 lg:max-w-110"
-    >
-      <PieChart>
-        <ChartTooltip
-          content={
-            <ChartTooltipContent
-              nameKey="asset"
-              formatter={(value, _name, item) => (
-                <div className="flex w-full items-center justify-between gap-3">
-                  <span className="text-muted-foreground">
-                    {item.payload.label}
-                  </span>
-                  <span className="font-medium tabular-nums">
-                    <Sensitive>{formatUsd(Number(value))}</Sensitive>
-                    {grandTotalValue > 0
-                      ? ` (${((Number(value) / grandTotalValue) * 100).toFixed(2)}%)`
-                      : ""}
-                  </span>
-                </div>
-              )}
-            />
-          }
-        />
-        <Pie
-          data={chartData}
-          dataKey="value"
-          nameKey="asset"
-          innerRadius="57%"
-          outerRadius="92%"
-          strokeWidth={2}
-          stroke="var(--background)"
-        >
-          <Label
-            content={({ viewBox }) => {
-              if (!viewBox || !("cx" in viewBox)) {
-                return null;
-              }
-              const { cx, cy } = viewBox;
-              return (
-                <text
-                  x={cx}
-                  y={cy}
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                >
-                  {/* A <span> is invalid inside SVG, so the marker goes on the
-                      tspan itself. */}
-                  <tspan
-                    data-sensitive
-                    x={cx}
-                    y={(cy ?? 0) - 8}
-                    className="fill-foreground text-xl md:text-2xl font-semibold tabular-nums"
-                  >
-                    {formatCompactUsd(grandTotalValue)}
-                  </tspan>
-                  <tspan
-                    x={cx}
-                    y={(cy ?? 0) + 14}
-                    className="fill-muted-foreground text-xs"
-                  >
-                    Net Worth
-                  </tspan>
-                </text>
-              );
-            }}
+    // The centre label is HTML overlaid on the chart rather than an SVG <text>
+    // inside it: the donut hole is the container's centre, and HTML keeps the
+    // figure stylable by the same rules as every other Sensitive Value.
+    <div className="relative mx-auto w-full max-w-95 sm:max-w-75 lg:max-w-110">
+      <ChartContainer
+        config={chartConfig}
+        className="aspect-square h-auto w-full"
+      >
+        <PieChart>
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                nameKey="asset"
+                formatter={(value, _name, item) => (
+                  <div className="flex w-full items-center justify-between gap-3">
+                    <span className="text-muted-foreground">
+                      {item.payload.label}
+                    </span>
+                    <span className="font-medium tabular-nums">
+                      <Sensitive>{formatUsd(Number(value))}</Sensitive>
+                      {grandTotalValue > 0
+                        ? ` (${((Number(value) / grandTotalValue) * 100).toFixed(2)}%)`
+                        : ""}
+                    </span>
+                  </div>
+                )}
+              />
+            }
           />
-        </Pie>
-      </PieChart>
-    </ChartContainer>
+          <Pie
+            data={chartData}
+            dataKey="value"
+            nameKey="asset"
+            innerRadius="57%"
+            outerRadius="92%"
+            strokeWidth={2}
+            stroke="var(--background)"
+          />
+        </PieChart>
+      </ChartContainer>
+
+      {/* Transparent to pointer events so the slices underneath stay hoverable. */}
+      <div className="pointer-events-none absolute inset-0 grid place-items-center">
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-xl font-semibold tabular-nums md:text-2xl">
+            <Sensitive>{formatCompactUsd(grandTotalValue)}</Sensitive>
+          </span>
+          <span className="text-xs text-muted-foreground">{totalLabel}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -229,10 +211,14 @@ export function PortfolioAllocations({
   grandTotalValue,
   totals,
   groups = [],
+  // "Net Worth" is only true of the whole portfolio. A single account's donut
+  // covers that account's holdings, so its caller says so.
+  totalLabel = "Net Worth",
 }: {
   grandTotalValue: number;
   totals: AssetTotal[];
   groups?: AssetGroup[];
+  totalLabel?: string;
 }) {
   const allocations = useMemo(
     () =>
@@ -281,6 +267,7 @@ export function PortfolioAllocations({
         grandTotalValue={grandTotalValue}
         totals={visibleTotals}
         groups={groups}
+        totalLabel={totalLabel}
       />
       <div className="min-w-0">
         <HoldingsRows rows={rows} colorByKey={colorByKey} />
