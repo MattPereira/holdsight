@@ -16,6 +16,7 @@ import {
   NestedLineItem,
   NestedLineItems,
 } from "@/components/ui/line-item";
+import { Sensitive } from "@/components/sensitive";
 import { cn } from "@/lib/utils";
 import { formatCompactUsd, formatPercent, formatUsd } from "@/lib/format";
 import { buildPortfolioAllocations } from "@/lib/portfolio/allocations";
@@ -110,7 +111,7 @@ function AllocationDonutChart({
                     {item.payload.label}
                   </span>
                   <span className="font-medium tabular-nums">
-                    {formatUsd(Number(value))}
+                    <Sensitive>{formatUsd(Number(value))}</Sensitive>
                     {grandTotalValue > 0
                       ? ` (${((Number(value) / grandTotalValue) * 100).toFixed(2)}%)`
                       : ""}
@@ -142,7 +143,10 @@ function AllocationDonutChart({
                   textAnchor="middle"
                   dominantBaseline="middle"
                 >
+                  {/* A <span> is invalid inside SVG, so the marker goes on the
+                      tspan itself. */}
                   <tspan
+                    data-sensitive
                     x={cx}
                     y={(cy ?? 0) - 8}
                     className="fill-foreground text-xl md:text-2xl font-semibold tabular-nums"
@@ -187,8 +191,10 @@ function HoldingsRows({
           labelTitle: row.symbol,
           sublabel: row.name,
           sublabelTitle: row.name,
+          // The weight is a percentage and stays legible; only the USD value
+          // beside it reveals the size of the holding.
           value: formatPercent(row.weight),
-          secondaryValue: formatUsd(row.valueUsd),
+          secondaryValue: <Sensitive>{formatUsd(row.valueUsd)}</Sensitive>,
         };
 
         if (!row.isGroup) {
@@ -206,7 +212,9 @@ function HoldingsRows({
                   sublabel={member.name}
                   sublabelTitle={member.name}
                   value={formatPercent(member.weight)}
-                  secondaryValue={formatUsd(member.valueUsd)}
+                  secondaryValue={
+                    <Sensitive>{formatUsd(member.valueUsd)}</Sensitive>
+                  }
                 />
               ))}
             </NestedLineItems>

@@ -41,3 +41,11 @@ The part of an Investment Journal Entry that captures expectations, intended act
 
 **Reflection**:
 The part of an Investment Journal Entry that captures what happened, what was learned, and what should change after or during its period.
+
+**Sensitive Value**:
+A rendered figure that reveals the size of a user's holdings — a USD value or an asset quantity. Asset prices and allocation percentages are not Sensitive Values, since they reveal nothing absolute about the user.
+_Avoid_: Private value, secret value, PII
+
+**Hidden Amounts**:
+A per-device display preference that visually obscures a user's Sensitive Values, so the app can be screenshotted or screenshared without revealing holdings. It obscures those values on screen only — it does not remove them from the page — and does not apply to asset prices, allocation percentages, or journal prose.
+_Avoid_: Private mode, privacy mode, incognito, redaction, masked balances

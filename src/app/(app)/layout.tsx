@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
 import { LoginForm } from "@/components/auth/login-form";
 import { AssetGroupsProvider } from "@/components/portfolio/asset-groups-context";
@@ -8,6 +10,10 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { getCurrentSession } from "@/lib/auth/session";
+import {
+  HIDDEN_AMOUNTS_COOKIE,
+  isHiddenAmountsValue,
+} from "@/lib/hidden-amounts";
 import { getUserAssetGroups } from "@/lib/portfolio/groups";
 
 export default async function AppLayout({
@@ -30,11 +36,21 @@ export default async function AppLayout({
   }
 
   const groups = await getUserAssetGroups(session.user.id);
+  // The root layout already applied the mask; the sidebar needs the same value
+  // so its menu item opens with the label that matches what is on screen.
+  const cookieStore = await cookies();
+  const hiddenAmounts = isHiddenAmountsValue(
+    cookieStore.get(HIDDEN_AMOUNTS_COOKIE)?.value,
+  );
 
   return (
     <SidebarProvider>
       <AssetGroupsProvider initialGroups={groups}>
-        <AppSidebar name={session.user.name} email={session.user.email} />
+        <AppSidebar
+          name={session.user.name}
+          email={session.user.email}
+          hiddenAmounts={hiddenAmounts}
+        />
         <SidebarInset>
           <header className="flex h-14 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />

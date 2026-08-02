@@ -123,7 +123,14 @@ export function TransactionsTable({
                   {transactionTimeFormat.format(executedAt)}
                 </span>
                 {transaction.displayType === "perp_event" ? (
-                  <span className="text-xs text-muted-foreground">
+                  // This line joins position size, entry/exit prices, PnL and
+                  // fees into one string. Rather than split it apart, the whole
+                  // line is marked: it over-blurs the prices, which is the safe
+                  // direction to err in.
+                  <span
+                    data-sensitive
+                    className="text-xs text-muted-foreground"
+                  >
                     {perpSecondaryLabel(transaction)}
                   </span>
                 ) : null}

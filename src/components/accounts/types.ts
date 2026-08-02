@@ -11,6 +11,9 @@ export type SecondaryColumn = {
   align: "left" | "right";
   // Optional label used in the compact mobile row where the table header is not visible.
   mobileLabel?: string;
+  // Whether this column's contents are a Sensitive Value. Cost basis is a USD
+  // figure and must be masked by Hidden Amounts; a chain name is not.
+  sensitive?: boolean;
 };
 
 export type BalanceRow = {

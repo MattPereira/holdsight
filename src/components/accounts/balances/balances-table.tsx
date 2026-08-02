@@ -12,6 +12,7 @@ import type {
   BalanceRow,
   SecondaryColumn,
 } from "@/components/accounts/types";
+import { Sensitive } from "@/components/sensitive";
 import { formatPrice, formatQuantity, formatUsd } from "@/lib/format";
 
 function DesktopTable({
@@ -55,16 +56,20 @@ function DesktopTable({
                   secondaryRight ? "text-right tabular-nums" : undefined
                 }
               >
-                {row.secondary}
+                {secondaryColumn.sensitive ? (
+                  <Sensitive>{row.secondary}</Sensitive>
+                ) : (
+                  row.secondary
+                )}
               </TableCell>
               <TableCell className="text-right tabular-nums">
-                {formatQuantity(row.amount)}
+                <Sensitive>{formatQuantity(row.amount)}</Sensitive>
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {formatPrice(row.priceUsd)}
               </TableCell>
               <TableCell className="text-right tabular-nums">
-                {formatUsd(row.valueUsd)}
+                <Sensitive>{formatUsd(row.valueUsd)}</Sensitive>
               </TableCell>
             </TableRow>
           ))}
@@ -73,7 +78,7 @@ function DesktopTable({
           <TableRow className="hover:bg-muted/50">
             <TableCell colSpan={4}>Total</TableCell>
             <TableCell className="text-right font-semibold tabular-nums">
-              {formatUsd(total)}
+              <Sensitive>{formatUsd(total)}</Sensitive>
             </TableCell>
           </TableRow>
         </TableFooter>
@@ -98,24 +103,40 @@ function MobileList({
           <div className="flex items-baseline justify-between gap-4">
             <span className="font-medium">{row.symbol}</span>
             <span className="font-medium tabular-nums">
-              {formatUsd(row.valueUsd)}
+              <Sensitive>{formatUsd(row.valueUsd)}</Sensitive>
             </span>
           </div>
           <div className="flex items-baseline justify-between gap-4 text-xs text-muted-foreground">
             <span>
-              {secondaryColumn.mobileLabel
-                ? `${secondaryColumn.mobileLabel} ${row.secondary}`
-                : row.secondary}
+              {secondaryColumn.mobileLabel ? (
+                <>
+                  {secondaryColumn.mobileLabel}{" "}
+                  {secondaryColumn.sensitive ? (
+                    <Sensitive>{row.secondary}</Sensitive>
+                  ) : (
+                    row.secondary
+                  )}
+                </>
+              ) : secondaryColumn.sensitive ? (
+                <Sensitive>{row.secondary}</Sensitive>
+              ) : (
+                row.secondary
+              )}
             </span>
+            {/* Quantity and price share this line, so only the quantity half is
+                marked — the price is public market data. */}
             <span className="tabular-nums">
-              {formatQuantity(row.amount)} @ {formatPrice(row.priceUsd)}
+              <Sensitive>{formatQuantity(row.amount)}</Sensitive> @{" "}
+              {formatPrice(row.priceUsd)}
             </span>
           </div>
         </li>
       ))}
       <li className="flex items-baseline justify-between gap-4 bg-muted/50 px-4 py-3 font-medium">
         <span>Total</span>
-        <span className="font-semibold tabular-nums">{formatUsd(total)}</span>
+        <span className="font-semibold tabular-nums">
+          <Sensitive>{formatUsd(total)}</Sensitive>
+        </span>
       </li>
     </ul>
   );

@@ -18,6 +18,7 @@ export const BROKERAGE_SECONDARY_COLUMN: SecondaryColumn = {
   header: "Cost Basis",
   align: "right",
   mobileLabel: "Cost",
+  sensitive: true,
 };
 
 function shortenAddress(address: string): string {

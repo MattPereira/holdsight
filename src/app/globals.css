@@ -143,3 +143,20 @@
     @apply font-sans;
   }
 }
+
+/*
+ * Hidden Amounts. See src/lib/hidden-amounts.ts.
+ *
+ * Deliberately visual only: the real values stay in the DOM, stay selectable,
+ * and stay readable to screen readers. The threat this defends against is a
+ * camera — screenshots, screenshares, shoulder-surfing — and a screen reader is
+ * not a camera, so hiding the values from assistive tech would cost real
+ * accessibility to buy nothing. Anyone with devtools open can still read them;
+ * that is accepted, not overlooked.
+ *
+ * The radius is in em so it scales with the text it covers, from 12px table
+ * rows up to the allocation donut's heading.
+ */
+.hidden-amounts [data-sensitive] {
+  filter: blur(0.35em);
+}

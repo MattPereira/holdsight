@@ -145,9 +145,13 @@ const legSign: Record<LegDirection, string> = {
   neutral: "",
 };
 
+// Every leg label is a Sensitive Value — either a quantity moved or its USD
+// value — so the whole span is marked rather than the label alone, which keeps
+// the direction sign under the same blur.
 export function Leg({ leg }: { leg: TransactionLeg }) {
   return (
     <span
+      data-sensitive
       className={cn(
         "text-sm font-medium tabular-nums",
         legClassName[leg.direction],

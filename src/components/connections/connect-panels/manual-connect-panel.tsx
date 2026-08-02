@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Sensitive } from "@/components/sensitive";
 import { formatUsd } from "@/lib/format";
 import type {
   ManualBalanceItemKind,
@@ -214,8 +215,11 @@ export function ManualConnectPanel({
                 <span className="truncate text-sm font-medium">
                   {item.name} {item.symbol}
                 </span>
+                {/* The saved amount is masked; the amount field in the form
+                    above is not, since blurring a value while it is being
+                    typed would be hostile. */}
                 <span className="text-xs text-muted-foreground capitalize">
-                  {item.kind} · {formatUsd(item.amount)}
+                  {item.kind} · <Sensitive>{formatUsd(item.amount)}</Sensitive>
                 </span>
               </button>
               <Button

@@ -6,6 +6,7 @@ import type { CreditCardAccountRow } from "@/lib/credit-card/accounts";
 import type { DepositoryAccountRow } from "@/lib/depository/accounts";
 import type { ManualBalanceItemRow } from "@/lib/manual-balance/items";
 import type { InvestmentAccountSection } from "@/lib/portfolio/account-asset-rows";
+import { Sensitive } from "@/components/sensitive";
 import { formatUsd } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -49,7 +50,7 @@ function AccountCard({
           <span
             className={cn("text-sm font-semibold tabular-nums", valueClassName)}
           >
-            {formatUsd(value)}
+            <Sensitive>{formatUsd(value)}</Sensitive>
           </span>
         </div>
       </div>
@@ -85,7 +86,7 @@ function AccountRow({
         ) : null}
       </div>
       <span className={cn("text-sm tabular-nums", valueClassName)}>
-        {formatUsd(value)}
+        <Sensitive>{formatUsd(value)}</Sensitive>
       </span>
     </div>
   );

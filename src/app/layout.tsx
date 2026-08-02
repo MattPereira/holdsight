@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
 import { Anta, Geist, Geist_Mono, Inter } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import {
+  HIDDEN_AMOUNTS_CLASS,
+  HIDDEN_AMOUNTS_COOKIE,
+  isHiddenAmountsValue,
+} from "@/lib/hidden-amounts";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -28,11 +34,19 @@ export const metadata: Metadata = {
   description: "Universal portfolio tracker",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Read on the server so the very first paint is already masked. Applying the
+  // class after hydration would stream the real values to screen first, which
+  // is the one thing this feature exists to prevent.
+  const cookieStore = await cookies();
+  const hiddenAmounts = isHiddenAmountsValue(
+    cookieStore.get(HIDDEN_AMOUNTS_COOKIE)?.value,
+  );
+
   return (
     <html
       lang="en"
@@ -45,6 +59,7 @@ export default function RootLayout({
         "font-sans",
         inter.variable,
         anta.variable,
+        hiddenAmounts && HIDDEN_AMOUNTS_CLASS,
       )}
     >
       <body className="min-h-full flex flex-col">

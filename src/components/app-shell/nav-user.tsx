@@ -4,12 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   RiExpandUpDownLine,
+  RiEyeLine,
+  RiEyeOffLine,
   RiLogoutBoxRLine,
   RiMoonLine,
   RiSunLine,
 } from "@remixicon/react";
 import { useTheme } from "next-themes";
 
+import { useHiddenAmounts } from "@/hooks/use-hidden-amounts";
 import { authClient } from "@/lib/auth/client";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -18,6 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -36,11 +40,21 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-export function NavUser({ name, email }: { name: string; email: string }) {
+export function NavUser({
+  name,
+  email,
+  hiddenAmounts,
+}: {
+  name: string;
+  email: string;
+  hiddenAmounts: boolean;
+}) {
   const { isMobile } = useSidebar();
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
+  const { hidden, toggle: toggleHiddenAmounts } =
+    useHiddenAmounts(hiddenAmounts);
   const [isPending, setIsPending] = useState(false);
 
   async function handleSignOut() {
@@ -103,6 +117,16 @@ export function NavUser({ name, email }: { name: string; email: string }) {
             >
               {isDark ? <RiSunLine /> : <RiMoonLine />}
               {isDark ? "Light mode" : "Dark mode"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                toggleHiddenAmounts();
+              }}
+            >
+              {hidden ? <RiEyeLine /> : <RiEyeOffLine />}
+              {hidden ? "Show amounts" : "Hide amounts"}
+              <DropdownMenuShortcut>⇧⌘H</DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} disabled={isPending}>

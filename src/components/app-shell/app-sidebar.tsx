@@ -38,7 +38,15 @@ const accountNavItems = [
   { label: "Exchanges", href: "/exchanges" },
 ];
 
-export function AppSidebar({ name, email }: { name: string; email: string }) {
+export function AppSidebar({
+  name,
+  email,
+  hiddenAmounts,
+}: {
+  name: string;
+  email: string;
+  hiddenAmounts: boolean;
+}) {
   return (
     <Sidebar collapsible="offcanvas">
       <SidebarHeader>
@@ -100,7 +108,7 @@ export function AppSidebar({ name, email }: { name: string; email: string }) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser name={name} email={email} />
+        <NavUser name={name} email={email} hiddenAmounts={hiddenAmounts} />
       </SidebarFooter>
     </Sidebar>
   );
