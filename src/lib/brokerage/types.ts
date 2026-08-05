@@ -15,7 +15,7 @@ export type BrokerageAssetClass =
 // brokerage account. Mirrors the EVM `InvestmentBalance` shape, minus the
 // chain-specific fields, plus an asset class so we can store the right enum.
 export type BrokerageBalance = {
-  sourceBalanceId?: string; // Plaid security_id, or account_id for cash
+  sourceBalanceId?: string; // Provider ID, scoped to its brokerage account
   symbol: string; // ticker (e.g. "VOO"), or currency code for cash
   name?: string;
   assetClass: BrokerageAssetClass;

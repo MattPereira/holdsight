@@ -188,7 +188,7 @@ function cashBalance(account: SchwabSecuritiesAccount): BrokerageBalance | null 
   if (!Number.isFinite(cash) || cash === 0) return null;
 
   return {
-    sourceBalanceId: `${account.accountNumber ?? "schwab"}:cash`,
+    sourceBalanceId: "schwab:cash",
     symbol: "USD",
     name: "Cash",
     assetClass: "cash",
