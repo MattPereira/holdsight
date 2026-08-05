@@ -51,6 +51,11 @@ type SchwabAccountResponse = {
   securitiesAccount?: SchwabSecuritiesAccount;
 };
 
+type SchwabAccountNumberEntry = {
+  accountNumber?: string;
+  hashValue?: string;
+};
+
 type SchwabUserPreferenceAccount = {
   accountNumber?: string;
   nickName?: string;
@@ -214,9 +219,17 @@ function accountLabel(
 function normalizeAccount(
   row: SchwabAccountResponse,
   preferencesByAccountNumber: Map<string, SchwabUserPreferenceAccount>,
+  hashesByAccountNumber: Map<string, string>,
 ): BrokerageAccountHoldings | null {
   const account = row.securitiesAccount;
   if (!account?.accountNumber) return null;
+
+  // SECURITY: `externalAccountId` is persisted, so it must be Schwab's opaque
+  // hashValue rather than the real account number. Skip the account when no
+  // hash is available — falling back to the account number would store it.
+  const externalAccountId = hashesByAccountNumber.get(account.accountNumber);
+  if (!externalAccountId) return null;
+
   const preference = preferencesByAccountNumber.get(account.accountNumber);
 
   const balances = (account.positions ?? [])
@@ -226,7 +239,7 @@ function normalizeAccount(
   if (cash) balances.push(cash);
 
   return {
-    externalAccountId: account.accountNumber,
+    externalAccountId,
     accountName: accountLabel(account, preference),
     accountType: toAccountType(account.type),
     mask: account.accountNumber.slice(-4),
@@ -257,6 +270,36 @@ async function getSchwabUserPreferenceAccounts(
     | SchwabUserPreferenceResponse
     | null;
   return userPreferenceAccounts(body);
+}
+
+/**
+ * Map each account number to Schwab's opaque `hashValue`. Schwab exposes this
+ * so callers can reference an account without handling its real number; it is
+ * the only account identifier we persist.
+ */
+async function getSchwabAccountHashes(
+  accessToken: string,
+): Promise<Map<string, string>> {
+  const response = await fetch(getSchwabConfig().accountNumbersUrl, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) return new Map();
+
+  const body = (await response.json().catch(() => null)) as
+    | SchwabAccountNumberEntry[]
+    | null;
+
+  return new Map(
+    (Array.isArray(body) ? body : []).flatMap((entry) =>
+      entry.accountNumber && entry.hashValue
+        ? [[entry.accountNumber, entry.hashValue] as const]
+        : [],
+    ),
+  );
 }
 
 export async function getSchwabHoldings(
@@ -298,19 +341,29 @@ export async function getSchwabHoldings(
     };
   }
 
+  const [preferenceAccounts, hashesByAccountNumber] = await Promise.all([
+    getSchwabUserPreferenceAccounts(accessToken),
+    getSchwabAccountHashes(accessToken),
+  ]);
+
   const preferencesByAccountNumber = new Map(
-    (await getSchwabUserPreferenceAccounts(accessToken)).flatMap(
-      (preference) =>
-        preference.accountNumber
-          ? [[preference.accountNumber, preference] as const]
-          : [],
+    preferenceAccounts.flatMap((preference) =>
+      preference.accountNumber
+        ? [[preference.accountNumber, preference] as const]
+        : [],
     ),
   );
 
   return {
     status: "ready",
     accounts: body
-      .map((account) => normalizeAccount(account, preferencesByAccountNumber))
+      .map((account) =>
+        normalizeAccount(
+          account,
+          preferencesByAccountNumber,
+          hashesByAccountNumber,
+        ),
+      )
       .filter((account): account is BrokerageAccountHoldings =>
         Boolean(account),
       ),

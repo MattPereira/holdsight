@@ -27,10 +27,13 @@ export type BrokerageBalance = {
 
 // One brokerage account exposed by a Plaid Item (e.g. a single Schwab Roth IRA).
 export type BrokerageAccountHoldings = {
-  externalAccountId: string; // Plaid account_id
+  // Opaque provider-side account ID (Plaid account_id, Schwab hashValue).
+  // SECURITY: never the institution's real account number — this is persisted
+  // to brokerage_accounts.external_account_id. Use `mask` for display.
+  externalAccountId: string;
   accountName: string;
   accountType: BrokerageAccountTypeValue;
-  mask: string | null; // last 4 digits, if Plaid provides them
+  mask: string | null; // last 4 digits, when the provider supplies them
   balances: BrokerageBalance[];
 };
 
