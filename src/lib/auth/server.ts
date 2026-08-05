@@ -8,6 +8,7 @@ import { db } from "@/db/index";
 import * as schema from "@/db/schema";
 import { emailNotAllowedError } from "@/lib/auth/access-error";
 import { isEmailAllowed, parseAllowedEmails } from "@/lib/auth/allowed-emails";
+import { withoutPersistedIdToken } from "@/lib/auth/token-storage";
 
 const baseURL = process.env.BETTER_AUTH_URL;
 const allowedEmails = parseAllowedEmails(process.env.ALLOWED_EMAILS);
@@ -31,12 +32,27 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
     },
   },
+  account: {
+    encryptOAuthTokens: true,
+  },
   advanced: {
     database: {
       generateId: "uuid",
     },
   },
   databaseHooks: {
+    account: {
+      create: {
+        async before(account) {
+          return { data: withoutPersistedIdToken(account) };
+        },
+      },
+      update: {
+        async before(account) {
+          return { data: withoutPersistedIdToken(account) };
+        },
+      },
+    },
     user: {
       create: {
         async before(user) {
