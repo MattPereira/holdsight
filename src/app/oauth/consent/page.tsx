@@ -1,6 +1,13 @@
 "use client";
 
-import { RiRefreshLine, RiRobot2Line, RiShieldCheckLine } from "@remixicon/react";
+import {
+  RiEditLine,
+  RiExchangeDollarLine,
+  RiFileList3Line,
+  RiRefreshLine,
+  RiRobot2Line,
+  RiShieldCheckLine,
+} from "@remixicon/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
@@ -110,25 +117,62 @@ function OAuthConsentContent() {
           </section>
 
           <section className="flex flex-col gap-3">
-            <h2 className="text-sm font-medium">What this agent can do</h2>
+            <h2 className="text-sm font-medium">What this agent can read</h2>
             <ul className="flex flex-col gap-3 text-sm">
               <li className="flex gap-3">
                 <RiShieldCheckLine className="mt-0.5 shrink-0 text-muted-foreground" />
                 <span>
-                  <span className="font-medium">Read portfolio allocations</span>
+                  <span className="font-medium">Portfolio allocations</span>
                   <span className="block text-muted-foreground">
-                    View your current asset, group, and allocation data without
-                    refreshing external accounts.
+                    Your current asset, group, and allocation data, including
+                    account values.
+                  </span>
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <RiExchangeDollarLine className="mt-0.5 shrink-0 text-muted-foreground" />
+                <span>
+                  <span className="font-medium">Transaction history</span>
+                  <span className="block text-muted-foreground">
+                    Your stored investment transactions, including the private
+                    journal notes attached to them.
+                  </span>
+                </span>
+              </li>
+              <li className="flex gap-3">
+                <RiFileList3Line className="mt-0.5 shrink-0 text-muted-foreground" />
+                <span>
+                  <span className="font-medium">Asset group theses</span>
+                  <span className="block text-muted-foreground">
+                    Your research write-ups: summary, bull case, bear case,
+                    invalidation criteria, and allocation strategy notes.
+                  </span>
+                </span>
+              </li>
+            </ul>
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <h2 className="text-sm font-medium">What this agent can change</h2>
+            <ul className="flex flex-col gap-3 text-sm">
+              <li className="flex gap-3">
+                <RiEditLine className="mt-0.5 shrink-0 text-muted-foreground" />
+                <span>
+                  <span className="font-medium">Rewrite asset group theses</span>
+                  <span className="block text-muted-foreground">
+                    Overwrite the research text of any asset group. It cannot
+                    change group membership, display settings, or target
+                    allocation.
                   </span>
                 </span>
               </li>
               <li className="flex gap-3">
                 <RiRefreshLine className="mt-0.5 shrink-0 text-muted-foreground" />
                 <span>
-                  <span className="font-medium">Refresh portfolio allocations</span>
+                  <span className="font-medium">Refresh connected accounts</span>
                   <span className="block text-muted-foreground">
-                    Refreshes connected accounts and may call your third-party
-                    financial providers before returning updated data.
+                    Triggers calls to your third-party financial providers before
+                    returning updated data.
                   </span>
                 </span>
               </li>
