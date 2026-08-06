@@ -1,8 +1,8 @@
 # HoldSight
 
-![HoldSight portfolio overview](public/screenshots/portfolio.png)
-
 Track portfolio allocations, document theses, and journal trade decisions.
+
+![HoldSight portfolio overview](public/screenshots/portfolio.png)
 
 ## Overview
 
