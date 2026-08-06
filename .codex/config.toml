@@ -2,7 +2,7 @@ approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 
 [sandbox_workspace_write]
-network_access = false
+network_access = true
 
 [mcp_servers.shadcn]
 command = "npx"
