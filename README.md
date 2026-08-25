@@ -2,8 +2,6 @@
 
 Track portfolio allocations, document theses, and journal trade decisions.
 
-![HoldSight portfolio overview](public/screenshots/portfolio.png)
-
 ## Overview
 
 - Consolidates EVM wallets, Hyperliquid, Lighter, Kraken, Plaid, and Schwab through a shared adapter registry
