@@ -274,6 +274,13 @@
       "when": 1785972491396,
       "tag": "0038_scrub_plaintext_auth_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1788129785048,
+      "tag": "0039_early_hellfire_club",
+      "breakpoints": true
     }
   ]
 }

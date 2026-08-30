@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   RiArrowLeftRightLine,
   RiBankLine,
-  RiBookOpenLine,
   RiLightbulbLine,
   RiPieChartLine,
 } from "@remixicon/react";
@@ -28,7 +27,6 @@ import {
 const navItems = [
   { label: "Portfolio", href: "/", icon: RiPieChartLine },
   { label: "Theses", href: "/theses", icon: RiLightbulbLine },
-  { label: "Journal", href: "/journal", icon: RiBookOpenLine },
   { label: "Trades", href: "/trades", icon: RiArrowLeftRightLine },
 ];
 
