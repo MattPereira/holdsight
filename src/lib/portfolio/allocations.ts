@@ -1,9 +1,8 @@
 import {
-  applyAssetGroups,
-  type AssetGroup,
+  applyPlans,
   type AssetTotal,
 } from "@/lib/portfolio/asset-totals";
-import type { AssetGroupThesis } from "@/lib/portfolio/asset-group-thesis";
+import type { Plan, PlanDetails } from "@/lib/portfolio/plan";
 
 // UI-only declutter threshold. An asset is collapsed into the "Other" bucket
 // when its value falls below 0.1% of the portfolio, but holdings above the
@@ -36,10 +35,9 @@ export type PortfolioAllocationRow = {
   amount: number;
   valueUsd: number;
   weight: number;
-  isGroup: boolean;
-  groupId?: string;
-  userDefinedName?: string | null;
-  thesis?: AssetGroupThesis;
+  isPlan: boolean;
+  planId?: string;
+  planDetails?: PlanDetails;
   targetAllocationPercent?: number | null;
   color?: string | null;
   members: PortfolioAllocationMember[];
@@ -57,19 +55,19 @@ function weightOf(valueUsd: number, grandTotalValueUsd: number) {
   return grandTotalValueUsd === 0 ? 0 : valueUsd / grandTotalValueUsd;
 }
 
-function groupIdFromKey(key: string) {
-  return key.startsWith("group:") ? key.slice("group:".length) : key;
+function planIdFromKey(key: string) {
+  return key.startsWith("plan:") ? key.slice("plan:".length) : key;
 }
 
 export function buildPortfolioAllocations({
   grandTotalValueUsd,
   totals,
-  groups,
+  plans,
   minimumAssetValueUsd = effectiveMinimumAssetValueUsd(grandTotalValueUsd),
 }: {
   grandTotalValueUsd: number;
   totals: AssetTotal[];
-  groups: AssetGroup[];
+  plans: Plan[];
   minimumAssetValueUsd?: number;
 }): PortfolioAllocations {
   const visibleTotals = totals.filter(
@@ -85,10 +83,10 @@ export function buildPortfolioAllocations({
     minimumAssetValueUsd,
     otherValueUsd: Math.max(0, grandTotalValueUsd - visibleValueUsd),
     visibleTotals,
-    rows: applyAssetGroups(visibleTotals, groups).map((row) => {
-      const groupId = row.isGroup ? groupIdFromKey(row.key) : undefined;
-      const group = groupId
-        ? groups.find((candidate) => candidate.id === groupId)
+    rows: applyPlans(visibleTotals, plans).map((row) => {
+      const planId = row.isPlan ? planIdFromKey(row.key) : undefined;
+      const plan = planId
+        ? plans.find((candidate) => candidate.id === planId)
         : undefined;
 
       return {
@@ -98,11 +96,10 @@ export function buildPortfolioAllocations({
         amount: row.amount,
         valueUsd: row.valueUsd,
         weight: weightOf(row.valueUsd, grandTotalValueUsd),
-        isGroup: row.isGroup,
-        groupId,
-        userDefinedName: group?.name ?? null,
-        thesis: group?.thesis,
-        targetAllocationPercent: group?.targetAllocationPercent ?? null,
+        isPlan: row.isPlan,
+        planId,
+        planDetails: plan?.details,
+        targetAllocationPercent: plan?.targetAllocationPercent ?? null,
         color: row.color,
         members: row.members.map((member) => ({
           key: member.key,

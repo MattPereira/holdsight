@@ -16,6 +16,34 @@ _Avoid_: Transaction (for the swap event itself), order, position
 A user's record of the reasoning, emotions, market bias, notes, and images associated with one specific Trade.
 _Avoid_: Transaction journal entry, note
 
+**Plan**:
+A user's strategy for assets connected by one shared reason, which may exist before any asset is acquired. It groups assigned assets for portfolio allocation and records the Thesis, Invalidation, Entry, Exit, target allocation, and Timeframe.
+_Avoid_: Thesis (for the whole record), asset group
+
+**Thesis**:
+The reasoning for owning the assets in a Plan.
+_Avoid_: Plan, investment case
+
+**Invalidation**:
+The evidence or conditions that would prove a Plan's Thesis wrong.
+_Avoid_: Bear case, risk
+
+**Entry**:
+The conditions for starting or increasing exposure under a Plan.
+_Avoid_: Trade, purchase
+
+**Exit**:
+The conditions for reducing or closing exposure under a Plan.
+_Avoid_: Trade, sale
+
+**Timeframe**:
+The expected holding or review horizon for a Plan.
+_Avoid_: Expiration, deadline
+
+**Target Allocation**:
+The intended percentage of the user's total portfolio assigned to a Plan. Targets across Plans are independent and may total more than 100 percent.
+_Avoid_: Size, current allocation
+
 **Transaction History Sync**:
 An asynchronous refresh of a user's provider transaction history that may continue after the user action returns a current snapshot.
 _Avoid_: Transaction fetch, transaction import, refresh transactions

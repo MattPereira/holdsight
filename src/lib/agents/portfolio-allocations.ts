@@ -1,13 +1,10 @@
 import "server-only";
 
+import { getPlanCompletion } from "@/lib/agents/plans";
 import { buildPortfolioAllocations } from "@/lib/portfolio/allocations";
-import {
-  serializeAssetGroupThesis,
-  type AssetGroupThesisForAgent,
-} from "@/lib/portfolio/asset-group-thesis";
 import { getPortfolioBalancesPageData } from "@/lib/portfolio/page-data";
+import { getUserPlans } from "@/lib/portfolio/plans";
 import { refreshPortfolioForUser } from "@/lib/portfolio/refresh";
-import { getUserAssetGroups } from "@/lib/portfolio/groups";
 
 export type PortfolioAllocationForAgent =
   | {
@@ -19,11 +16,14 @@ export type PortfolioAllocationForAgent =
       currentAllocationPercent: number;
     }
   | {
-      type: "group";
+      type: "plan";
       id: string;
       name: string;
-      userDefinedName: string | null;
-      thesis: AssetGroupThesisForAgent;
+      details: NonNullable<
+        ReturnType<typeof buildPortfolioAllocations>["rows"][number]["planDetails"]
+      >;
+      targetAllocationPercent: number | null;
+      completion: ReturnType<typeof getPlanCompletion>;
       valueUsd: number;
       currentAllocationPercent: number;
       members: {
@@ -48,11 +48,11 @@ export async function getPortfolioAllocationsForAgent(
   userId: string,
   { refresh = false }: { refresh?: boolean } = {},
 ): Promise<PortfolioAllocationsForAgent> {
-  const [data, groups] = await Promise.all([
+  const [data, plans] = await Promise.all([
     refresh
       ? refreshPortfolioForUser(userId)
       : getPortfolioBalancesPageData(userId),
-    getUserAssetGroups(userId),
+    getUserPlans(userId),
   ]);
   // Agents receive every holding with no declutter cutoff — hiding small
   // positions is a UI concern, and a full dataset lets allocations reconcile to the
@@ -60,7 +60,7 @@ export async function getPortfolioAllocationsForAgent(
   const allocations = buildPortfolioAllocations({
     grandTotalValueUsd: data.portfolioSummary.grandTotalValue,
     totals: data.portfolioSummary.totals,
-    groups,
+    plans,
     minimumAssetValueUsd: Number.NEGATIVE_INFINITY,
   });
 
@@ -70,7 +70,7 @@ export async function getPortfolioAllocationsForAgent(
     portfolio: {
       grandTotalValueUsd: allocations.grandTotalValueUsd,
       allocations: allocations.rows.map((row) => {
-        if (!row.isGroup) {
+        if (!row.isPlan) {
           return {
             type: "asset",
             symbol: row.label,
@@ -80,17 +80,18 @@ export async function getPortfolioAllocationsForAgent(
             currentAllocationPercent: row.weight * 100,
           };
         }
-        if (!row.thesis) {
-          throw new Error("Asset group allocation is missing thesis metadata.");
+        if (!row.planDetails) {
+          throw new Error("Plan allocation is missing Plan metadata.");
         }
 
         return {
-          type: "group",
-          id: row.groupId ?? row.key,
+          type: "plan",
+          id: row.planId ?? row.key,
           name: row.label,
-          userDefinedName: row.userDefinedName ?? null,
-          thesis: serializeAssetGroupThesis(
-            row.thesis,
+          details: row.planDetails,
+          targetAllocationPercent: row.targetAllocationPercent ?? null,
+          completion: getPlanCompletion(
+            row.planDetails,
             row.targetAllocationPercent ?? null,
           ),
           valueUsd: row.valueUsd,

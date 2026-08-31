@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AccountDetailsView } from "@/components/accounts/account-details-view";
 import { WALLET_SECONDARY_COLUMN } from "@/components/accounts/balances/groups";
-import { AssetGroupsProvider } from "@/components/portfolio/asset-groups-context";
+import { PlansProvider } from "@/components/portfolio/plans-context";
 import type { BalancesView } from "@/lib/accounts/balances-view";
 
 // The transactions tab statically pulls in server actions (auth/db at load
@@ -45,9 +45,9 @@ function balancesView(symbol: string): BalancesView {
 
 function renderView(props: Parameters<typeof AccountDetailsView>[0]) {
   return render(
-    <AssetGroupsProvider initialGroups={[]}>
+    <PlansProvider initialPlans={[]}>
       <AccountDetailsView {...props} />
-    </AssetGroupsProvider>,
+    </PlansProvider>,
   );
 }
 

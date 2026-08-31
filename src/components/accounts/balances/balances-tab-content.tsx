@@ -1,6 +1,6 @@
 import { BalancesTable } from "@/components/accounts/balances/balances-table";
 import type { BalanceGroup, SecondaryColumn } from "@/components/accounts/types";
-import { useAssetGroups } from "@/components/portfolio/asset-groups-context";
+import { usePlans } from "@/components/portfolio/plans-context";
 import { PortfolioAllocations } from "@/components/portfolio/portfolio-allocations";
 import type { PortfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 
@@ -13,7 +13,7 @@ export function BalancesTabContent({
   secondaryColumn: SecondaryColumn;
   summary: PortfolioAssetSummary;
 }) {
-  const { groups: assetGroups } = useAssetGroups();
+  const { plans } = usePlans();
   const hasHoldings = groups.some((group) => group.rows.length > 0);
 
   return (
@@ -22,7 +22,7 @@ export function BalancesTabContent({
         <PortfolioAllocations
           grandTotalValue={summary.grandTotalValue}
           totals={summary.totals}
-          groups={assetGroups}
+          plans={plans}
           totalLabel="Total Assets"
         />
       ) : null}

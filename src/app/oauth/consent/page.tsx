@@ -142,10 +142,10 @@ function OAuthConsentContent() {
               <li className="flex gap-3">
                 <RiFileList3Line className="mt-0.5 shrink-0 text-muted-foreground" />
                 <span>
-                  <span className="font-medium">Asset group theses</span>
+                  <span className="font-medium">Plans</span>
                   <span className="block text-muted-foreground">
-                    Your research write-ups: summary, bull case, bear case,
-                    invalidation criteria, and allocation strategy notes.
+                    Your Plans: Thesis, Invalidation, Entry, Exit, Timeframe,
+                    assigned assets, and target allocation.
                   </span>
                 </span>
               </li>
@@ -158,11 +158,10 @@ function OAuthConsentContent() {
               <li className="flex gap-3">
                 <RiEditLine className="mt-0.5 shrink-0 text-muted-foreground" />
                 <span>
-                  <span className="font-medium">Rewrite asset group theses</span>
+                  <span className="font-medium">Rewrite Plan details</span>
                   <span className="block text-muted-foreground">
-                    Overwrite the research text of any asset group. It cannot
-                    change group membership, display settings, or target
-                    allocation.
+                    Overwrite the prose fields of any Plan. It cannot change
+                    asset assignments, names, colors, or target allocations.
                   </span>
                 </span>
               </li>

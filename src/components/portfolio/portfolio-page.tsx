@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { loadPortfolioPageData } from "@/app/(app)/portfolio/actions";
 import { PageHeader } from "@/components/app-shell/page-header";
-import { useAssetGroups } from "@/components/portfolio/asset-groups-context";
+import { usePlans } from "@/components/portfolio/plans-context";
 import { PortfolioAllocations } from "@/components/portfolio/portfolio-allocations";
 import type { PortfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 import { cn } from "@/lib/utils";
@@ -19,7 +19,7 @@ export function PortfolioPage({
 }: {
   initialData: PortfolioPageData;
 }) {
-  const { groups } = useAssetGroups();
+  const { plans } = usePlans();
   const [summary, setSummary] = useState<PortfolioAssetSummary>(
     initialData.portfolioSummary,
   );
@@ -69,7 +69,7 @@ export function PortfolioPage({
           <PortfolioAllocations
             grandTotalValue={summary.grandTotalValue}
             totals={summary.totals}
-            groups={groups}
+            plans={plans}
           />
         </div>
       </div>

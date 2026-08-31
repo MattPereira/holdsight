@@ -26,7 +26,7 @@ import {
 
 const navItems = [
   { label: "Portfolio", href: "/", icon: RiPieChartLine },
-  { label: "Theses", href: "/theses", icon: RiLightbulbLine },
+  { label: "Plans", href: "/plans", icon: RiLightbulbLine },
   { label: "Trades", href: "/trades", icon: RiArrowLeftRightLine },
 ];
 

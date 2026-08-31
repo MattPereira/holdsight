@@ -13,8 +13,8 @@ import {
   type TradeJournalEntryRow,
 } from "@/lib/journal/transaction-entry";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
-import type { AssetGroup } from "@/lib/portfolio/asset-totals";
-import { getUserAssetGroups } from "@/lib/portfolio/groups";
+import type { Plan } from "@/lib/portfolio/plan";
+import { getUserPlans } from "@/lib/portfolio/plans";
 import { getCurrentPortfolioTransactions } from "@/lib/portfolio/transactions";
 
 const DEFAULT_LIMIT = 100;
@@ -22,7 +22,7 @@ export const MAX_AGENT_TRANSACTION_LIMIT = 100;
 
 export type AgentPortfolioTransactionFilters = {
   symbols?: string[];
-  groupIds?: string[];
+  planIds?: string[];
   startAt?: string;
   endAt?: string;
   kinds?: InvestmentTransactionKind[];
@@ -106,11 +106,11 @@ function decodeCursor(cursor: string): TransactionCursor {
   }
 }
 
-function groupBySymbol(groups: AssetGroup[]): Map<string, AssetGroup> {
-  const result = new Map<string, AssetGroup>();
-  for (const group of groups) {
-    for (const symbol of group.symbols) {
-      result.set(symbol.trim().toUpperCase(), group);
+function planBySymbol(plans: Plan[]): Map<string, Plan> {
+  const result = new Map<string, Plan>();
+  for (const plan of plans) {
+    for (const symbol of plan.symbols) {
+      result.set(symbol.trim().toUpperCase(), plan);
     }
   }
   return result;
@@ -165,13 +165,13 @@ export async function getPortfolioTransactionsForAgent(
   userId: string,
   input: AgentPortfolioTransactionFilters = {},
 ) {
-  const [snapshot, groups] = await Promise.all([
+  const [snapshot, plans] = await Promise.all([
     getCurrentPortfolioTransactions(userId),
-    getUserAssetGroups(userId),
+    getUserPlans(userId),
   ]);
 
   const symbols = uniqueNormalizedSymbols(input.symbols);
-  const groupIds = uniqueValues(input.groupIds);
+  const planIds = uniqueValues(input.planIds);
   const kinds = uniqueValues(input.kinds);
   const sides = uniqueValues(input.sides);
   const accountIds = uniqueValues(input.accountIds);
@@ -203,19 +203,19 @@ export async function getPortfolioTransactionsForAgent(
     );
   }
 
-  const groupsById = new Map(groups.map((group) => [group.id, group]));
-  const unknownGroupIds = groupIds.filter(
-    (groupId) => !groupsById.has(groupId),
+  const plansById = new Map(plans.map((plan) => [plan.id, plan]));
+  const unknownPlanIds = planIds.filter(
+    (planId) => !plansById.has(planId),
   );
-  if (unknownGroupIds.length > 0) {
+  if (unknownPlanIds.length > 0) {
     throw new AgentTransactionInputError(
-      "One or more groupIds do not belong to the authenticated user.",
+      "One or more planIds do not belong to the authenticated user.",
     );
   }
 
   const selectedAssetSymbols = new Set(symbols);
-  for (const groupId of groupIds) {
-    for (const symbol of groupsById.get(groupId)?.symbols ?? []) {
+  for (const planId of planIds) {
+    for (const symbol of plansById.get(planId)?.symbols ?? []) {
       selectedAssetSymbols.add(symbol.trim().toUpperCase());
     }
   }
@@ -223,7 +223,7 @@ export async function getPortfolioTransactionsForAgent(
   const kindSet = new Set(kinds);
   const sideSet = new Set(sides);
   const accountIdSet = new Set(accountIds);
-  const hasAssetFilter = symbols.length > 0 || groupIds.length > 0;
+  const hasAssetFilter = symbols.length > 0 || planIds.length > 0;
 
   const matched = snapshot.transactions
     .filter((transaction) => {
@@ -290,18 +290,18 @@ export async function getPortfolioTransactionsForAgent(
     journalEntries.map((entry) => [entry.transactionId, entry]),
   );
   const journalImagesByTransaction = imagesByTransaction(journalImages);
-  const groupsBySymbol = groupBySymbol(groups);
-  const relevantGroupIds = new Set(groupIds);
+  const plansBySymbol = planBySymbol(plans);
+  const relevantPlanIds = new Set(planIds);
 
   const transactions = pageTransactions.map((transaction) => {
-    const assetGroup = transaction.baseAssetSymbol
-      ? groupsBySymbol.get(transaction.baseAssetSymbol.toUpperCase())
+    const plan = transaction.baseAssetSymbol
+      ? plansBySymbol.get(transaction.baseAssetSymbol.toUpperCase())
       : undefined;
-    if (assetGroup) relevantGroupIds.add(assetGroup.id);
+    if (plan) relevantPlanIds.add(plan.id);
 
     return {
       ...withoutJournalSummary(transaction),
-      assetGroupId: assetGroup?.id ?? null,
+      planId: plan?.id ?? null,
       journal: serializeJournal(
         journalByTransaction.get(transaction.id),
         journalImagesByTransaction.get(transaction.id) ?? [],
@@ -315,7 +315,7 @@ export async function getPortfolioTransactionsForAgent(
     retrievedAt: new Date().toISOString(),
     filters: {
       symbols,
-      groupIds,
+      planIds,
       startAt,
       endAt,
       kinds,
@@ -325,13 +325,13 @@ export async function getPortfolioTransactionsForAgent(
       maxValueUsd: input.maxValueUsd ?? null,
       hasJournal: input.hasJournal ?? null,
     },
-    assetGroups: groups
-      .filter((group) => relevantGroupIds.has(group.id))
-      .map((group) => ({
-        id: group.id,
-        name: group.name,
-        symbols: group.symbols,
-        thesisUpdatedAt: group.updatedAt,
+    plans: plans
+      .filter((plan) => relevantPlanIds.has(plan.id))
+      .map((plan) => ({
+        id: plan.id,
+        name: plan.name,
+        symbols: plan.symbols,
+        updatedAt: plan.updatedAt,
       })),
     transactions,
     page: {

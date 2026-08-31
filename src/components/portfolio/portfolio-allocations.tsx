@@ -21,12 +21,12 @@ import { cn } from "@/lib/utils";
 import { formatCompactUsd, formatPercent, formatUsd } from "@/lib/format";
 import { buildPortfolioAllocations } from "@/lib/portfolio/allocations";
 import {
-  applyAssetGroups,
+  applyPlans,
   ASSET_CHART_COLORS,
   assetColorByKey,
-  type AssetGroup,
   type AssetTotal,
 } from "@/lib/portfolio/asset-totals";
+import type { Plan } from "@/lib/portfolio/plan";
 
 // Recharts/shadcn keys must be safe CSS-identifier-ish tokens; symbols can
 // contain "+" and spaces (e.g. "HYPE + sHYPE"), so slugify them.
@@ -45,7 +45,7 @@ type HoldingsDisplayRow = {
   amount: number;
   valueUsd: number;
   weight: number;
-  isGroup?: boolean;
+  isPlan?: boolean;
   members?: HoldingsDisplayRow[];
 };
 
@@ -71,17 +71,17 @@ function ColorSwatch({
 function AllocationDonutChart({
   grandTotalValue,
   totals,
-  groups,
+  plans,
   totalLabel,
 }: {
   grandTotalValue: number;
   totals: AssetTotal[];
-  groups: AssetGroup[];
+  plans: Plan[];
   totalLabel: string;
 }) {
   const { chartData, chartConfig } = useMemo(() => {
-    const rows = applyAssetGroups(totals, groups);
-    const colorByKey = assetColorByKey(totals, groups);
+    const rows = applyPlans(totals, plans);
+    const colorByKey = assetColorByKey(totals, plans);
     const config: ChartConfig = { value: { label: "Value" } };
     const data = rows.map((row, index) => {
       const key = slugify(row.label, index);
@@ -95,7 +95,7 @@ function AllocationDonutChart({
       };
     });
     return { chartData: data, chartConfig: config };
-  }, [totals, groups]);
+  }, [totals, plans]);
 
   return (
     // The centre label is HTML overlaid on the chart rather than an SVG <text>
@@ -179,7 +179,7 @@ function HoldingsRows({
           secondaryValue: <Sensitive>{formatUsd(row.valueUsd)}</Sensitive>,
         };
 
-        if (!row.isGroup) {
+        if (!row.isPlan) {
           return <LineItemRow key={row.key} {...fields} />;
         }
 
@@ -210,14 +210,14 @@ function HoldingsRows({
 export function PortfolioAllocations({
   grandTotalValue,
   totals,
-  groups = [],
+  plans = [],
   // "Net Worth" is only true of the whole portfolio. A single account's donut
   // covers that account's holdings, so its caller says so.
   totalLabel = "Net Worth",
 }: {
   grandTotalValue: number;
   totals: AssetTotal[];
-  groups?: AssetGroup[];
+  plans?: Plan[];
   totalLabel?: string;
 }) {
   const allocations = useMemo(
@@ -225,14 +225,14 @@ export function PortfolioAllocations({
       buildPortfolioAllocations({
         grandTotalValueUsd: grandTotalValue,
         totals,
-        groups,
+        plans,
       }),
-    [grandTotalValue, totals, groups],
+    [grandTotalValue, totals, plans],
   );
   const { visibleTotals } = allocations;
   const colorByKey = useMemo(
-    () => assetColorByKey(visibleTotals, groups),
-    [visibleTotals, groups],
+    () => assetColorByKey(visibleTotals, plans),
+    [visibleTotals, plans],
   );
   const rows: HoldingsDisplayRow[] = useMemo(
     () =>
@@ -243,7 +243,7 @@ export function PortfolioAllocations({
         amount: row.amount,
         valueUsd: row.valueUsd,
         weight: row.weight,
-        isGroup: row.isGroup,
+        isPlan: row.isPlan,
         color: row.color,
         members: row.members.map((member) => ({
           key: member.key,
@@ -266,7 +266,7 @@ export function PortfolioAllocations({
       <AllocationDonutChart
         grandTotalValue={grandTotalValue}
         totals={visibleTotals}
-        groups={groups}
+        plans={plans}
         totalLabel={totalLabel}
       />
       <div className="min-w-0">

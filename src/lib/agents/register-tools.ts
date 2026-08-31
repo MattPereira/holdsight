@@ -4,11 +4,11 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import {
-  AgentAssetGroupThesisError,
-  getAssetGroupThesisForAgent,
-  listAssetGroupThesesForAgent,
-  updateAssetGroupThesisForAgent,
-} from "@/lib/agents/asset-group-theses";
+  AgentPlanError,
+  getPlanForAgent,
+  listPlansForAgent,
+  updatePlanForAgent,
+} from "@/lib/agents/plans";
 import { getPortfolioAllocationsForAgent } from "@/lib/agents/portfolio-allocations";
 import {
   AgentTransactionInputError,
@@ -16,18 +16,18 @@ import {
   MAX_AGENT_TRANSACTION_LIMIT,
 } from "@/lib/agents/portfolio-transactions";
 import {
-  assetGroupThesisListResultSchema,
-  assetGroupThesisResultSchema,
+  planListResultSchema,
+  planResultSchema,
   portfolioAllocationsResultSchema,
   portfolioTransactionsResultSchema,
 } from "@/lib/agents/output-schemas";
-import { MAX_ASSET_GROUP_THESIS_SECTION_LENGTH } from "@/lib/portfolio/asset-group-thesis";
+import { MAX_PLAN_TEXT_LENGTH } from "@/lib/portfolio/plan";
 
-const thesisSection = (description: string) =>
+const planSection = (description: string) =>
   z
     .string()
     .trim()
-    .max(MAX_ASSET_GROUP_THESIS_SECTION_LENGTH)
+    .max(MAX_PLAN_TEXT_LENGTH)
     .nullable()
     .optional()
     .describe(
@@ -47,7 +47,7 @@ function registerPortfolioAllocationTools(server: McpServer, userId: string) {
     {
       title: "Get Portfolio Allocations",
       description:
-        "Read the current Holdsight portfolio allocations and structured asset-group theses without refreshing external account balances. Current allocation percentages use a 0–100 scale.",
+        "Read the current Holdsight portfolio allocations and Plans without refreshing external account balances. Current and target allocation percentages use a 0–100 scale.",
       inputSchema: {},
       outputSchema: portfolioAllocationsResultSchema.shape,
       annotations: {
@@ -109,23 +109,23 @@ function registerPortfolioAllocationTools(server: McpServer, userId: string) {
   );
 }
 
-function registerAssetGroupThesisTools(server: McpServer, userId: string) {
+function registerPlanTools(server: McpServer, userId: string) {
   server.registerTool(
-    "list_asset_group_theses",
+    "list_plans",
     {
-      title: "List Asset Group Theses",
+      title: "List Plans",
       description:
-        "List the authenticated user's asset-group theses with IDs, names, member symbols, completion status, and last-updated timestamps. Use this compact index to identify a thesis, then call get_asset_group_thesis to read its contents.",
+        "List the authenticated user's Plans with IDs, names, assigned symbols, target allocations, completion status, and last-updated timestamps. Use this compact index to identify a Plan, then call get_plan to read it.",
       inputSchema: {},
-      outputSchema: assetGroupThesisListResultSchema.shape,
+      outputSchema: planListResultSchema.shape,
       annotations: {
         readOnlyHint: true,
         openWorldHint: false,
       },
     },
     async () => {
-      const theses = await listAssetGroupThesesForAgent(userId);
-      const result = { theses };
+      const plans = await listPlansForAgent(userId);
+      const result = { plans };
 
       return {
         content: [],
@@ -135,35 +135,33 @@ function registerAssetGroupThesisTools(server: McpServer, userId: string) {
   );
 
   server.registerTool(
-    "get_asset_group_thesis",
+    "get_plan",
     {
-      title: "Get Asset Group Thesis",
+      title: "Get Plan",
       description:
-        "Read one structured asset-group thesis and its updatedAt timestamp without refreshing external providers. Use the returned updatedAt value when updating the thesis.",
+        "Read one Plan and its updatedAt timestamp without refreshing external providers. Use the returned updatedAt value when updating the Plan.",
       inputSchema: {
-        assetGroupId: z
+        planId: z
           .string()
           .uuid()
-          .describe(
-            "Asset group ID returned by list_asset_group_theses or get_portfolio_allocations.",
-          ),
+          .describe("Plan ID returned by list_plans or get_portfolio_allocations."),
       },
-      outputSchema: assetGroupThesisResultSchema.shape,
+      outputSchema: planResultSchema.shape,
       annotations: {
         readOnlyHint: true,
         openWorldHint: false,
       },
     },
-    async ({ assetGroupId }) => {
+    async ({ planId }) => {
       try {
-        const thesis = await getAssetGroupThesisForAgent(userId, assetGroupId);
+        const plan = await getPlanForAgent(userId, planId);
 
         return {
           content: [],
-          structuredContent: thesis,
+          structuredContent: plan,
         };
       } catch (error) {
-        if (error instanceof AgentAssetGroupThesisError) {
+        if (error instanceof AgentPlanError) {
           return toolError(error);
         }
         throw error;
@@ -172,35 +170,31 @@ function registerAssetGroupThesisTools(server: McpServer, userId: string) {
   );
 
   server.registerTool(
-    "update_asset_group_thesis",
+    "update_plan",
     {
-      title: "Update Asset Group Thesis",
+      title: "Update Plan",
       description:
-        "Patch the research text for one Holdsight asset-group thesis. Read the thesis first and pass its updatedAt value to prevent overwriting a concurrent edit. This tool cannot change group membership, display settings, or target allocation.",
+        "Patch the prose fields for one Holdsight Plan. Read the Plan first and pass its updatedAt value to prevent overwriting a concurrent edit. This tool cannot change asset assignment, name, color, or target allocation.",
       inputSchema: {
-        assetGroupId: z
+        planId: z
           .string()
           .uuid()
           .describe(
-            "Asset group ID returned by list_asset_group_theses, get_portfolio_allocations, or get_asset_group_thesis.",
+            "Plan ID returned by list_plans, get_portfolio_allocations, or get_plan.",
           ),
         expectedUpdatedAt: z
           .string()
           .datetime({ offset: true })
           .describe(
-            "Pass the exact updatedAt value from the most recent get_asset_group_thesis response. If the update reports a conflict, fetch the thesis again, reconcile the changes, and retry.",
+            "Pass the exact updatedAt value from the most recent get_plan response. If the update reports a conflict, fetch the Plan again, reconcile the changes, and retry.",
           ),
-        summary: thesisSection("Concise thesis summary."),
-        bullCase: thesisSection("Evidence and reasoning for the bull case."),
-        bearCase: thesisSection("Evidence and reasoning for the bear case."),
-        invalidationCriteria: thesisSection(
-          "Observable conditions that would invalidate the thesis.",
-        ),
-        allocationStrategyNotes: thesisSection(
-          "Notes connecting the thesis to allocation strategy.",
-        ),
+        thesis: planSection("The reasoning for owning the Plan's assets."),
+        invalidation: planSection("What would prove the Thesis wrong."),
+        entry: planSection("Conditions for starting or increasing exposure."),
+        exit: planSection("Conditions for reducing or closing exposure."),
+        timeframe: planSection("Expected holding or review horizon."),
       },
-      outputSchema: assetGroupThesisResultSchema.shape,
+      outputSchema: planResultSchema.shape,
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -208,21 +202,21 @@ function registerAssetGroupThesisTools(server: McpServer, userId: string) {
         openWorldHint: false,
       },
     },
-    async ({ assetGroupId, expectedUpdatedAt, ...patch }) => {
+    async ({ planId, expectedUpdatedAt, ...patch }) => {
       try {
-        const thesis = await updateAssetGroupThesisForAgent(
+        const plan = await updatePlanForAgent(
           userId,
-          assetGroupId,
+          planId,
           expectedUpdatedAt,
           patch,
         );
 
         return {
           content: [],
-          structuredContent: thesis,
+          structuredContent: plan,
         };
       } catch (error) {
-        if (error instanceof AgentAssetGroupThesisError) {
+        if (error instanceof AgentPlanError) {
           return toolError(error);
         }
         throw error;
@@ -237,7 +231,7 @@ function registerPortfolioTransactionTools(server: McpServer, userId: string) {
     {
       title: "Get Portfolio Transactions",
       description:
-        "Read stored Holdsight investment transactions with optional asset, group, date, kind, side, account, value, and journal filters, plus compact references to relevant asset groups. Call get_asset_group_thesis with a returned group ID when thesis contents are needed. All filters are optional; arrays use OR, filter categories use AND, and symbols and groups match the base asset. Results are newest first. This tool does not refresh external providers.",
+        "Read stored Holdsight investment transactions with optional asset, Plan, date, kind, side, account, value, and journal filters, plus compact references to relevant Plans. Call get_plan with a returned Plan ID when Plan contents are needed. All filters are optional; arrays use OR, filter categories use AND, and symbols and Plans match the base asset. Results are newest first. This tool does not refresh external providers.",
       inputSchema: {
         symbols: z
           .array(z.string().trim().min(1).max(64))
@@ -245,13 +239,13 @@ function registerPortfolioTransactionTools(server: McpServer, userId: string) {
           .max(100)
           .optional()
           .describe("Base asset symbols to match, such as BTC or AAPL."),
-        groupIds: z
+        planIds: z
           .array(z.string().uuid())
           .min(1)
           .max(50)
           .optional()
           .describe(
-            "Asset group IDs returned by get_portfolio_allocations, list_asset_group_theses, or prior transaction results. Symbols and groups are combined as a union.",
+            "Plan IDs returned by get_portfolio_allocations, list_plans, or prior transaction results. Symbols and Plans are combined as a union.",
           ),
         startAt: z
           .string()
@@ -363,6 +357,6 @@ function registerPortfolioTransactionTools(server: McpServer, userId: string) {
 
 export function registerHoldsightTools(server: McpServer, userId: string) {
   registerPortfolioAllocationTools(server, userId);
-  registerAssetGroupThesisTools(server, userId);
+  registerPlanTools(server, userId);
   registerPortfolioTransactionTools(server, userId);
 }

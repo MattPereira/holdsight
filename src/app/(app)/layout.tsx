@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
 import { LoginForm } from "@/components/auth/login-form";
-import { AssetGroupsProvider } from "@/components/portfolio/asset-groups-context";
+import { PlansProvider } from "@/components/portfolio/plans-context";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import {
   SidebarInset,
@@ -14,7 +14,7 @@ import {
   HIDDEN_AMOUNTS_COOKIE,
   isHiddenAmountsValue,
 } from "@/lib/hidden-amounts";
-import { getUserAssetGroups } from "@/lib/portfolio/groups";
+import { getUserPlans } from "@/lib/portfolio/plans";
 
 export default async function AppLayout({
   children,
@@ -35,7 +35,7 @@ export default async function AppLayout({
     );
   }
 
-  const groups = await getUserAssetGroups(session.user.id);
+  const plans = await getUserPlans(session.user.id);
   // The root layout already applied the mask; the sidebar needs the same value
   // so its menu item opens with the label that matches what is on screen.
   const cookieStore = await cookies();
@@ -45,7 +45,7 @@ export default async function AppLayout({
 
   return (
     <SidebarProvider>
-      <AssetGroupsProvider initialGroups={groups}>
+      <PlansProvider initialPlans={plans}>
         <AppSidebar
           name={session.user.name}
           email={session.user.email}
@@ -60,7 +60,7 @@ export default async function AppLayout({
           </header>
           <div className="p-6 md:p-10">{children}</div>
         </SidebarInset>
-      </AssetGroupsProvider>
+      </PlansProvider>
     </SidebarProvider>
   );
 }

@@ -1,5 +1,5 @@
 import type { BalancesResult } from "@/lib/portfolio/types";
-import type { AssetGroupThesis } from "@/lib/portfolio/asset-group-thesis";
+import type { Plan } from "@/lib/portfolio/plan";
 
 export type AssetTotal = {
   key: string;
@@ -14,20 +14,10 @@ export type PortfolioAssetSummary = {
   totals: AssetTotal[];
 };
 
-export type AssetGroup = {
-  id: string;
-  name: string | null;
-  color: string | null;
-  thesis: AssetGroupThesis;
-  targetAllocationPercent: number | null;
-  updatedAt: string;
-  symbols: string[];
-};
-
 /**
- * A row in the holdings summary. Ungrouped assets have an empty `members`
- * array; grouped assets carry their underlying holdings so the UI can expand
- * them. A group's `amount` is meaningless (different symbols) so callers should
+ * A row in the holdings summary. Unplanned assets have an empty `members`
+ * array; planned assets carry their underlying holdings so the UI can expand
+ * them. A Plan's `amount` is meaningless (different symbols) so callers should
  * only render it for single-asset rows.
  */
 export type AssetTotalRow = {
@@ -36,7 +26,7 @@ export type AssetTotalRow = {
   name?: string;
   amount: number;
   valueUsd: number;
-  isGroup: boolean;
+  isPlan: boolean;
   color?: string | null;
   members: AssetTotal[];
 };
@@ -45,41 +35,40 @@ function symbolKey(symbol: string): string {
   return symbol.trim().toUpperCase();
 }
 
-/** Label a group by its name, falling back to its members joined with " + ". */
-export function groupLabel(name: string | null, memberSymbols: string[]): string {
-  const trimmed = name?.trim();
-  return trimmed ? trimmed : memberSymbols.join(" + ");
+/** Label a Plan by its required name. */
+export function planLabel(name: string): string {
+  return name.trim();
 }
 
 /**
- * Fold grouped assets into combined rows. Members are matched to groups
- * case-insensitively by symbol. A group with no held members is omitted, so
+ * Fold assets assigned to Plans into combined rows. Members are matched
+ * case-insensitively by symbol. A Plan with no held members is omitted, so
  * combined totals only ever reflect assets the user actually holds.
  */
-export function applyAssetGroups(
+export function applyPlans(
   totals: AssetTotal[],
-  groups: AssetGroup[],
+  plans: Plan[],
 ): AssetTotalRow[] {
-  const symbolToGroupId = new Map<string, string>();
-  const groupById = new Map<string, AssetGroup>();
-  for (const group of groups) {
-    groupById.set(group.id, group);
-    for (const symbol of group.symbols) {
-      symbolToGroupId.set(symbolKey(symbol), group.id);
+  const symbolToPlanId = new Map<string, string>();
+  const planById = new Map<string, Plan>();
+  for (const plan of plans) {
+    planById.set(plan.id, plan);
+    for (const symbol of plan.symbols) {
+      symbolToPlanId.set(symbolKey(symbol), plan.id);
     }
   }
 
-  const grouped = new Map<string, AssetTotal[]>();
+  const planned = new Map<string, AssetTotal[]>();
   const rows: AssetTotalRow[] = [];
 
   for (const total of totals) {
-    const groupId = symbolToGroupId.get(symbolKey(total.symbol));
-    if (groupId && groupById.has(groupId)) {
-      const members = grouped.get(groupId);
+    const planId = symbolToPlanId.get(symbolKey(total.symbol));
+    if (planId && planById.has(planId)) {
+      const members = planned.get(planId);
       if (members) {
         members.push(total);
       } else {
-        grouped.set(groupId, [total]);
+        planned.set(planId, [total]);
       }
     } else {
       rows.push({
@@ -88,41 +77,38 @@ export function applyAssetGroups(
         name: total.name,
         amount: total.amount,
         valueUsd: total.valueUsd,
-        isGroup: false,
+        isPlan: false,
         members: [],
       });
     }
   }
 
-  for (const [groupId, members] of grouped) {
-    const group = groupById.get(groupId)!;
-    // A single-member group still renders as a group so its name/color stick.
-    // Without a custom label, fall back to the lone symbol rather than the
-    // bare "X" joined string so it reads like a normal holding.
+  for (const [planId, members] of planned) {
+    const plan = planById.get(planId)!;
+    // A single-member Plan still renders as a Plan so its name/color stick.
     if (members.length < 2) {
       const [member] = members;
       rows.push({
-        key: `group:${groupId}`,
-        label: groupLabel(group.name, [member.symbol]),
+        key: `plan:${planId}`,
+        label: planLabel(plan.name),
         name: member.name,
         amount: member.amount,
         valueUsd: member.valueUsd,
-        isGroup: true,
-        color: group.color,
+        isPlan: true,
+        color: plan.color,
         members,
       });
       continue;
     }
 
     members.sort((a, b) => b.valueUsd - a.valueUsd);
-    const memberSymbols = members.map((member) => member.symbol);
     rows.push({
-      key: `group:${groupId}`,
-      label: groupLabel(group.name, memberSymbols),
+      key: `plan:${planId}`,
+      label: planLabel(plan.name),
       amount: 0,
       valueUsd: members.reduce((sum, member) => sum + member.valueUsd, 0),
-      isGroup: true,
-      color: group.color,
+      isPlan: true,
+      color: plan.color,
       members,
     });
   }
@@ -148,8 +134,8 @@ export const ASSET_CHART_COLORS = [
 
 /**
  * Map each grouped/ungrouped row key to its allocation color. Rows are ordered
- * by value (see {@link applyAssetGroups}), so the assignment is stable as long
- * as both the chart and the table start from the same totals/groups.
+ * by value (see {@link applyPlans}), so the assignment is stable as long
+ * as both the chart and the table start from the same totals/Plans.
  *
  * Auto-assigned rows claim the first palette color not already taken — by a
  * manual pick or an earlier auto row — so no two slices share a hue until all
@@ -158,9 +144,9 @@ export const ASSET_CHART_COLORS = [
  */
 export function assetColorByKey(
   totals: AssetTotal[],
-  groups: AssetGroup[],
+  plans: Plan[],
 ): Map<string, string> {
-  const rows = applyAssetGroups(totals, groups);
+  const rows = applyPlans(totals, plans);
   const used = new Set(
     rows.map((row) => row.color).filter((color): color is string => !!color),
   );

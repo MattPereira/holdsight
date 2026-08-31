@@ -35,49 +35,48 @@ const transactionStatusSchema = z.enum([
   "unknown",
 ]);
 
-const thesisMissingFieldSchema = z.enum([
-  "summary",
-  "bullCase",
-  "bearCase",
-  "invalidationCriteria",
-  "allocationStrategy.targetAllocationPercent",
-  "allocationStrategy.notes",
+const planMissingFieldSchema = z.enum([
+  "thesis",
+  "invalidation",
+  "entry",
+  "exit",
+  "targetAllocationPercent",
+  "timeframe",
 ]);
 
-export const assetGroupThesisSchema = z.object({
-  summary: z.string().nullable(),
-  bullCase: z.string().nullable(),
-  bearCase: z.string().nullable(),
-  invalidationCriteria: z.string().nullable(),
-  allocationStrategy: z.object({
-    targetAllocationPercent: z.number().min(0).max(100).nullable(),
-    notes: z.string().nullable(),
-  }),
-  completion: z.object({
-    completedSections: z.number().int().min(0).max(5),
-    totalSections: z.literal(5),
-    isComplete: z.boolean(),
-    missing: z.array(thesisMissingFieldSchema),
-  }),
+export const planDetailsSchema = z.object({
+  thesis: z.string().nullable(),
+  invalidation: z.string().nullable(),
+  entry: z.string().nullable(),
+  exit: z.string().nullable(),
+  timeframe: z.string().nullable(),
 });
 
-export const assetGroupThesisResultSchema = z.object({
-  assetGroup: z.object({
-    id: z.string().uuid(),
-    name: z.string().nullable(),
-    symbols: z.array(z.string()),
-  }),
-  thesis: assetGroupThesisSchema,
+export const planCompletionSchema = z.object({
+  completedFields: z.number().int().min(0).max(6),
+  totalFields: z.literal(6),
+  isComplete: z.boolean(),
+  missing: z.array(planMissingFieldSchema),
+});
+
+export const planResultSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  symbols: z.array(z.string()),
+  details: planDetailsSchema,
+  targetAllocationPercent: z.number().min(0).max(100).nullable(),
+  completion: planCompletionSchema,
   updatedAt: timestampSchema,
 });
 
-export const assetGroupThesisListResultSchema = z.object({
-  theses: z.array(
+export const planListResultSchema = z.object({
+  plans: z.array(
     z.object({
       id: z.string().uuid(),
-      name: z.string().nullable(),
+      name: z.string(),
       symbols: z.array(z.string()),
-      completion: assetGroupThesisSchema.shape.completion,
+      targetAllocationPercent: z.number().min(0).max(100).nullable(),
+      completion: planCompletionSchema,
       updatedAt: timestampSchema,
     }),
   ),
@@ -93,11 +92,12 @@ const portfolioAllocationSchema = z.discriminatedUnion("type", [
     currentAllocationPercent: z.number(),
   }),
   z.object({
-    type: z.literal("group"),
+    type: z.literal("plan"),
     id: z.string().uuid(),
     name: z.string(),
-    userDefinedName: z.string().nullable(),
-    thesis: assetGroupThesisSchema,
+    details: planDetailsSchema,
+    targetAllocationPercent: z.number().min(0).max(100).nullable(),
+    completion: planCompletionSchema,
     valueUsd: z.number(),
     currentAllocationPercent: z.number(),
     members: z.array(
@@ -121,6 +121,10 @@ export const portfolioAllocationsResultSchema = z.object({
   }),
 });
 
+/*
+ * Keep journal schemas below the Plan contract so transaction tools can reuse
+ * the same timestamps and Plan identifiers without a second public model.
+ */
 const journalSchema = z.object({
   id: z.string().uuid(),
   note: z.string().nullable(),
@@ -189,7 +193,7 @@ const transactionSchema = z.object({
   exitPrice: z.number().nullable().optional(),
   grossPnlUsd: z.number().nullable().optional(),
   netPnlUsd: z.number().nullable().optional(),
-  assetGroupId: z.string().uuid().nullable(),
+  planId: z.string().uuid().nullable(),
   journal: journalSchema.nullable(),
 });
 
@@ -197,7 +201,7 @@ export const portfolioTransactionsResultSchema = z.object({
   retrievedAt: timestampSchema,
   filters: z.object({
     symbols: z.array(z.string()),
-    groupIds: z.array(z.string().uuid()),
+    planIds: z.array(z.string().uuid()),
     startAt: timestampSchema.nullable(),
     endAt: timestampSchema.nullable(),
     kinds: z.array(transactionKindSchema),
@@ -207,12 +211,12 @@ export const portfolioTransactionsResultSchema = z.object({
     maxValueUsd: z.number().nonnegative().nullable(),
     hasJournal: z.boolean().nullable(),
   }),
-  assetGroups: z.array(
+  plans: z.array(
     z.object({
       id: z.string().uuid(),
-      name: z.string().nullable(),
+      name: z.string(),
       symbols: z.array(z.string()),
-      thesisUpdatedAt: timestampSchema,
+      updatedAt: timestampSchema,
     }),
   ),
   transactions: z.array(transactionSchema),
