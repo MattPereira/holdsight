@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   check,
+  foreignKey,
   index,
   numeric,
   pgTable,
@@ -46,15 +47,17 @@ export const plans = pgTable(
       "plans_target_allocation_percent_check",
       sql`${table.targetAllocationPercent} is null or (${table.targetAllocationPercent} >= 0 and ${table.targetAllocationPercent} <= 100)`,
     ),
+    check(
+      "plans_name_length_check",
+      sql`char_length(${table.name}) between 1 and 40`,
+    ),
   ],
 );
 
 export const planAssets = pgTable(
   "plan_assets",
   {
-    planId: uuid("plan_id")
-      .notNull()
-      .references(() => plans.id, { onDelete: "cascade" }),
+    planId: uuid("plan_id").notNull(),
     userId: uuid("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
@@ -64,6 +67,11 @@ export const planAssets = pgTable(
     primaryKey({ columns: [table.planId, table.symbol] }),
     uniqueIndex("plan_assets_user_symbol_idx").on(table.userId, table.symbol),
     index("plan_assets_plan_id_idx").on(table.planId),
+    foreignKey({
+      name: "plan_assets_plan_user_fk",
+      columns: [table.planId, table.userId],
+      foreignColumns: [plans.id, plans.userId],
+    }).onDelete("cascade"),
   ],
 );
 

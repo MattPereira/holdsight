@@ -35,11 +35,6 @@ function symbolKey(symbol: string): string {
   return symbol.trim().toUpperCase();
 }
 
-/** Label a Plan by its required name. */
-export function planLabel(name: string): string {
-  return name.trim();
-}
-
 /**
  * Fold assets assigned to Plans into combined rows. Members are matched
  * case-insensitively by symbol. A Plan with no held members is omitted, so
@@ -90,7 +85,7 @@ export function applyPlans(
       const [member] = members;
       rows.push({
         key: `plan:${planId}`,
-        label: planLabel(plan.name),
+        label: plan.name,
         name: member.name,
         amount: member.amount,
         valueUsd: member.valueUsd,
@@ -104,7 +99,7 @@ export function applyPlans(
     members.sort((a, b) => b.valueUsd - a.valueUsd);
     rows.push({
       key: `plan:${planId}`,
-      label: planLabel(plan.name),
+      label: plan.name,
       amount: 0,
       valueUsd: members.reduce((sum, member) => sum + member.valueUsd, 0),
       isPlan: true,
@@ -133,7 +128,7 @@ export const ASSET_CHART_COLORS = [
 ];
 
 /**
- * Map each grouped/ungrouped row key to its allocation color. Rows are ordered
+ * Map each planned/unplanned row key to its allocation color. Rows are ordered
  * by value (see {@link applyPlans}), so the assignment is stable as long
  * as both the chart and the table start from the same totals/Plans.
  *

@@ -124,7 +124,7 @@ function OAuthConsentContent() {
                 <span>
                   <span className="font-medium">Portfolio allocations</span>
                   <span className="block text-muted-foreground">
-                    Your current asset, group, and allocation data, including
+                    Your current asset, Plan, and allocation data, including
                     account values.
                   </span>
                 </span>
