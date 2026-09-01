@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { PLAN_FIELDS } from "@/lib/portfolio/plan";
+
 const timestampSchema = z.string().datetime({ offset: true });
 
 const transactionKindSchema = z.enum([
@@ -36,26 +38,20 @@ const transactionStatusSchema = z.enum([
 ]);
 
 const planMissingFieldSchema = z.enum([
-  "thesis",
-  "invalidation",
-  "entry",
-  "exit",
+  ...PLAN_FIELDS.map((field) => field.key),
   "targetAllocationPercent",
 ]);
 
-export const planDetailsSchema = z.object({
-  thesis: z.string().nullable(),
-  invalidation: z.string().nullable(),
-  entry: z.string().nullable(),
-  exit: z.string().nullable(),
-});
+export const planDetailsSchema = z.object(
+  Object.fromEntries(
+    PLAN_FIELDS.map((field) => [field.key, z.string().nullable()]),
+  ) as {
+    [K in (typeof PLAN_FIELDS)[number]["key"]]: z.ZodNullable<z.ZodString>;
+  },
+);
 
-export const planCompletionSchema = z.object({
-  completedFields: z.number().int().min(0).max(5),
-  totalFields: z.literal(5),
-  isComplete: z.boolean(),
-  missing: z.array(planMissingFieldSchema),
-});
+/** The Plan commitments that have not been made yet. Empty means all six are answered. */
+export const planMissingSchema = z.array(planMissingFieldSchema);
 
 export const planResultSchema = z.object({
   id: z.string().uuid(),
@@ -63,7 +59,7 @@ export const planResultSchema = z.object({
   symbols: z.array(z.string()),
   details: planDetailsSchema,
   targetAllocationPercent: z.number().min(0).max(100).nullable(),
-  completion: planCompletionSchema,
+  missing: planMissingSchema,
   updatedAt: timestampSchema,
 });
 
@@ -74,7 +70,7 @@ export const planListResultSchema = z.object({
       name: z.string(),
       symbols: z.array(z.string()),
       targetAllocationPercent: z.number().min(0).max(100).nullable(),
-      completion: planCompletionSchema,
+      missing: planMissingSchema,
       updatedAt: timestampSchema,
     }),
   ),
@@ -95,7 +91,7 @@ const portfolioAllocationSchema = z.discriminatedUnion("type", [
     name: z.string(),
     details: planDetailsSchema,
     targetAllocationPercent: z.number().min(0).max(100).nullable(),
-    completion: planCompletionSchema,
+    missing: planMissingSchema,
     valueUsd: z.number(),
     currentAllocationPercent: z.number(),
     members: z.array(

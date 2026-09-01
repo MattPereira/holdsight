@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildPortfolioAllocations } from "@/lib/portfolio/allocations";
-import type { Plan } from "@/lib/portfolio/plan";
+import { emptyPlanDetails, type Plan } from "@/lib/portfolio/plan";
 
 describe("buildPortfolioAllocations", () => {
   it("groups assigned holdings under their Plan", () => {
@@ -9,12 +9,7 @@ describe("buildPortfolioAllocations", () => {
       id: "plan-1",
       name: "AI infrastructure",
       color: "var(--chart-2)",
-      details: {
-        thesis: "Compute demand grows",
-        invalidation: null,
-        entry: null,
-        exit: null,
-      },
+      details: { ...emptyPlanDetails(), thesis: "Compute demand grows" },
       targetAllocationPercent: 30,
       updatedAt: "2026-08-30T00:00:00.000Z",
       symbols: ["NVDA", "TSM"],

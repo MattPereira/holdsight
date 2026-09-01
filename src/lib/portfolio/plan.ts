@@ -3,12 +3,82 @@ import { ASSET_CHART_COLORS } from "@/lib/portfolio/asset-totals";
 export const MAX_PLAN_NAME_LENGTH = 40;
 export const MAX_PLAN_TEXT_LENGTH = 10_000;
 
-export type PlanDetails = {
-  thesis: string | null;
-  invalidation: string | null;
-  entry: string | null;
-  exit: string | null;
-};
+/**
+ * The six commitments a Plan asks you to make before taking exposure, in the
+ * order they are read. Exit rules sit above entry rules on purpose: what you
+ * are willing to lose is decided before how you get in.
+ *
+ * Two boundaries carry the weight here. Invalidation is the thesis being
+ * wrong; Risk is how much you will lose before closing the position entirely.
+ * Entry is the first buy; Adding is every buy after it.
+ *
+ * This list is the single source of truth for the fields — the editor labels,
+ * the agent tool descriptions, and the missing-field report all read from it.
+ */
+export const PLAN_FIELDS = [
+  {
+    key: "thesis",
+    label: "Thesis",
+    prompt: "Why do I own this?",
+  },
+  {
+    key: "invalidation",
+    label: "Invalidation",
+    prompt: "What would prove the thesis wrong?",
+  },
+  {
+    key: "risk",
+    label: "Risk",
+    prompt: "How much am I willing to lose before I give up on this trade?",
+  },
+  {
+    key: "profit",
+    label: "Profit",
+    prompt: "What makes me take profit?",
+  },
+  {
+    key: "entry",
+    label: "Entry",
+    prompt: "What has to be true before I buy?",
+  },
+  {
+    key: "adding",
+    label: "Adding",
+    prompt: "What has to be true before I buy more, and how much each time?",
+  },
+] as const;
+
+export type PlanField = (typeof PLAN_FIELDS)[number]["key"];
+
+export type PlanDetails = Record<PlanField, string | null>;
+
+export function emptyPlanDetails(): PlanDetails {
+  return {
+    thesis: null,
+    invalidation: null,
+    risk: null,
+    profit: null,
+    entry: null,
+    adding: null,
+  };
+}
+
+export type PlanMissingField = PlanField | "targetAllocationPercent";
+
+/**
+ * Which commitments a Plan has not made yet. This is a presence check, not a
+ * quality one — an answered field can still be mush.
+ */
+export function getMissingPlanFields(
+  details: PlanDetails,
+  targetAllocationPercent: number | null,
+): PlanMissingField[] {
+  const missing: PlanMissingField[] = PLAN_FIELDS.flatMap((field) =>
+    details[field.key]?.trim() ? [] : [field.key],
+  );
+  if (targetAllocationPercent === null) missing.push("targetAllocationPercent");
+  return missing;
+}
 
 export type Plan = {
   id: string;
@@ -99,16 +169,12 @@ export function normalizePlanInput(
     };
   }
 
-  const sections = {
-    thesis: normalizeText(input.details.thesis, "Thesis"),
-    invalidation: normalizeText(input.details.invalidation, "Invalidation"),
-    entry: normalizeText(input.details.entry, "Entry"),
-    exit: normalizeText(input.details.exit, "Exit"),
-  };
-  const sectionError = Object.values(sections).find(
-    (section) => section.error,
-  )?.error;
-  if (sectionError) return { value: null, error: sectionError };
+  const details = emptyPlanDetails();
+  for (const field of PLAN_FIELDS) {
+    const section = normalizeText(input.details[field.key], field.label);
+    if (section.error) return { value: null, error: section.error };
+    details[field.key] = section.value;
+  }
 
   const target = normalizeTargetAllocation(input.targetAllocationPercent);
   if (target.error) return { value: null, error: target.error };
@@ -123,12 +189,7 @@ export function normalizePlanInput(
     value: {
       name,
       color,
-      details: {
-        thesis: sections.thesis.value,
-        invalidation: sections.invalidation.value,
-        entry: sections.entry.value,
-        exit: sections.exit.value,
-      },
+      details,
       targetAllocationPercent: target.value,
       symbols: normalizeSymbols(input.symbols),
     },

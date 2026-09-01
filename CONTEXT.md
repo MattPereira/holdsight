@@ -17,7 +17,7 @@ A user's record of the reasoning, emotions, market bias, notes, and images assoc
 _Avoid_: Transaction journal entry, note
 
 **Plan**:
-A user's strategy for assets connected by one shared reason, which may exist before any asset is acquired. It groups assigned assets for portfolio allocation and records the Thesis, Invalidation, Entry, Exit, and target allocation.
+A user's strategy for assets connected by one shared reason, which may exist before any asset is acquired. It groups assigned assets for portfolio allocation and records six commitments — Thesis, Invalidation, Risk, Profit, Entry, Adding — plus a target allocation. The commitments are made before taking exposure; they are presented with the exit rules above the entry rules, because what the user will lose is decided before how they get in.
 _Avoid_: Thesis (for the whole record), asset group
 
 **Thesis**:
@@ -25,16 +25,24 @@ The reasoning for owning the assets in a Plan.
 _Avoid_: Plan, investment case
 
 **Invalidation**:
-The evidence or conditions that would prove a Plan's Thesis wrong.
-_Avoid_: Bear case, risk
+The evidence or conditions that would prove a Plan's Thesis wrong. Invalidation is about the idea being wrong; Risk is about the position being closed. The two are distinct and both are recorded.
+_Avoid_: Bear case, Risk, stop loss
+
+**Risk**:
+How much the user is willing to lose before giving up on a Plan and closing the position entirely. Recorded as prose, not a number — a Plan spans several assets, so it states the rule that produces a stop rather than a price.
+_Avoid_: Invalidation, stop loss, Exit
+
+**Profit**:
+The conditions under which the user takes profit on a Plan.
+_Avoid_: Exit, target, sale
 
 **Entry**:
-The conditions for starting or increasing exposure under a Plan.
-_Avoid_: Trade, purchase
+The conditions that must be true before the user makes the first buy under a Plan. Subsequent buys are Adding.
+_Avoid_: Trade, purchase, Adding
 
-**Exit**:
-The conditions for reducing or closing exposure under a Plan.
-_Avoid_: Trade, sale
+**Adding**:
+The conditions that must be true before the user buys more of an existing position under a Plan, and how much is bought each time. Distinct from Entry, which governs only the first buy.
+_Avoid_: Entry, scaling, pyramiding, averaging in
 
 **Target Allocation**:
 The intended percentage of the user's total portfolio assigned to a Plan. Targets across Plans are independent and may total more than 100 percent.

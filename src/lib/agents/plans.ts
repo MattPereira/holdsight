@@ -5,22 +5,15 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { planAssets, plans } from "@/db/schema/plans";
 import {
+  emptyPlanDetails,
+  getMissingPlanFields,
   MAX_PLAN_TEXT_LENGTH,
+  PLAN_FIELDS,
   type PlanDetails,
+  type PlanMissingField,
 } from "@/lib/portfolio/plan";
 
 export type AgentPlanPatch = Partial<PlanDetails>;
-
-export type PlanMissingField =
-  | keyof PlanDetails
-  | "targetAllocationPercent";
-
-export type PlanCompletion = {
-  completedFields: number;
-  totalFields: 5;
-  isComplete: boolean;
-  missing: PlanMissingField[];
-};
 
 export type AgentPlan = {
   id: string;
@@ -28,7 +21,7 @@ export type AgentPlan = {
   symbols: string[];
   details: PlanDetails;
   targetAllocationPercent: number | null;
-  completion: PlanCompletion;
+  missing: PlanMissingField[];
   updatedAt: string;
 };
 
@@ -38,7 +31,7 @@ export type AgentPlanListItem = Pick<
   | "name"
   | "symbols"
   | "targetAllocationPercent"
-  | "completion"
+  | "missing"
   | "updatedAt"
 >;
 
@@ -64,57 +57,24 @@ function normalizeSection(value: string | null, label: string): string | null {
   return trimmed;
 }
 
-export function getPlanCompletion(
-  details: PlanDetails,
-  targetAllocationPercent: number | null,
-): PlanCompletion {
-  const missing: PlanMissingField[] = [];
-  let completedFields = 0;
-  for (const field of [
-    "thesis",
-    "invalidation",
-    "entry",
-    "exit",
-  ] as const) {
-    if (details[field]?.trim()) completedFields += 1;
-    else missing.push(field);
-  }
-  if (targetAllocationPercent === null) missing.push("targetAllocationPercent");
-  else completedFields += 1;
-  return {
-    completedFields,
-    totalFields: 5,
-    isComplete: completedFields === 5,
-    missing,
-  };
-}
-
 function serializeAgentPlan(
-  plan: {
+  plan: PlanDetails & {
     id: string;
     name: string;
-    thesis: string | null;
-    invalidation: string | null;
-    entry: string | null;
-    exit: string | null;
     targetAllocationPercent: number | null;
     updatedAt: Date;
   },
   symbols: string[],
 ): AgentPlan {
-  const details: PlanDetails = {
-    thesis: plan.thesis,
-    invalidation: plan.invalidation,
-    entry: plan.entry,
-    exit: plan.exit,
-  };
+  const details = emptyPlanDetails();
+  for (const field of PLAN_FIELDS) details[field.key] = plan[field.key];
   return {
     id: plan.id,
     name: plan.name,
     symbols,
     details,
     targetAllocationPercent: plan.targetAllocationPercent,
-    completion: getPlanCompletion(details, plan.targetAllocationPercent),
+    missing: getMissingPlanFields(details, plan.targetAllocationPercent),
     updatedAt: plan.updatedAt.toISOString(),
   };
 }
@@ -122,10 +82,9 @@ function serializeAgentPlan(
 const planSelection = {
   id: plans.id,
   name: plans.name,
-  thesis: plans.thesis,
-  invalidation: plans.invalidation,
-  entry: plans.entry,
-  exit: plans.exit,
+  ...(Object.fromEntries(
+    PLAN_FIELDS.map((field) => [field.key, plans[field.key]]),
+  ) as { [K in (typeof PLAN_FIELDS)[number]["key"]]: (typeof plans)[K] }),
   targetAllocationPercent: plans.targetAllocationPercent,
   updatedAt: plans.updatedAt,
 };
@@ -167,7 +126,7 @@ export async function listPlansForAgent(
       name: serialized.name,
       symbols: serialized.symbols,
       targetAllocationPercent: serialized.targetAllocationPercent,
-      completion: serialized.completion,
+      missing: serialized.missing,
       updatedAt: serialized.updatedAt,
     };
   });
@@ -203,14 +162,9 @@ export async function updatePlanForAgent(
 ): Promise<AgentPlan> {
   const current = await getPlanForAgent(userId, planId);
   const updates: Partial<PlanDetails> = {};
-  for (const [field, label] of [
-    ["thesis", "Thesis"],
-    ["invalidation", "Invalidation"],
-    ["entry", "Entry"],
-    ["exit", "Exit"],
-  ] as const) {
-    if (patch[field] !== undefined) {
-      updates[field] = normalizeSection(patch[field], label);
+  for (const { key, label } of PLAN_FIELDS) {
+    if (patch[key] !== undefined) {
+      updates[key] = normalizeSection(patch[key], label);
     }
   }
   if (Object.keys(updates).length === 0) {

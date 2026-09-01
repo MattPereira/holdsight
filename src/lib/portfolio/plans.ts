@@ -6,10 +6,25 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { planAssets, plans } from "@/db/schema/plans";
 import {
+  emptyPlanDetails,
   normalizePlanInput,
+  PLAN_FIELDS,
   type Plan,
+  type PlanDetails,
   type PlanInput,
 } from "@/lib/portfolio/plan";
+
+const planDetailColumns = Object.fromEntries(
+  PLAN_FIELDS.map((field) => [field.key, plans[field.key]]),
+) as { [K in (typeof PLAN_FIELDS)[number]["key"]]: (typeof plans)[K] };
+
+function detailsFromRow(row: Record<string, unknown>): PlanDetails {
+  const details = emptyPlanDetails();
+  for (const field of PLAN_FIELDS) {
+    details[field.key] = (row[field.key] as string | null) ?? null;
+  }
+  return details;
+}
 
 type PlanTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -19,10 +34,7 @@ export async function getUserPlans(userId: string): Promise<Plan[]> {
       id: plans.id,
       name: plans.name,
       color: plans.color,
-      thesis: plans.thesis,
-      invalidation: plans.invalidation,
-      entry: plans.entry,
-      exit: plans.exit,
+      ...planDetailColumns,
       targetAllocationPercent: plans.targetAllocationPercent,
       createdAt: plans.createdAt,
       updatedAt: plans.updatedAt,
@@ -41,12 +53,7 @@ export async function getUserPlans(userId: string): Promise<Plan[]> {
         id: row.id,
         name: row.name,
         color: row.color,
-        details: {
-          thesis: row.thesis,
-          invalidation: row.invalidation,
-          entry: row.entry,
-          exit: row.exit,
-        },
+        details: detailsFromRow(row),
         targetAllocationPercent: row.targetAllocationPercent,
         updatedAt: row.updatedAt.toISOString(),
         symbols: [],
@@ -91,10 +98,7 @@ export async function createPlan(
       userId,
       name: plan.name,
       color: plan.color,
-      thesis: plan.details.thesis,
-      invalidation: plan.details.invalidation,
-      entry: plan.details.entry,
-      exit: plan.details.exit,
+      ...plan.details,
       targetAllocationPercent: plan.targetAllocationPercent,
     });
     if (plan.symbols.length > 0) {
@@ -134,10 +138,7 @@ export async function updatePlan(
       .set({
         name: plan.name,
         color: plan.color,
-        thesis: plan.details.thesis,
-        invalidation: plan.details.invalidation,
-        entry: plan.details.entry,
-        exit: plan.details.exit,
+        ...plan.details,
         targetAllocationPercent: plan.targetAllocationPercent,
       })
       .where(and(eq(plans.id, planId), eq(plans.userId, userId)));

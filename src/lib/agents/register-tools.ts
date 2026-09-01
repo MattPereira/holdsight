@@ -21,7 +21,7 @@ import {
   portfolioAllocationsResultSchema,
   portfolioTransactionsResultSchema,
 } from "@/lib/agents/output-schemas";
-import { MAX_PLAN_TEXT_LENGTH } from "@/lib/portfolio/plan";
+import { MAX_PLAN_TEXT_LENGTH, PLAN_FIELDS } from "@/lib/portfolio/plan";
 
 const planSection = (description: string) =>
   z
@@ -188,10 +188,13 @@ function registerPlanTools(server: McpServer, userId: string) {
           .describe(
             "Pass the exact updatedAt value from the most recent get_plan response. If the update reports a conflict, fetch the Plan again, reconcile the changes, and retry.",
           ),
-        thesis: planSection("The reasoning for owning the Plan's assets."),
-        invalidation: planSection("What would prove the Thesis wrong."),
-        entry: planSection("Conditions for starting or increasing exposure."),
-        exit: planSection("Conditions for reducing or closing exposure."),
+        ...(Object.fromEntries(
+          PLAN_FIELDS.map((field) => [field.key, planSection(field.prompt)]),
+        ) as {
+          [K in (typeof PLAN_FIELDS)[number]["key"]]: ReturnType<
+            typeof planSection
+          >;
+        }),
       },
       outputSchema: planResultSchema.shape,
       annotations: {

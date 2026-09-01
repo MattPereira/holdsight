@@ -54,8 +54,10 @@ import {
   type PortfolioAssetSummary,
 } from "@/lib/portfolio/asset-totals";
 import {
+  emptyPlanDetails,
   MAX_PLAN_NAME_LENGTH,
   MAX_PLAN_TEXT_LENGTH,
+  PLAN_FIELDS,
   type Plan,
   type PlanDetails,
   type PlanInput,
@@ -95,12 +97,7 @@ type EditorSession = {
 const EMPTY_DRAFT: PlanDraft = {
   name: "",
   color: null,
-  details: {
-    thesis: null,
-    invalidation: null,
-    entry: null,
-    exit: null,
-  },
+  details: emptyPlanDetails(),
   targetAllocation: "",
   symbols: [],
 };
@@ -616,38 +613,17 @@ function PlanForm({
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <PlanTextField
-            id="plan-thesis"
-            label="Thesis"
-            placeholder="Why you intend to own these assets."
-            value={draft.details.thesis}
-            onChange={(value) => onDetailChange("thesis", value)}
-            disabled={disabled}
-          />
-          <PlanTextField
-            id="plan-invalidation"
-            label="Invalidation"
-            placeholder="What would prove the Thesis wrong."
-            value={draft.details.invalidation}
-            onChange={(value) => onDetailChange("invalidation", value)}
-            disabled={disabled}
-          />
-          <PlanTextField
-            id="plan-entry"
-            label="Entry"
-            placeholder="Conditions for starting or increasing exposure."
-            value={draft.details.entry}
-            onChange={(value) => onDetailChange("entry", value)}
-            disabled={disabled}
-          />
-          <PlanTextField
-            id="plan-exit"
-            label="Exit"
-            placeholder="Conditions for reducing or closing exposure."
-            value={draft.details.exit}
-            onChange={(value) => onDetailChange("exit", value)}
-            disabled={disabled}
-          />
+          {PLAN_FIELDS.map((field) => (
+            <PlanTextField
+              key={field.key}
+              id={`plan-${field.key}`}
+              label={field.label}
+              placeholder={field.prompt}
+              value={draft.details[field.key]}
+              onChange={(value) => onDetailChange(field.key, value)}
+              disabled={disabled}
+            />
+          ))}
         </div>
 
         <AllocationProgress

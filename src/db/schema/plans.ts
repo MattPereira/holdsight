@@ -26,8 +26,10 @@ export const plans = pgTable(
     color: text("color"),
     thesis: text("thesis"),
     invalidation: text("invalidation"),
+    risk: text("risk"),
+    profit: text("profit"),
     entry: text("entry"),
-    exit: text("exit"),
+    adding: text("adding"),
     targetAllocationPercent: numeric("target_allocation_percent", {
       precision: 5,
       scale: 2,

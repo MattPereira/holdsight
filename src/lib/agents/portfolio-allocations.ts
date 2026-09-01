@@ -1,8 +1,8 @@
 import "server-only";
 
-import { getPlanCompletion } from "@/lib/agents/plans";
 import { buildPortfolioAllocations } from "@/lib/portfolio/allocations";
 import { getPortfolioBalancesPageData } from "@/lib/portfolio/page-data";
+import { getMissingPlanFields } from "@/lib/portfolio/plan";
 import { getUserPlans } from "@/lib/portfolio/plans";
 import { refreshPortfolioForUser } from "@/lib/portfolio/refresh";
 
@@ -23,7 +23,7 @@ export type PortfolioAllocationForAgent =
         ReturnType<typeof buildPortfolioAllocations>["rows"][number]["planDetails"]
       >;
       targetAllocationPercent: number | null;
-      completion: ReturnType<typeof getPlanCompletion>;
+      missing: ReturnType<typeof getMissingPlanFields>;
       valueUsd: number;
       currentAllocationPercent: number;
       members: {
@@ -90,7 +90,7 @@ export async function getPortfolioAllocationsForAgent(
           name: row.label,
           details: row.planDetails,
           targetAllocationPercent: row.targetAllocationPercent ?? null,
-          completion: getPlanCompletion(
+          missing: getMissingPlanFields(
             row.planDetails,
             row.targetAllocationPercent ?? null,
           ),

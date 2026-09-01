@@ -9,7 +9,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PlansEditor } from "@/components/portfolio/plans-editor";
 import { PlansProvider } from "@/components/portfolio/plans-context";
-import type { Plan } from "@/lib/portfolio/plan";
+import {
+  emptyPlanDetails,
+  PLAN_FIELDS,
+  type Plan,
+} from "@/lib/portfolio/plan";
 
 const actions = vi.hoisted(() => ({
   deletePlan: vi.fn(),
@@ -23,12 +27,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-const EMPTY_DETAILS = {
-  thesis: null,
-  invalidation: null,
-  entry: null,
-  exit: null,
-};
+const EMPTY_DETAILS = emptyPlanDetails();
 
 function plan(overrides: Partial<Plan> = {}): Plan {
   return {
@@ -74,7 +73,7 @@ describe("PlansEditor", () => {
   it("shows every section of the form before anything is filled in", () => {
     renderEditor();
 
-    for (const field of ["Plan", "Thesis", "Invalidation", "Entry", "Exit"]) {
+    for (const field of ["Plan", ...PLAN_FIELDS.map((f) => f.label)]) {
       expect(screen.getByLabelText(field)).toBeTruthy();
     }
     // The form autosaves, so it has no submit or cancel of its own.
