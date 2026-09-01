@@ -2,16 +2,10 @@
 
 import {
   RiAddLine,
-  RiAlertLine,
-  RiArrowDownLine,
-  RiArrowUpLine,
   RiCheckLine,
   RiCloseLine,
   RiDeleteBinLine,
-  RiLightbulbLine,
-  RiScales3Line,
 } from "@remixicon/react";
-import type { RemixiconComponentType } from "@remixicon/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
@@ -51,6 +45,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAutosaveEntry } from "@/lib/forms/use-autosave-entry";
 import { useUnsavedChangesGuard } from "@/lib/forms/use-unsaved-changes-guard";
@@ -329,28 +332,64 @@ export function PlansEditor({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center gap-3">
         <h1 className="text-xl font-semibold">Plans</h1>
-        <div className="flex items-center gap-3">
-          <SaveIndicator status={status} />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="New Plan"
-            onClick={handleNewPlan}
-            disabled={isPending}
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-lg"
+          className="ml-auto size-10"
+          aria-label="New Plan"
+          onClick={handleNewPlan}
+          disabled={isPending}
+        >
+          <RiAddLine />
+        </Button>
+        <Select
+          value={activePlan?.id ?? ""}
+          onValueChange={(planId) => {
+            const plan = plans.find((candidate) => candidate.id === planId);
+            if (plan) void handleSelectPlan(plan);
+          }}
+          disabled={isPending || plans.length === 0}
+        >
+          <SelectTrigger
+            size="lg"
+            className="w-full max-w-xs"
+            aria-label="Current plan"
           >
-            <RiAddLine />
-          </Button>
-        </div>
+            <SelectValue placeholder="No plans yet" />
+          </SelectTrigger>
+          <SelectContent align="end">
+            <SelectGroup>
+              <SelectLabel>Plans</SelectLabel>
+              {[...plans]
+                .sort(
+                  (a, b) =>
+                    (b.targetAllocationPercent ?? -1) -
+                    (a.targetAllocationPercent ?? -1),
+                )
+                .map((plan) => (
+                  <SelectItem key={plan.id} value={plan.id}>
+                    <span
+                      aria-hidden="true"
+                      className="size-4 shrink-0 rounded-sm border"
+                      style={{
+                        backgroundColor: plan.color ?? "var(--muted)",
+                      }}
+                    />
+                    <span>{plan.name}</span>
+                    <span className="text-muted-foreground">
+                      {plan.targetAllocationPercent === null
+                        ? "No target"
+                        : `${allocationPercentFormat.format(plan.targetAllocationPercent)}%`}
+                    </span>
+                  </SelectItem>
+                ))}
+            </SelectGroup>
+          </SelectContent>
+        </Select>
       </div>
-
-      <PlanList
-        plans={plans}
-        selectedPlanId={activePlan?.id}
-        onSelect={handleSelectPlan}
-      />
 
       <div className="flex flex-col gap-4 rounded-lg border p-4 sm:p-6">
         <PlanForm
@@ -360,6 +399,7 @@ export function PlansEditor({
             activePlan ? (currentAllocationByPlanId.get(activePlan.id) ?? 0) : 0
           }
           saveError={saveError}
+          saveStatus={status}
           disabled={isPending}
           canDelete={Boolean(activePlan)}
           onNameChange={updateName}
@@ -378,71 +418,15 @@ export function PlansEditor({
   );
 }
 
-function PlanList({
-  plans,
-  selectedPlanId,
-  onSelect,
-}: {
-  plans: Plan[];
-  selectedPlanId: string | undefined;
-  onSelect: (plan: Plan) => void;
-}) {
-  const sortedPlans = [...plans].sort(
-    (a, b) =>
-      (b.targetAllocationPercent ?? -1) - (a.targetAllocationPercent ?? -1),
-  );
-  if (sortedPlans.length === 0) {
-    return (
-      <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
-        No Plans yet.
-      </p>
-    );
-  }
-  return (
-    <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-      {sortedPlans.map((plan) => {
-        const isSelected = plan.id === selectedPlanId;
-        return (
-          <li key={plan.id}>
-            <button
-              type="button"
-              aria-label={`Edit ${plan.name}`}
-              aria-pressed={isSelected}
-              onClick={() => onSelect(plan)}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left transition-colors",
-                "hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
-                isSelected && "border-primary bg-primary/5 ring-1 ring-primary",
-              )}
-            >
-              <span
-                aria-hidden="true"
-                className="size-12 shrink-0 rounded-md border"
-                style={{ backgroundColor: plan.color ?? "var(--muted)" }}
-              />
-              <span className="min-w-0 truncate text-lg font-medium">
-                {plan.name}
-              </span>
-              <span className="ml-auto shrink-0 text-lg font-semibold tabular-nums">
-                {plan.targetAllocationPercent === null
-                  ? "—"
-                  : `${allocationPercentFormat.format(plan.targetAllocationPercent)}%`}
-              </span>
-            </button>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
 function AllocationProgress({
+  color,
   currentAllocationPercent,
   targetAllocationPercent,
   targetAllocationValue,
   disabled,
   onTargetAllocationChange,
 }: {
+  color: string | null;
   currentAllocationPercent: number;
   targetAllocationPercent: number | null;
   targetAllocationValue: string;
@@ -496,9 +480,7 @@ function AllocationProgress({
             step="5"
             inputMode="numeric"
             value={targetAllocationValue}
-            onChange={(event) =>
-              onTargetAllocationChange(event.target.value)
-            }
+            onChange={(event) => onTargetAllocationChange(event.target.value)}
             onBlur={finishEditingTarget}
             onKeyDown={(event) => {
               if (event.key === "Enter") event.currentTarget.blur();
@@ -528,9 +510,12 @@ function AllocationProgress({
           <div
             className={cn(
               "h-full rounded-md transition-all",
-              isOverTarget ? "bg-amber-500" : "bg-primary",
+              !color && (isOverTarget ? "bg-amber-500" : "bg-primary"),
             )}
-            style={{ width: `${fillPercent}%` }}
+            style={{
+              width: `${fillPercent}%`,
+              backgroundColor: color ?? undefined,
+            }}
           />
         </div>
       ) : null}
@@ -543,6 +528,7 @@ function PlanForm({
   selectableSymbols,
   currentAllocationPercent,
   saveError,
+  saveStatus,
   disabled,
   canDelete,
   onNameChange,
@@ -556,6 +542,7 @@ function PlanForm({
   selectableSymbols: string[];
   currentAllocationPercent: number;
   saveError: string | null;
+  saveStatus: Parameters<typeof SaveIndicator>[0]["status"];
   disabled: boolean;
   canDelete: boolean;
   onNameChange: (value: string) => void;
@@ -578,32 +565,38 @@ function PlanForm({
   return (
     <div className="flex flex-col gap-4">
       <FieldGroup>
-        <div className="grid grid-cols-2 gap-4">
-          <Field data-disabled={disabled} data-invalid={Boolean(saveError)}>
-            <FieldLabel htmlFor="plan-name">Name</FieldLabel>
-            <Input
-              id="plan-name"
-              value={draft.name}
-              onChange={(event) => onNameChange(event.target.value)}
-              placeholder="AI infrastructure"
-              maxLength={MAX_PLAN_NAME_LENGTH}
-              required
-              autoComplete="off"
-              disabled={disabled}
-            />
-            <FieldError>{saveError}</FieldError>
-          </Field>
-          <AllocationProgress
-            currentAllocationPercent={currentAllocationPercent}
-            targetAllocationPercent={targetAllocationPercent}
-            targetAllocationValue={draft.targetAllocation}
-            disabled={disabled}
-            onTargetAllocationChange={onTargetAllocationChange}
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Field data-disabled={disabled}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex items-start gap-4">
+            <Field
+              data-disabled={disabled}
+              data-invalid={Boolean(saveError)}
+              className="min-w-0 flex-1"
+            >
+              <FieldLabel htmlFor="plan-name">Name</FieldLabel>
+              <Input
+                id="plan-name"
+                value={draft.name}
+                onChange={(event) => onNameChange(event.target.value)}
+                placeholder="AI infrastructure"
+                maxLength={MAX_PLAN_NAME_LENGTH}
+                required
+                autoComplete="off"
+                disabled={disabled}
+              />
+              <FieldError>{saveError}</FieldError>
+            </Field>
+            <Field data-disabled={disabled} className="w-auto shrink-0">
+              <FieldLabel aria-hidden="true" className="invisible">
+                Color
+              </FieldLabel>
+              <ColorPicker
+                value={draft.color}
+                onChange={onColorChange}
+                disabled={disabled}
+              />
+            </Field>
+          </div>
+          <Field data-disabled={disabled} className="min-w-0">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <FieldLabel>Assets</FieldLabel>
               <SelectedAssetBadges
@@ -619,35 +612,21 @@ function PlanForm({
               disabled={disabled}
             />
           </Field>
-          <Field data-disabled={disabled}>
-            <FieldLabel>Color</FieldLabel>
-            <div className="flex flex-wrap gap-2">
-              {ASSET_CHART_COLORS.map((option, index) => (
-                <button
-                  key={option}
-                  type="button"
-                  className={cn(
-                    "size-9 rounded-md border",
-                    draft.color === option &&
-                      "border-foreground ring-2 ring-ring",
-                  )}
-                  style={{ backgroundColor: option }}
-                  aria-label={`Use color ${index + 1}`}
-                  aria-pressed={draft.color === option}
-                  onClick={() => onColorChange(option)}
-                  disabled={disabled}
-                />
-              ))}
-            </div>
-          </Field>
         </div>
+
+        <AllocationProgress
+          color={draft.color}
+          currentAllocationPercent={currentAllocationPercent}
+          targetAllocationPercent={targetAllocationPercent}
+          targetAllocationValue={draft.targetAllocation}
+          disabled={disabled}
+          onTargetAllocationChange={onTargetAllocationChange}
+        />
 
         <div className="grid gap-4 sm:grid-cols-2">
           <PlanTextField
             id="plan-thesis"
             label="Thesis"
-            icon={RiLightbulbLine}
-            accent="text-primary"
             placeholder="Why you intend to own these assets."
             value={draft.details.thesis}
             onChange={(value) => onDetailChange("thesis", value)}
@@ -656,8 +635,6 @@ function PlanForm({
           <PlanTextField
             id="plan-invalidation"
             label="Invalidation"
-            icon={RiAlertLine}
-            accent="text-amber-600 dark:text-amber-500"
             placeholder="What would prove the Thesis wrong."
             value={draft.details.invalidation}
             onChange={(value) => onDetailChange("invalidation", value)}
@@ -666,8 +643,6 @@ function PlanForm({
           <PlanTextField
             id="plan-entry"
             label="Entry"
-            icon={RiArrowUpLine}
-            accent="text-emerald-600 dark:text-emerald-500"
             placeholder="Conditions for starting or increasing exposure."
             value={draft.details.entry}
             onChange={(value) => onDetailChange("entry", value)}
@@ -676,8 +651,6 @@ function PlanForm({
           <PlanTextField
             id="plan-exit"
             label="Exit"
-            icon={RiArrowDownLine}
-            accent="text-red-600 dark:text-red-500"
             placeholder="Conditions for reducing or closing exposure."
             value={draft.details.exit}
             onChange={(value) => onDetailChange("exit", value)}
@@ -687,8 +660,6 @@ function PlanForm({
         <PlanTextField
           id="plan-timeframe"
           label="Timeframe"
-          icon={RiScales3Line}
-          accent="text-primary"
           placeholder="Expected holding or review horizon."
           value={draft.details.timeframe}
           onChange={(value) => onDetailChange("timeframe", value)}
@@ -696,34 +667,34 @@ function PlanForm({
         />
       </FieldGroup>
 
-      {canDelete ? (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              type="button"
-              variant="destructive"
-              className="self-start"
-              disabled={disabled}
-            >
-              <RiDeleteBinLine data-icon="inline-start" />
-              Delete
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete this Plan?</AlertDialogTitle>
-              <AlertDialogDescription>
-                {draft.name || "This Plan"} and its details will be removed.
-                Assets assigned to it return to being unassigned.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={onDelete}>Delete</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      ) : null}
+      <div className="flex items-center gap-3">
+        {canDelete ? (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button type="button" variant="destructive" disabled={disabled}>
+                <RiDeleteBinLine data-icon="inline-start" />
+                Delete
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this Plan?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {draft.name || "This Plan"} and its details will be removed.
+                  Assets assigned to it return to being unassigned.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={onDelete}>Delete</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : null}
+        <div className="ml-auto">
+          <SaveIndicator status={saveStatus} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -731,8 +702,6 @@ function PlanForm({
 function PlanTextField({
   id,
   label,
-  icon: Icon,
-  accent,
   placeholder,
   value,
   onChange,
@@ -740,8 +709,6 @@ function PlanTextField({
 }: {
   id: string;
   label: string;
-  icon: RemixiconComponentType;
-  accent: string;
   placeholder: string;
   value: string | null;
   onChange: (value: string) => void;
@@ -749,10 +716,7 @@ function PlanTextField({
 }) {
   return (
     <Field data-disabled={disabled}>
-      <FieldLabel htmlFor={id} className="flex items-center gap-1.5">
-        <Icon aria-hidden="true" className={cn("size-4 shrink-0", accent)} />
-        {label}
-      </FieldLabel>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Textarea
         id={id}
         value={value ?? ""}
@@ -763,6 +727,58 @@ function PlanTextField({
         disabled={disabled}
       />
     </Field>
+  );
+}
+
+function ColorPicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string | null;
+  onChange: (value: string | null) => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          aria-label="Plan color"
+          disabled={disabled}
+        >
+          <span
+            aria-hidden="true"
+            className="size-4 rounded-sm border"
+            style={{ backgroundColor: value ?? "var(--muted)" }}
+          />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-2">
+        <div className="grid grid-cols-5 gap-2">
+          {ASSET_CHART_COLORS.map((option, index) => (
+            <button
+              key={option}
+              type="button"
+              className={cn(
+                "size-7 rounded-md border",
+                value === option && "border-foreground ring-2 ring-ring",
+              )}
+              style={{ backgroundColor: option }}
+              aria-label={`Use color ${index + 1}`}
+              aria-pressed={value === option}
+              onClick={() => {
+                onChange(option);
+                setOpen(false);
+              }}
+            />
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
