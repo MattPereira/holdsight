@@ -119,6 +119,40 @@ describe("PlansEditor", () => {
     expect(actions.savePlan).not.toHaveBeenCalled();
   });
 
+  it("edits the target allocation in 5% increments", async () => {
+    const existing = plan({ targetAllocationPercent: 50 });
+    const saved = plan({ targetAllocationPercent: 45 });
+    actions.savePlan.mockResolvedValue({
+      plans: [saved],
+      plan: saved,
+      error: null,
+    });
+    renderEditor([existing]);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit target allocation" }),
+    );
+    const target = screen.getByLabelText("Target allocation");
+    fireEvent.change(target, { target: { value: "43" } });
+    fireEvent.blur(target);
+
+    expect(
+      screen.getByRole("button", { name: "Edit target allocation" })
+        .textContent,
+    ).toBe("45%");
+
+    await vi.advanceTimersByTimeAsync(1000);
+    await waitFor(() => {
+      expect(actions.savePlan).toHaveBeenCalledWith("plan-1", {
+        name: "Future BTC",
+        color: null,
+        details: EMPTY_DETAILS,
+        targetAllocationPercent: 45,
+        symbols: [],
+      });
+    });
+  });
+
   it("saves later edits against the existing Plan id", async () => {
     const existing = plan();
     actions.savePlan.mockResolvedValue({

@@ -439,10 +439,17 @@ function PlanList({
 function AllocationProgress({
   currentAllocationPercent,
   targetAllocationPercent,
+  targetAllocationValue,
+  disabled,
+  onTargetAllocationChange,
 }: {
   currentAllocationPercent: number;
   targetAllocationPercent: number | null;
+  targetAllocationValue: string;
+  disabled: boolean;
+  onTargetAllocationChange: (value: string) => void;
 }) {
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
   const hasTarget = targetAllocationPercent !== null;
   const isOverTarget =
     hasTarget && currentAllocationPercent > targetAllocationPercent;
@@ -453,8 +460,24 @@ function AllocationProgress({
           100,
         )
       : 0;
+
+  function finishEditingTarget() {
+    setIsEditingTarget(false);
+    if (targetAllocationValue === "") return;
+    const parsed = Number(targetAllocationValue);
+    const normalized = Number.isNaN(parsed)
+      ? ""
+      : Math.min(50, Math.max(5, Math.round(parsed / 5) * 5)).toString();
+    if (normalized !== targetAllocationValue) {
+      onTargetAllocationChange(normalized);
+    }
+  }
+
   return (
-    <div className="flex w-full flex-col gap-2">
+    <Field data-disabled={disabled}>
+      <FieldLabel htmlFor="plan-target-allocation" className="sr-only">
+        Target allocation
+      </FieldLabel>
       <div className="flex items-end justify-between gap-2">
         <span
           className={cn(
@@ -464,9 +487,41 @@ function AllocationProgress({
         >
           {allocationPercentFormat.format(currentAllocationPercent)}%
         </span>
-        <span className="text-xl font-semibold tabular-nums tracking-tight">
-          {hasTarget ? `${targetAllocationPercent}%` : "No target"}
-        </span>
+        {isEditingTarget ? (
+          <Input
+            id="plan-target-allocation"
+            type="number"
+            min="5"
+            max="50"
+            step="5"
+            inputMode="numeric"
+            value={targetAllocationValue}
+            onChange={(event) =>
+              onTargetAllocationChange(event.target.value)
+            }
+            onBlur={finishEditingTarget}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
+            }}
+            className="ml-auto w-20 text-right"
+            autoFocus
+            disabled={disabled}
+          />
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            aria-label="Edit target allocation"
+            onClick={() => setIsEditingTarget(true)}
+            disabled={disabled}
+          >
+            <span className="text-xl font-semibold tabular-nums tracking-tight">
+              {hasTarget ? `${targetAllocationPercent}%` : "Set target"}
+            </span>
+          </Button>
+        )}
       </div>
       {hasTarget ? (
         <div className="h-5 w-full overflow-hidden rounded-md bg-muted">
@@ -479,7 +534,7 @@ function AllocationProgress({
           />
         </div>
       ) : null}
-    </div>
+    </Field>
   );
 }
 
@@ -522,13 +577,8 @@ function PlanForm({
 
   return (
     <div className="flex flex-col gap-4">
-      <AllocationProgress
-        currentAllocationPercent={currentAllocationPercent}
-        targetAllocationPercent={targetAllocationPercent}
-      />
-
       <FieldGroup>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-4">
           <Field data-disabled={disabled} data-invalid={Boolean(saveError)}>
             <FieldLabel htmlFor="plan-name">Name</FieldLabel>
             <Input
@@ -543,41 +593,16 @@ function PlanForm({
             />
             <FieldError>{saveError}</FieldError>
           </Field>
-          <Field data-disabled={disabled}>
-            <FieldLabel>Color</FieldLabel>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={cn(
-                  "flex h-9 items-center rounded-md border px-3 text-sm",
-                  draft.color === null && "border-foreground",
-                )}
-                onClick={() => onColorChange(null)}
-                disabled={disabled}
-              >
-                Auto
-              </button>
-              {ASSET_CHART_COLORS.map((option, index) => (
-                <button
-                  key={option}
-                  type="button"
-                  className={cn(
-                    "size-9 rounded-md border",
-                    draft.color === option &&
-                      "border-foreground ring-2 ring-ring",
-                  )}
-                  style={{ backgroundColor: option }}
-                  aria-label={`Use color ${index + 1}`}
-                  aria-pressed={draft.color === option}
-                  onClick={() => onColorChange(option)}
-                  disabled={disabled}
-                />
-              ))}
-            </div>
-          </Field>
+          <AllocationProgress
+            currentAllocationPercent={currentAllocationPercent}
+            targetAllocationPercent={targetAllocationPercent}
+            targetAllocationValue={draft.targetAllocation}
+            disabled={disabled}
+            onTargetAllocationChange={onTargetAllocationChange}
+          />
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-4">
           <Field data-disabled={disabled}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <FieldLabel>Assets</FieldLabel>
@@ -595,21 +620,25 @@ function PlanForm({
             />
           </Field>
           <Field data-disabled={disabled}>
-            <FieldLabel htmlFor="plan-target-allocation">
-              Target allocation (%)
-            </FieldLabel>
-            <Input
-              id="plan-target-allocation"
-              type="number"
-              min="0"
-              max="100"
-              step="0.01"
-              inputMode="decimal"
-              value={draft.targetAllocation}
-              onChange={(event) => onTargetAllocationChange(event.target.value)}
-              placeholder="Optional"
-              disabled={disabled}
-            />
+            <FieldLabel>Color</FieldLabel>
+            <div className="flex flex-wrap gap-2">
+              {ASSET_CHART_COLORS.map((option, index) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={cn(
+                    "size-9 rounded-md border",
+                    draft.color === option &&
+                      "border-foreground ring-2 ring-ring",
+                  )}
+                  style={{ backgroundColor: option }}
+                  aria-label={`Use color ${index + 1}`}
+                  aria-pressed={draft.color === option}
+                  onClick={() => onColorChange(option)}
+                  disabled={disabled}
+                />
+              ))}
+            </div>
           </Field>
         </div>
 
