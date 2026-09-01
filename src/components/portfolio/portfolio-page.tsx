@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -8,6 +9,8 @@ import { PageHeader } from "@/components/app-shell/page-header";
 import { usePlans } from "@/components/portfolio/plans-context";
 import { PlansEditor } from "@/components/portfolio/plans-editor";
 import { PortfolioAllocations } from "@/components/portfolio/portfolio-allocations";
+import { TradingPrinciplesPanel } from "@/components/principles/trading-principles-panel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { PortfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 import { cn } from "@/lib/utils";
 
@@ -21,6 +24,9 @@ export function PortfolioPage({
   initialData: PortfolioPageData;
 }) {
   const { plans } = usePlans();
+  // A link into a specific Plan (?plan=...) is a request for the form, so it
+  // overrides the principles-first default.
+  const hasSelectedPlan = useSearchParams().has("plan");
   const [summary, setSummary] = useState<PortfolioAssetSummary>(
     initialData.portfolioSummary,
   );
@@ -74,7 +80,28 @@ export function PortfolioPage({
           />
         </div>
 
-        <PlansEditor portfolioSummary={summary} />
+        <Tabs defaultValue={hasSelectedPlan ? "strategy" : "mindset"}>
+          <TabsList className="mb-4 group-data-horizontal/tabs:h-11">
+            <TabsTrigger value="mindset" className="px-4 text-base">
+              Mindset
+            </TabsTrigger>
+            <TabsTrigger value="strategy" className="px-4 text-base">
+              Strategy
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="mindset">
+            <TradingPrinciplesPanel />
+          </TabsContent>
+          {/* Force-mounted so switching tabs mid-edit never discards a Plan
+              draft or its pending autosave. */}
+          <TabsContent
+            value="strategy"
+            forceMount
+            className="data-[state=inactive]:hidden"
+          >
+            <PlansEditor portfolioSummary={summary} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
