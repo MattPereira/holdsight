@@ -214,4 +214,74 @@ describe("PlansEditor", () => {
       await screen.findByText("Plan name must be 60 characters or fewer."),
     ).toBeTruthy();
   });
+
+  describe("the Plan picker", () => {
+    it("renders one checked radio per Plan and switches the form on click", async () => {
+      const btc = plan({ id: "plan-1", name: "Future BTC" });
+      const eth = plan({ id: "plan-2", name: "Ethereum" });
+      renderEditor([btc, eth]);
+
+      const group = screen.getByRole("radiogroup", { name: "Plans" });
+      const chips = screen.getAllByRole("radio");
+      expect(group).toBeTruthy();
+      expect(chips.map((chip) => chip.textContent)).toEqual([
+        "Future BTC",
+        "Ethereum",
+      ]);
+      expect(chips[0].getAttribute("aria-checked")).toBe("true");
+      expect(screen.getByLabelText("Name")).toHaveProperty(
+        "value",
+        "Future BTC",
+      );
+
+      fireEvent.click(chips[1]);
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Name")).toHaveProperty(
+          "value",
+          "Ethereum",
+        );
+      });
+      expect(screen.getAllByRole("radio")[1].getAttribute("aria-checked")).toBe(
+        "true",
+      );
+    });
+
+    it("moves selection with the arrow keys", async () => {
+      renderEditor([
+        plan({ id: "plan-1", name: "Future BTC" }),
+        plan({ id: "plan-2", name: "Ethereum" }),
+      ]);
+
+      const chips = screen.getAllByRole("radio");
+      chips[0].focus();
+      fireEvent.keyDown(screen.getByRole("radiogroup", { name: "Plans" }), {
+        key: "ArrowRight",
+      });
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Name")).toHaveProperty(
+          "value",
+          "Ethereum",
+        );
+      });
+    });
+
+    it("adds a transient New Plan chip while a Plan is being created", async () => {
+      renderEditor([plan({ id: "plan-1", name: "Future BTC" })]);
+
+      expect(screen.getAllByRole("radio")).toHaveLength(1);
+
+      fireEvent.click(screen.getByRole("button", { name: "Create" }));
+
+      await waitFor(() => {
+        const chips = screen.getAllByRole("radio");
+        expect(chips.map((chip) => chip.textContent)).toEqual([
+          "Future BTC",
+          "New Plan",
+        ]);
+        expect(chips[1].getAttribute("aria-checked")).toBe("true");
+      });
+    });
+  });
 });
