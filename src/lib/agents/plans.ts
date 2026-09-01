@@ -3,7 +3,7 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { planAssets, plans } from "@/db/schema/plans";
+import { planAssets, planDetailColumns, plans } from "@/db/schema/plans";
 import {
   emptyPlanDetails,
   getMissingPlanFields,
@@ -82,9 +82,7 @@ function serializeAgentPlan(
 const planSelection = {
   id: plans.id,
   name: plans.name,
-  ...(Object.fromEntries(
-    PLAN_FIELDS.map((field) => [field.key, plans[field.key]]),
-  ) as { [K in (typeof PLAN_FIELDS)[number]["key"]]: (typeof plans)[K] }),
+  ...planDetailColumns,
   targetAllocationPercent: plans.targetAllocationPercent,
   updatedAt: plans.updatedAt,
 };

@@ -21,7 +21,7 @@ import {
   portfolioAllocationsResultSchema,
   portfolioTransactionsResultSchema,
 } from "@/lib/agents/output-schemas";
-import { MAX_PLAN_TEXT_LENGTH, PLAN_FIELDS } from "@/lib/portfolio/plan";
+import { MAX_PLAN_TEXT_LENGTH, planFieldRecord } from "@/lib/portfolio/plan";
 
 const planSection = (description: string) =>
   z
@@ -115,7 +115,7 @@ function registerPlanTools(server: McpServer, userId: string) {
     {
       title: "List Plans",
       description:
-        "List the authenticated user's Plans with IDs, names, assigned symbols, target allocations, completion status, and last-updated timestamps. Use this compact index to identify a Plan, then call get_plan to read it.",
+        "List the authenticated user's Plans with IDs, names, assigned symbols, target allocations, which commitments are still missing, and last-updated timestamps. Use this compact index to identify a Plan, then call get_plan to read it.",
       inputSchema: {},
       outputSchema: planListResultSchema.shape,
       annotations: {
@@ -188,13 +188,7 @@ function registerPlanTools(server: McpServer, userId: string) {
           .describe(
             "Pass the exact updatedAt value from the most recent get_plan response. If the update reports a conflict, fetch the Plan again, reconcile the changes, and retry.",
           ),
-        ...(Object.fromEntries(
-          PLAN_FIELDS.map((field) => [field.key, planSection(field.prompt)]),
-        ) as {
-          [K in (typeof PLAN_FIELDS)[number]["key"]]: ReturnType<
-            typeof planSection
-          >;
-        }),
+        ...planFieldRecord((field) => planSection(field.prompt)),
       },
       outputSchema: planResultSchema.shape,
       annotations: {

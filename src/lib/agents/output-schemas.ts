@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { PLAN_FIELDS } from "@/lib/portfolio/plan";
+import { PLAN_FIELDS, planFieldRecord } from "@/lib/portfolio/plan";
 
 const timestampSchema = z.string().datetime({ offset: true });
 
@@ -43,11 +43,7 @@ const planMissingFieldSchema = z.enum([
 ]);
 
 export const planDetailsSchema = z.object(
-  Object.fromEntries(
-    PLAN_FIELDS.map((field) => [field.key, z.string().nullable()]),
-  ) as {
-    [K in (typeof PLAN_FIELDS)[number]["key"]]: z.ZodNullable<z.ZodString>;
-  },
+  planFieldRecord(() => z.string().nullable()),
 );
 
 /** The Plan commitments that have not been made yet. Empty means all six are answered. */

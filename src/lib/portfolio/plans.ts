@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { and, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
-import { planAssets, plans } from "@/db/schema/plans";
+import { planAssets, planDetailColumns, plans } from "@/db/schema/plans";
 import {
   emptyPlanDetails,
   normalizePlanInput,
@@ -13,10 +13,6 @@ import {
   type PlanDetails,
   type PlanInput,
 } from "@/lib/portfolio/plan";
-
-const planDetailColumns = Object.fromEntries(
-  PLAN_FIELDS.map((field) => [field.key, plans[field.key]]),
-) as { [K in (typeof PLAN_FIELDS)[number]["key"]]: (typeof plans)[K] };
 
 function detailsFromRow(row: Record<string, unknown>): PlanDetails {
   const details = emptyPlanDetails();

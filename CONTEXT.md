@@ -17,7 +17,7 @@ A user's record of the reasoning, emotions, market bias, notes, and images assoc
 _Avoid_: Transaction journal entry, note
 
 **Plan**:
-A user's strategy for assets connected by one shared reason, which may exist before any asset is acquired. It groups assigned assets for portfolio allocation and records six commitments — Thesis, Invalidation, Risk, Profit, Entry, Adding — plus a target allocation. The commitments are made before taking exposure; they are presented with the exit rules above the entry rules, because what the user will lose is decided before how they get in.
+A user's strategy for assets connected by one shared reason, which may exist before any asset is acquired. It groups assigned assets for portfolio allocation and records six commitments — Thesis, Invalidation, Risk, Profit, Entry, Adding — plus a target allocation. The commitments are made before taking exposure; Risk and Profit are presented above Entry and Adding, because what the user will lose is decided before how they get in.
 _Avoid_: Thesis (for the whole record), asset group
 
 **Thesis**:

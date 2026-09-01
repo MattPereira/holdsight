@@ -5,8 +5,8 @@ export const MAX_PLAN_TEXT_LENGTH = 10_000;
 
 /**
  * The six commitments a Plan asks you to make before taking exposure, in the
- * order they are read. Exit rules sit above entry rules on purpose: what you
- * are willing to lose is decided before how you get in.
+ * order they are read. Risk and Profit sit above Entry and Adding on purpose:
+ * what you are willing to lose is decided before how you get in.
  *
  * Two boundaries carry the weight here. Invalidation is the thesis being
  * wrong; Risk is how much you will lose before closing the position entirely.
@@ -52,15 +52,21 @@ export type PlanField = (typeof PLAN_FIELDS)[number]["key"];
 
 export type PlanDetails = Record<PlanField, string | null>;
 
+/**
+ * Builds one value per Plan field, keyed by field. The single place that
+ * asserts a `PLAN_FIELDS`-derived object covers every `PlanField`, so callers
+ * — DB column maps, zod shapes, empty drafts — don't each repeat the cast.
+ */
+export function planFieldRecord<T>(
+  build: (field: (typeof PLAN_FIELDS)[number]) => T,
+): Record<PlanField, T> {
+  return Object.fromEntries(
+    PLAN_FIELDS.map((field) => [field.key, build(field)]),
+  ) as Record<PlanField, T>;
+}
+
 export function emptyPlanDetails(): PlanDetails {
-  return {
-    thesis: null,
-    invalidation: null,
-    risk: null,
-    profit: null,
-    entry: null,
-    adding: null,
-  };
+  return planFieldRecord<string | null>(() => null);
 }
 
 export type PlanMissingField = PlanField | "targetAllocationPercent";

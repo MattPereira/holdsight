@@ -63,7 +63,7 @@ describe("Plan input", () => {
 });
 
 describe("Plan fields", () => {
-  it("orders the six fields so exit rules are read before entry rules", () => {
+  it("orders the six fields so Risk and Profit are read before Entry and Adding", () => {
     expect(PLAN_FIELDS.map((field) => field.key)).toEqual([
       "thesis",
       "invalidation",

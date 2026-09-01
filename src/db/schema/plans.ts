@@ -13,6 +13,8 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
+import { PLAN_FIELDS, type PlanField } from "@/lib/portfolio/plan";
+
 import { user } from "./auth";
 
 export const plans = pgTable(
@@ -90,3 +92,11 @@ export const planAssetsRelations = relations(planAssets, ({ one }) => ({
     references: [plans.id],
   }),
 }));
+
+/**
+ * The Plan commitment columns, keyed by field, for reuse in `select()` shapes.
+ * Typed per column so row types stay precise.
+ */
+export const planDetailColumns = Object.fromEntries(
+  PLAN_FIELDS.map((field) => [field.key, plans[field.key]]),
+) as { [K in PlanField]: (typeof plans)[K] };
