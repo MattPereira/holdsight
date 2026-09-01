@@ -37,7 +37,9 @@ function PrincipleList({
   items: readonly string[];
 }) {
   return (
-    <Card className="h-full">
+    // The rows carry their own spacing, so the Card's gap and bottom padding
+    // would only pad the first and last of them twice.
+    <Card className="h-full gap-0 pb-0">
       {/* Negative top margin cancels the Card's own top padding so the band
           runs flush to the rounded edge. */}
       <CardHeader className="-mt-(--card-spacing) border-b border-foreground/5 bg-muted/40 py-(--card-spacing)">

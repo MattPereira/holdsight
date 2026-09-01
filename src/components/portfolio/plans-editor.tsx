@@ -65,6 +65,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const SELECTED_PLAN_PARAM = "plan";
+const PLAN_NAME_PLACEHOLDER = "AI infrastructure";
 const UNSAVED_CHANGES_MESSAGE =
   "This Plan has unsaved changes. Leave the page anyway?";
 const allocationPercentFormat = new Intl.NumberFormat("en-US", {
@@ -368,7 +369,7 @@ export function PlansEditor({
                   <Button
                     type="button"
                     variant="outline"
-                    size="icon"
+                    size="icon-lg"
                     aria-label="Delete Plan"
                     className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                     disabled={isPending}
@@ -571,20 +572,42 @@ function PlanForm({
             {/* The input holds the editable name, with the list of every
                 other Plan behind the chevron on the right. Colour and delete
                 sit outside it, since they act on the Plan rather than its
-                name. */}
+                name. The two share one border: the input claims only as much
+                width as its text needs (down to a floor, so an unnamed Plan
+                is still typeable), and everything past it opens the list. */}
             <div className="flex items-center gap-2">
-              <div className="relative min-w-0 flex-1">
-                <Input
-                  id="plan-name"
-                  value={draft.name}
-                  onChange={(event) => onNameChange(event.target.value)}
-                  placeholder="AI infrastructure"
-                  maxLength={MAX_PLAN_NAME_LENGTH}
-                  required
-                  autoComplete="off"
-                  disabled={disabled}
-                  className="pr-20"
-                />
+              <div
+                className={cn(
+                  "flex h-9 min-w-0 flex-1 items-center rounded-lg border border-input bg-transparent transition-colors",
+                  "focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50",
+                  "dark:bg-input/30",
+                  saveError &&
+                    "border-destructive ring-3 ring-destructive/20 dark:border-destructive/50 dark:ring-destructive/40",
+                  disabled &&
+                    "cursor-not-allowed bg-input/50 opacity-50 dark:bg-input/80",
+                )}
+              >
+                {/* The hidden copy of the value sets the column width, so the
+                    input grows with what's typed without measuring in JS. */}
+                <div className="grid min-w-24 shrink overflow-hidden">
+                  <span
+                    aria-hidden="true"
+                    className="col-start-1 row-start-1 h-0 overflow-hidden px-2.5 text-base whitespace-pre"
+                  >
+                    {draft.name || PLAN_NAME_PLACEHOLDER}
+                  </span>
+                  <Input
+                    id="plan-name"
+                    value={draft.name}
+                    onChange={(event) => onNameChange(event.target.value)}
+                    placeholder={PLAN_NAME_PLACEHOLDER}
+                    maxLength={MAX_PLAN_NAME_LENGTH}
+                    required
+                    autoComplete="off"
+                    disabled={disabled}
+                    className="col-start-1 row-start-1 h-full w-full rounded-none border-0 bg-transparent disabled:bg-transparent disabled:opacity-100 focus-visible:border-0 focus-visible:ring-0 md:text-base dark:bg-transparent dark:disabled:bg-transparent"
+                  />
+                </div>
                 <PlanSwitcher
                   plans={plans}
                   activePlanId={activePlanId}
@@ -691,7 +714,7 @@ function ColorPicker({
         <Button
           type="button"
           variant="outline"
-          size="icon"
+          size="icon-lg"
           aria-label="Plan color"
           disabled={disabled}
           className={triggerClassName}
@@ -731,7 +754,8 @@ function ColorPicker({
 /**
  * The Plan list, folded into the right edge of the name input so that naming
  * the current Plan and switching to another one are one control rather than
- * two. Anchored to the input's field so the popover spans the whole input.
+ * two. It fills whatever width the name input doesn't need, so the click zone
+ * grows as the name shrinks.
  */
 function PlanSwitcher({
   plans,
@@ -755,7 +779,7 @@ function PlanSwitcher({
           aria-label="Switch Plan"
           disabled={disabled}
           className={cn(
-            "absolute top-1/2 right-1 flex h-7 w-18 -translate-y-1/2 items-center justify-end rounded-sm pr-1.5",
+            "flex h-full min-w-10 flex-1 items-center justify-end rounded-r-lg pr-2.5",
             "text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
             "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
             "disabled:pointer-events-none disabled:opacity-50",
@@ -858,10 +882,10 @@ function AssetsField({
               type="button"
               disabled={unavailable}
               className={cn(
-                "flex h-8 w-full min-w-0 flex-1 items-center gap-2 rounded-lg border border-input bg-transparent px-2.5 py-1 text-left text-base transition-colors outline-none",
+                "flex h-9 w-full min-w-0 flex-1 items-center gap-2 rounded-lg border border-input bg-transparent px-2.5 py-1 text-left text-base transition-colors outline-none",
                 "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
                 "disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50",
-                "md:text-sm dark:bg-input/30 dark:disabled:bg-input/80",
+                "md:text-base dark:bg-input/30 dark:disabled:bg-input/80",
               )}
             >
               <span
@@ -911,7 +935,7 @@ function AssetsField({
         <Button
           type="button"
           variant="outline"
-          size="icon"
+          size="icon-lg"
           aria-label="Clear assets"
           className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           onClick={onClear}
