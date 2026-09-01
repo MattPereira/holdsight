@@ -6,7 +6,7 @@ import {
 } from "@remixicon/react";
 
 import { Badge } from "@/components/ui/badge";
-import type { SaveStatus } from "@/lib/journal/use-autosave-entry";
+import type { SaveStatus } from "@/lib/forms/use-autosave-entry";
 
 export function SaveIndicator({ status }: { status: SaveStatus }) {
   if (status === "saving") {

@@ -14,9 +14,8 @@ export type SaveResult<TEntry> =
 
 /**
  * Unifies the autosave/save-queue/conflict-resolution engine shared by the
- * Investment Journal Entry and Trade Journal Entry editors. Persistence
- * is injected as a port (`save`) so this module never knows which journal
- * type it's driving.
+ * always-open editors (Trade Journal Entry, Plans). Persistence is injected
+ * as a port (`save`) so this module never knows what it's driving.
  *
  * `key` identifies the entry being edited (e.g. `${periodType}:${periodStart}`
  * or a transaction id). Changing it resets local state and guarantees a save
