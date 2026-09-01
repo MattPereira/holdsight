@@ -74,10 +74,11 @@ describe("PlansEditor", () => {
   it("shows every section of the form before anything is filled in", () => {
     renderEditor();
 
-    for (const field of ["Name", "Thesis", "Invalidation", "Entry", "Exit"]) {
+    for (const field of ["Plan", "Thesis", "Invalidation", "Entry", "Exit"]) {
       expect(screen.getByLabelText(field)).toBeTruthy();
     }
-    expect(screen.queryByRole("button", { name: "Create Plan" })).toBeNull();
+    // The form autosaves, so it has no submit or cancel of its own.
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
   });
 
@@ -90,7 +91,7 @@ describe("PlansEditor", () => {
     });
     renderEditor();
 
-    fireEvent.change(screen.getByLabelText("Name"), {
+    fireEvent.change(screen.getByLabelText("Plan"), {
       target: { value: "Future BTC" },
     });
     expect(actions.savePlan).not.toHaveBeenCalled();
@@ -106,7 +107,6 @@ describe("PlansEditor", () => {
         symbols: [],
       });
     });
-    expect(await screen.findByText("Saved")).toBeTruthy();
   });
 
   it("does not autosave while the Plan has no name", async () => {
@@ -206,7 +206,7 @@ describe("PlansEditor", () => {
     });
     renderEditor();
 
-    fireEvent.change(screen.getByLabelText("Name"), {
+    fireEvent.change(screen.getByLabelText("Plan"), {
       target: { value: "Future BTC" },
     });
     await vi.advanceTimersByTimeAsync(1000);
@@ -223,7 +223,7 @@ describe("PlansEditor", () => {
         plan({ id: "plan-2", name: "Ethereum" }),
       ]);
 
-      expect(screen.getByLabelText("Name")).toHaveProperty(
+      expect(screen.getByLabelText("Plan")).toHaveProperty(
         "value",
         "Future BTC",
       );
@@ -240,17 +240,40 @@ describe("PlansEditor", () => {
       fireEvent.click(await screen.findByText("Ethereum"));
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Name")).toHaveProperty(
+        expect(screen.getByLabelText("Plan")).toHaveProperty(
           "value",
           "Ethereum",
         );
       });
     });
 
-    it("hides the switcher until there is a Plan to switch to", () => {
-      renderEditor();
+    it("clears every asset from the Plan at once", async () => {
+      actions.savePlan.mockResolvedValue({
+        plans: [plan({ symbols: [] })],
+        plan: plan({ symbols: [] }),
+        error: null,
+      });
+      renderEditor([plan({ symbols: ["BTC", "ETH"] })]);
 
-      expect(screen.queryByRole("button", { name: "Switch Plan" })).toBeNull();
+      expect(screen.getByLabelText("Assets").textContent).toContain("BTC");
+      fireEvent.click(screen.getByRole("button", { name: "Clear assets" }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Assets").textContent).toContain(
+          "No assets",
+        );
+      });
+    });
+
+    it("starts a blank Plan from the switcher", async () => {
+      renderEditor([plan({ id: "plan-1", name: "Future BTC" })]);
+
+      fireEvent.click(screen.getByRole("button", { name: "Switch Plan" }));
+      fireEvent.click(await screen.findByText("New Plan"));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Plan")).toHaveProperty("value", "");
+      });
     });
   });
 });

@@ -4,15 +4,13 @@ import {
   RiAddLine,
   RiArrowDownSLine,
   RiCheckLine,
-  RiCloseLine,
   RiDeleteBinLine,
 } from "@remixicon/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { type ReactNode, useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { deletePlan, savePlan } from "@/app/(app)/plans/actions";
-import { SaveIndicator } from "@/components/forms/save-indicator";
 import { usePlans } from "@/components/portfolio/plans-context";
 import {
   AlertDialog,
@@ -25,7 +23,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -33,6 +30,8 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
+  CommandShortcut,
 } from "@/components/ui/command";
 import {
   Field,
@@ -327,6 +326,10 @@ export function PlansEditor({
     }));
   }
 
+  function clearSymbols() {
+    updateDraft((current) => ({ ...current, symbols: [] }));
+  }
+
   function updateDetail(field: keyof PlanDetails, value: string) {
     updateDraft((current) => ({
       ...current,
@@ -336,22 +339,7 @@ export function PlansEditor({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-3">
-        <h2 className="text-xl font-semibold">Plans</h2>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="ml-auto"
-          onClick={handleNewPlan}
-          disabled={isPending}
-        >
-          <RiAddLine data-icon="inline-start" />
-          Create
-        </Button>
-      </div>
-
-      <div className="flex flex-col gap-4 rounded-lg border p-4 sm:p-6">
+      <div className="flex flex-col gap-4">
         <PlanForm
           draft={draft}
           plans={sortedPlans}
@@ -370,50 +358,46 @@ export function PlansEditor({
             updateDraft((current) => ({ ...current, targetAllocation }))
           }
           onToggleSymbol={toggleSymbol}
+          onClearSymbols={clearSymbols}
           onDetailChange={updateDetail}
           onSelectPlan={handleSelectPlan}
-        />
-
-        {/* Below the allocation bar: deleting the Plan and its save state are
-            both about the Plan as a whole rather than any field inside it. */}
-        <div className="flex items-center gap-3">
-          {activePlan ? (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                {/* The confirmation dialog carries the warning, so the
+          onNewPlan={handleNewPlan}
+          deleteAction={
+            activePlan ? (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  {/* The confirmation dialog carries the warning, so the
                     trigger stays quiet until you reach for it. */}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Delete Plan"
-                  className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                  disabled={isPending}
-                >
-                  <RiDeleteBinLine />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete this Plan?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {draft.name || "This Plan"} and its details will be removed.
-                    Assets assigned to it return to being unassigned.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete}>
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          ) : null}
-          <div className="ml-auto">
-            <SaveIndicator status={status} />
-          </div>
-        </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Delete Plan"
+                    className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    disabled={isPending}
+                  >
+                    <RiDeleteBinLine />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this Plan?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {draft.name || "This Plan"} and its details will be
+                      removed. Assets assigned to it return to being unassigned.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete}>
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            ) : null
+          }
+        />
       </div>
     </div>
   );
@@ -458,68 +442,74 @@ function AllocationProgress({
     }
   }
 
+  const currentLabel = `${allocationPercentFormat.format(
+    currentAllocationPercent,
+  )}${hasTarget ? "" : "%"}`;
+
   return (
     <Field data-disabled={disabled}>
-      <FieldLabel htmlFor="plan-target-allocation" className="sr-only">
-        Target allocation
-      </FieldLabel>
-      <div className="flex items-end justify-between gap-2">
-        <span
-          className={cn(
-            "text-xl font-semibold tabular-nums tracking-tight",
-            isOverTarget && "text-amber-600 dark:text-amber-500",
-          )}
-        >
-          {allocationPercentFormat.format(currentAllocationPercent)}%
-        </span>
-        {isEditingTarget ? (
-          <Input
-            id="plan-target-allocation"
-            type="number"
-            min="5"
-            max="50"
-            step="5"
-            inputMode="numeric"
-            value={targetAllocationValue}
-            onChange={(event) => onTargetAllocationChange(event.target.value)}
-            onBlur={finishEditingTarget}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") event.currentTarget.blur();
-            }}
-            className="ml-auto w-20 text-right"
-            autoFocus
-            disabled={disabled}
-          />
-        ) : (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="ml-auto"
-            aria-label="Edit target allocation"
-            onClick={() => setIsEditingTarget(true)}
-            disabled={disabled}
-          >
-            <span className="text-xl font-semibold tabular-nums tracking-tight">
-              {hasTarget ? `${targetAllocationPercent}%` : "Set target"}
+      {/* Current and target sit side by side rather than at opposite ends of
+          the row, where they read as the two endpoints of a range instead of
+          an amount and the goal it is measured against. */}
+      <div className="flex items-center justify-between gap-2">
+        <FieldLabel className="text-base">Allocation</FieldLabel>
+        <div className="flex items-center gap-1">
+          <span className="text-base font-semibold tabular-nums tracking-tight">
+            {currentLabel}
+          </span>
+          {hasTarget ? (
+            <span className="text-base font-semibold text-muted-foreground">
+              /
             </span>
-          </Button>
-        )}
-      </div>
-      {hasTarget ? (
-        <div className="h-5 w-full overflow-hidden rounded-md bg-muted">
-          <div
-            className={cn(
-              "h-full rounded-md transition-all",
-              !color && (isOverTarget ? "bg-amber-500" : "bg-primary"),
-            )}
-            style={{
-              width: `${fillPercent}%`,
-              backgroundColor: color ?? undefined,
-            }}
-          />
+          ) : null}
+          {isEditingTarget ? (
+            <Input
+              id="plan-target-allocation"
+              aria-label="Target allocation"
+              type="number"
+              min="5"
+              max="50"
+              step="5"
+              inputMode="numeric"
+              value={targetAllocationValue}
+              onChange={(event) => onTargetAllocationChange(event.target.value)}
+              onBlur={finishEditingTarget}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+              }}
+              className="h-7 w-20 text-right"
+              autoFocus
+              disabled={disabled}
+            />
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="-mx-1 h-8 px-1"
+              aria-label="Edit target allocation"
+              onClick={() => setIsEditingTarget(true)}
+              disabled={disabled}
+            >
+              <span className="text-base font-semibold tabular-nums tracking-tight">
+                {hasTarget ? `${targetAllocationPercent}%` : "Set target"}
+              </span>
+            </Button>
+          )}
         </div>
-      ) : null}
+      </div>
+      <div className="h-8 w-full overflow-hidden rounded-lg bg-muted">
+        <div
+          className={cn(
+            "h-full rounded-lg transition-all",
+            !color && (isOverTarget ? "bg-amber-500" : "bg-primary"),
+          )}
+          style={{
+            width: `${fillPercent}%`,
+            backgroundColor: color ?? undefined,
+          }}
+        />
+      </div>
     </Field>
   );
 }
@@ -536,8 +526,11 @@ function PlanForm({
   onColorChange,
   onTargetAllocationChange,
   onToggleSymbol,
+  onClearSymbols,
   onDetailChange,
   onSelectPlan,
+  onNewPlan,
+  deleteAction,
 }: {
   draft: PlanDraft;
   plans: Plan[];
@@ -550,8 +543,11 @@ function PlanForm({
   onColorChange: (value: string | null) => void;
   onTargetAllocationChange: (value: string) => void;
   onToggleSymbol: (symbol: string) => void;
+  onClearSymbols: () => void;
   onDetailChange: (field: keyof PlanDetails, value: string) => void;
   onSelectPlan: (plan: Plan) => void;
+  onNewPlan: () => void;
+  deleteAction: ReactNode;
 }) {
   const selected = new Set(draft.symbols.map(symbolKey));
   const selectedSymbols = selectableSymbols.filter((symbol) =>
@@ -572,53 +568,51 @@ function PlanForm({
             data-invalid={Boolean(saveError)}
             className="min-w-0"
           >
-            <FieldLabel htmlFor="plan-name">Name</FieldLabel>
-            {/* One control carries the whole identity of a Plan: its colour on
-                the left, its editable name in the middle, and the list of every
-                other Plan behind the chevron on the right. */}
-            <div className="relative">
+            <FieldLabel htmlFor="plan-name" className="text-base">
+              Plan
+            </FieldLabel>
+            {/* The input holds the editable name, with the list of every
+                other Plan behind the chevron on the right. Colour and delete
+                sit outside it, since they act on the Plan rather than its
+                name. */}
+            <div className="flex items-center gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Input
+                  id="plan-name"
+                  value={draft.name}
+                  onChange={(event) => onNameChange(event.target.value)}
+                  placeholder="AI infrastructure"
+                  maxLength={MAX_PLAN_NAME_LENGTH}
+                  required
+                  autoComplete="off"
+                  disabled={disabled}
+                  className="pr-20"
+                />
+                <PlanSwitcher
+                  plans={plans}
+                  activePlanId={activePlanId}
+                  onSelect={onSelectPlan}
+                  onNewPlan={onNewPlan}
+                  disabled={disabled}
+                />
+              </div>
               <ColorPicker
                 value={draft.color}
                 onChange={onColorChange}
                 disabled={disabled}
-                triggerClassName="absolute top-1/2 left-1 size-6 -translate-y-1/2"
               />
-              <Input
-                id="plan-name"
-                value={draft.name}
-                onChange={(event) => onNameChange(event.target.value)}
-                placeholder="AI infrastructure"
-                maxLength={MAX_PLAN_NAME_LENGTH}
-                required
-                autoComplete="off"
-                disabled={disabled}
-                className="pl-8"
-              />
-              <PlanSwitcher
-                plans={plans}
-                activePlanId={activePlanId}
-                onSelect={onSelectPlan}
-                disabled={disabled}
-              />
+              {deleteAction}
             </div>
             <FieldError>{saveError}</FieldError>
           </Field>
-          <Field data-disabled={disabled} className="min-w-0">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <FieldLabel>Assets</FieldLabel>
-              <SelectedAssetBadges
-                selectedSymbols={selectedSymbols}
-                onToggle={onToggleSymbol}
-                disabled={disabled}
-              />
-            </div>
-            <AssetMultiSelect
-              selectableSymbols={selectableSymbols}
-              selected={selected}
-              onToggle={onToggleSymbol}
-              disabled={disabled}
-            />
-          </Field>
+          <AssetsField
+            selectableSymbols={selectableSymbols}
+            selected={selected}
+            selectedSymbols={selectedSymbols}
+            onToggle={onToggleSymbol}
+            onClear={onClearSymbols}
+            disabled={disabled}
+          />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -686,9 +680,12 @@ function PlanTextField({
 }) {
   return (
     <Field data-disabled={disabled}>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <FieldLabel htmlFor={id} className="text-base">
+        {label}
+      </FieldLabel>
       <Textarea
         id={id}
+        className="md:text-base"
         value={value ?? ""}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
@@ -717,7 +714,7 @@ function ColorPicker({
       <PopoverTrigger asChild>
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           size="icon"
           aria-label="Plan color"
           disabled={disabled}
@@ -725,7 +722,7 @@ function ColorPicker({
         >
           <span
             aria-hidden="true"
-            className="size-3.5 rounded-sm border"
+            className="size-4 rounded-sm border"
             style={{ backgroundColor: value ?? "var(--muted)" }}
           />
         </Button>
@@ -764,15 +761,16 @@ function PlanSwitcher({
   plans,
   activePlanId,
   onSelect,
+  onNewPlan,
   disabled,
 }: {
   plans: Plan[];
   activePlanId: string | null;
   onSelect: (plan: Plan) => void;
+  onNewPlan: () => void;
   disabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  if (plans.length === 0) return null;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -781,7 +779,7 @@ function PlanSwitcher({
           aria-label="Switch Plan"
           disabled={disabled}
           className={cn(
-            "absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-sm",
+            "absolute top-1/2 right-1 flex h-7 w-18 -translate-y-1/2 items-center justify-end rounded-sm pr-1.5",
             "text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
             "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
             "disabled:pointer-events-none disabled:opacity-50",
@@ -804,25 +802,42 @@ function PlanSwitcher({
                   onSelect(plan);
                 }}
               >
-                <RiCheckLine
-                  className={cn(
-                    "size-4",
-                    plan.id === activePlanId ? "opacity-100" : "opacity-0",
-                  )}
-                />
                 <span
                   aria-hidden="true"
                   className="size-4 shrink-0 rounded-sm border"
                   style={{ backgroundColor: plan.color ?? "var(--muted)" }}
                 />
                 <span className="truncate">{plan.name}</span>
-                <span className="ml-auto text-muted-foreground">
+                <RiCheckLine
+                  className={cn(
+                    "size-4 shrink-0",
+                    plan.id === activePlanId ? "opacity-100" : "opacity-0",
+                  )}
+                />
+                {/* A shortcut slot rather than a plain span: it pins the
+                    target to the right edge and suppresses the check that
+                    CommandItem would otherwise append there, since this list
+                    marks the active Plan beside its name instead. */}
+                <CommandShortcut className="shrink-0 pl-2 text-sm tracking-normal tabular-nums">
                   {plan.targetAllocationPercent === null
                     ? "No target"
                     : `${allocationPercentFormat.format(plan.targetAllocationPercent)}%`}
-                </span>
+                </CommandShortcut>
               </CommandItem>
             ))}
+            {plans.length > 0 ? <CommandSeparator /> : null}
+            {/* Starting a Plan is another way of choosing which Plan you're
+                editing, so it lives in the list rather than beside it. */}
+            <CommandItem
+              value="New Plan"
+              onSelect={() => {
+                setOpen(false);
+                onNewPlan();
+              }}
+            >
+              <RiAddLine className="size-4" />
+              <span>New Plan</span>
+            </CommandItem>
           </CommandList>
         </Command>
       </PopoverContent>
@@ -830,91 +845,105 @@ function PlanSwitcher({
   );
 }
 
-function AssetMultiSelect({
+/**
+ * The Assets field mirrors the Plan field above it: one control holds the whole
+ * value — the chosen symbols read as text, with the picker behind the same
+ * chevron. Picking and unpicking both happen in that popover.
+ */
+function AssetsField({
   selectableSymbols,
   selected,
+  selectedSymbols,
   onToggle,
+  onClear,
   disabled,
 }: {
   selectableSymbols: string[];
   selected: Set<string>;
+  selectedSymbols: string[];
   onToggle: (symbol: string) => void;
+  onClear: () => void;
   disabled: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const unavailable = disabled || selectableSymbols.length === 0;
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
+    <Field data-disabled={disabled} className="min-w-0">
+      <FieldLabel htmlFor="plan-assets" className="text-base">
+        Assets
+      </FieldLabel>
+      {/* Clearing the set sits outside the control, mirroring the delete
+          button beside the Plan name. */}
+      <div className="flex items-center gap-2">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <button
+              id="plan-assets"
+              type="button"
+              disabled={unavailable}
+              className={cn(
+                "flex h-8 w-full min-w-0 flex-1 items-center gap-2 rounded-lg border border-input bg-transparent px-2.5 py-1 text-left text-base transition-colors outline-none",
+                "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+                "disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50",
+                "md:text-sm dark:bg-input/30 dark:disabled:bg-input/80",
+              )}
+            >
+              <span
+                className={cn(
+                  "truncate",
+                  selectedSymbols.length === 0 && "text-muted-foreground",
+                )}
+              >
+                {selectedSymbols.length === 0
+                  ? "No assets"
+                  : selectedSymbols.join(", ")}
+              </span>
+              <RiArrowDownSLine className="ml-auto size-4 shrink-0 text-muted-foreground" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="w-(--radix-popover-trigger-width) p-0"
+          >
+            <Command>
+              <CommandInput placeholder="Search symbols..." />
+              <CommandList>
+                <CommandEmpty>No matching assets.</CommandEmpty>
+                {selectableSymbols.map((symbol) => {
+                  const key = symbolKey(symbol);
+                  const isSelected = selected.has(key);
+                  return (
+                    <CommandItem
+                      key={key}
+                      value={symbol}
+                      onSelect={() => onToggle(symbol)}
+                    >
+                      <RiCheckLine
+                        className={cn(
+                          "size-4",
+                          isSelected ? "opacity-100" : "opacity-0",
+                        )}
+                      />
+                      <span className="font-medium">{symbol}</span>
+                    </CommandItem>
+                  );
+                })}
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
         <Button
           type="button"
           variant="outline"
-          className="justify-start font-normal text-muted-foreground"
-          disabled={disabled || selectableSymbols.length === 0}
+          size="icon"
+          aria-label="Clear assets"
+          className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          onClick={onClear}
+          disabled={disabled || selectedSymbols.length === 0}
         >
-          <RiAddLine data-icon="inline-start" />
-          Add assets
+          <RiDeleteBinLine />
         </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        className="w-(--radix-popover-trigger-width) p-0"
-      >
-        <Command>
-          <CommandInput placeholder="Search symbols..." />
-          <CommandList>
-            <CommandEmpty>No matching assets.</CommandEmpty>
-            {selectableSymbols.map((symbol) => {
-              const key = symbolKey(symbol);
-              const isSelected = selected.has(key);
-              return (
-                <CommandItem
-                  key={key}
-                  value={symbol}
-                  onSelect={() => onToggle(symbol)}
-                >
-                  <RiCheckLine
-                    className={cn(
-                      "size-4",
-                      isSelected ? "opacity-100" : "opacity-0",
-                    )}
-                  />
-                  <span className="font-medium">{symbol}</span>
-                </CommandItem>
-              );
-            })}
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-function SelectedAssetBadges({
-  selectedSymbols,
-  onToggle,
-  disabled,
-}: {
-  selectedSymbols: string[];
-  onToggle: (symbol: string) => void;
-  disabled: boolean;
-}) {
-  if (selectedSymbols.length === 0) return null;
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {selectedSymbols.map((symbol) => (
-        <Badge key={symbol} variant="secondary" className="gap-1 pr-1">
-          {symbol}
-          <button
-            type="button"
-            className="rounded-sm opacity-70 hover:opacity-100"
-            aria-label={`Remove ${symbol}`}
-            onClick={() => onToggle(symbol)}
-            disabled={disabled}
-          >
-            <RiCloseLine className="size-3" />
-          </button>
-        </Badge>
-      ))}
-    </div>
+      </div>
+    </Field>
   );
 }
