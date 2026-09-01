@@ -24,5 +24,3 @@ Define a Thesis, compare target and current allocations, and record Entry, Exit,
 - Neon Postgres
 - Drizzle ORM
 - Better Auth
-- Plaid
-- Recharts
