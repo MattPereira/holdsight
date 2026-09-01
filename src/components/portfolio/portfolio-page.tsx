@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { loadPortfolioPageData } from "@/app/(app)/portfolio/actions";
 import { PageHeader } from "@/components/app-shell/page-header";
 import { usePlans } from "@/components/portfolio/plans-context";
+import { PlansEditor } from "@/components/portfolio/plans-editor";
 import { PortfolioAllocations } from "@/components/portfolio/portfolio-allocations";
 import type { PortfolioAssetSummary } from "@/lib/portfolio/asset-totals";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,8 @@ export function PortfolioPage({
             plans={plans}
           />
         </div>
+
+        <PlansEditor portfolioSummary={summary} />
       </div>
     </div>
   );

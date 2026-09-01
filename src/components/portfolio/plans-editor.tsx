@@ -333,7 +333,7 @@ export function PlansEditor({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center gap-3">
-        <h1 className="text-xl font-semibold">Plans</h1>
+        <h2 className="text-xl font-semibold">Plans</h2>
         <Button
           type="button"
           variant="outline"

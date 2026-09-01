@@ -22,7 +22,6 @@ async function unauthorizedResult(): Promise<PlanActionResult> {
 
 function revalidatePlanPaths(): void {
   revalidatePath("/");
-  revalidatePath("/plans");
   revalidatePath("/wallets");
   revalidatePath("/exchanges");
   revalidatePath("/brokerages");
