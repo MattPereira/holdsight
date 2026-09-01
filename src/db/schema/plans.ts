@@ -93,10 +93,7 @@ export const planAssetsRelations = relations(planAssets, ({ one }) => ({
   }),
 }));
 
-/**
- * The Plan commitment columns, keyed by field, for reuse in `select()` shapes.
- * Typed per column so row types stay precise.
- */
+/** Typed per column, unlike planFieldRecord, so select() row types stay precise. */
 export const planDetailColumns = Object.fromEntries(
   PLAN_FIELDS.map((field) => [field.key, plans[field.key]]),
 ) as { [K in PlanField]: (typeof plans)[K] };

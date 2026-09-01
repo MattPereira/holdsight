@@ -4,47 +4,39 @@ export const MAX_PLAN_NAME_LENGTH = 40;
 export const MAX_PLAN_TEXT_LENGTH = 10_000;
 
 /**
- * The six commitments a Plan asks you to make before taking exposure, in the
- * order they are read. Risk and Profit sit above Entry and Adding on purpose:
- * what you are willing to lose is decided before how you get in.
- *
- * Two boundaries carry the weight here. Invalidation is the thesis being
- * wrong; Risk is how much you will lose before closing the position entirely.
- * Entry is the first buy; Adding is every buy after it.
- *
- * This list is the single source of truth for the fields — the editor labels,
- * the agent tool descriptions, and the missing-field report all read from it.
+ * Field meanings and boundaries live in CONTEXT.md. Order is load-bearing:
+ * Risk and Profit are read before Entry and Adding.
  */
 export const PLAN_FIELDS = [
   {
     key: "thesis",
     label: "Thesis",
-    prompt: "Why do I own this?",
+    prompt: "Reason to believe price will move",
   },
   {
     key: "invalidation",
     label: "Invalidation",
-    prompt: "What would prove the thesis wrong?",
+    prompt: "Situation that would prove thesis wrong",
   },
   {
     key: "risk",
     label: "Risk",
-    prompt: "How much am I willing to lose before I give up on this trade?",
+    prompt: "Define exactly how much you are willing to lose",
   },
   {
     key: "profit",
     label: "Profit",
-    prompt: "What makes me take profit?",
+    prompt: "When and what increment to sell for gains",
   },
   {
     key: "entry",
     label: "Entry",
-    prompt: "What has to be true before I buy?",
+    prompt: "When and what size to open initial position",
   },
   {
     key: "adding",
     label: "Adding",
-    prompt: "What has to be true before I buy more, and how much each time?",
+    prompt: "When and how to increase size of position",
   },
 ] as const;
 
@@ -52,11 +44,7 @@ export type PlanField = (typeof PLAN_FIELDS)[number]["key"];
 
 export type PlanDetails = Record<PlanField, string | null>;
 
-/**
- * Builds one value per Plan field, keyed by field. The single place that
- * asserts a `PLAN_FIELDS`-derived object covers every `PlanField`, so callers
- * — DB column maps, zod shapes, empty drafts — don't each repeat the cast.
- */
+/** Holds the one assertion that a PLAN_FIELDS-derived object covers every PlanField. */
 export function planFieldRecord<T>(
   build: (field: (typeof PLAN_FIELDS)[number]) => T,
 ): Record<PlanField, T> {
@@ -71,10 +59,7 @@ export function emptyPlanDetails(): PlanDetails {
 
 export type PlanMissingField = PlanField | "targetAllocationPercent";
 
-/**
- * Which commitments a Plan has not made yet. This is a presence check, not a
- * quality one — an answered field can still be mush.
- */
+/** A presence check, not a quality one — an answered field can still be mush. */
 export function getMissingPlanFields(
   details: PlanDetails,
   targetAllocationPercent: number | null,

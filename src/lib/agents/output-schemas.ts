@@ -46,7 +46,6 @@ export const planDetailsSchema = z.object(
   planFieldRecord(() => z.string().nullable()),
 );
 
-/** The Plan commitments that have not been made yet. Empty means all six are answered. */
 export const planMissingSchema = z.array(planMissingFieldSchema);
 
 export const planResultSchema = z.object({

@@ -666,7 +666,7 @@ function PlanTextField({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         maxLength={MAX_PLAN_TEXT_LENGTH}
-        rows={6}
+        rows={3}
         disabled={disabled}
       />
     </Field>
