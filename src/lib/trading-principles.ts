@@ -1,7 +1,8 @@
 /**
  * Mark Douglas's five fundamental truths and seven principles of consistency,
- * quoted verbatim. Displayed on entering the portfolio as a discipline ritual,
- * not as product copy — reword only if the intent is to change the mantra.
+ * quoted verbatim, and the only copy of them — displayed on entering the
+ * portfolio as a discipline ritual, not as product copy. Reword only if the
+ * intent is to change the mantra.
  */
 
 export const FUNDAMENTAL_TRUTHS = [
