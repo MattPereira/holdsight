@@ -8,7 +8,6 @@ export type PlanDetails = {
   invalidation: string | null;
   entry: string | null;
   exit: string | null;
-  timeframe: string | null;
 };
 
 export type Plan = {
@@ -105,7 +104,6 @@ export function normalizePlanInput(
     invalidation: normalizeText(input.details.invalidation, "Invalidation"),
     entry: normalizeText(input.details.entry, "Entry"),
     exit: normalizeText(input.details.exit, "Exit"),
-    timeframe: normalizeText(input.details.timeframe, "Timeframe"),
   };
   const sectionError = Object.values(sections).find(
     (section) => section.error,
@@ -130,7 +128,6 @@ export function normalizePlanInput(
         invalidation: sections.invalidation.value,
         entry: sections.entry.value,
         exit: sections.exit.value,
-        timeframe: sections.timeframe.value,
       },
       targetAllocationPercent: target.value,
       symbols: normalizeSymbols(input.symbols),

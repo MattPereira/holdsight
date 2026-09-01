@@ -2,19 +2,13 @@
 
 import {
   RiAddLine,
+  RiArrowDownSLine,
   RiCheckLine,
   RiCloseLine,
   RiDeleteBinLine,
 } from "@remixicon/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-  type CSSProperties,
-  type KeyboardEvent,
-} from "react";
+import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { deletePlan, savePlan } from "@/app/(app)/plans/actions";
@@ -107,7 +101,6 @@ const EMPTY_DRAFT: PlanDraft = {
     invalidation: null,
     entry: null,
     exit: null,
-    timeframe: null,
   },
   targetAllocation: "",
   symbols: [],
@@ -173,6 +166,19 @@ export function PlansEditor({
       ),
     );
   }, [plans, portfolioSummary]);
+  // Plans you hold nothing of have no slice in the donut and no row in the
+  // allocations list above, so they sort below the ones that do.
+  const sortedPlans = useMemo(() => {
+    const held = (plan: Plan) =>
+      (currentAllocationByPlanId.get(plan.id) ?? 0) > 0;
+    return [...plans].sort((a, b) => {
+      const heldDiff = Number(held(b)) - Number(held(a));
+      if (heldDiff !== 0) return heldDiff;
+      return (
+        (b.targetAllocationPercent ?? -1) - (a.targetAllocationPercent ?? -1)
+      );
+    });
+  }, [plans, currentAllocationByPlanId]);
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -345,18 +351,11 @@ export function PlansEditor({
         </Button>
       </div>
 
-      <PlanPicker
-        plans={plans}
-        activePlanId={activePlan?.id ?? null}
-        isCreating={!activePlan}
-        currentAllocationByPlanId={currentAllocationByPlanId}
-        onSelect={handleSelectPlan}
-        disabled={isPending}
-      />
-
       <div className="flex flex-col gap-4 rounded-lg border p-4 sm:p-6">
         <PlanForm
           draft={draft}
+          plans={sortedPlans}
+          activePlanId={activePlan?.id ?? null}
           selectableSymbols={selectableSymbols}
           currentAllocationPercent={
             activePlan ? (currentAllocationByPlanId.get(activePlan.id) ?? 0) : 0
@@ -372,215 +371,50 @@ export function PlansEditor({
           }
           onToggleSymbol={toggleSymbol}
           onDetailChange={updateDetail}
+          onSelectPlan={handleSelectPlan}
         />
-      </div>
 
-      {/* Outside the card: deleting the Plan and the Plan's save state are
-          both about the Plan as a whole rather than any field inside it. */}
-      <div className="flex items-center gap-3">
-        {activePlan ? (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              {/* The confirmation dialog carries the warning, so the
-                  trigger stays quiet until you reach for it. */}
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Delete Plan"
-                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                disabled={isPending}
-              >
-                <RiDeleteBinLine />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete this Plan?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {draft.name || "This Plan"} and its details will be removed.
-                  Assets assigned to it return to being unassigned.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete}>
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        ) : null}
-        <div className="ml-auto">
-          <SaveIndicator status={status} />
+        {/* Below the allocation bar: deleting the Plan and its save state are
+            both about the Plan as a whole rather than any field inside it. */}
+        <div className="flex items-center gap-3">
+          {activePlan ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                {/* The confirmation dialog carries the warning, so the
+                    trigger stays quiet until you reach for it. */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Delete Plan"
+                  className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  disabled={isPending}
+                >
+                  <RiDeleteBinLine />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this Plan?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {draft.name || "This Plan"} and its details will be removed.
+                    Assets assigned to it return to being unassigned.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete}>
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          ) : null}
+          <div className="ml-auto">
+            <SaveIndicator status={status} />
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-const PLAN_PICKER_MAX_COLUMNS = 3;
-
-/**
- * Lays the chips out in the fewest rows that stay within
- * {@link PLAN_PICKER_MAX_COLUMNS}, then splits them evenly across those rows so
- * the last one is never left holding a single orphan chip. Four plans land as
- * 2x2, six as 3x2, nine as 3x3.
- */
-function planPickerColumns(cellCount: number): number {
-  const cells = Math.max(1, cellCount);
-  const rows = Math.ceil(cells / PLAN_PICKER_MAX_COLUMNS);
-  return Math.ceil(cells / rows);
-}
-
-type PlanPickerCell = { key: string; plan: Plan | null; isHeld: boolean };
-
-/**
- * The always-visible replacement for the old Plans dropdown: one chip per Plan,
- * exactly one of them checked, so the set of Plans is readable without opening
- * anything. Selection follows focus, as it does in any radio group.
- *
- * The grid is sized for one more cell than there are Plans, so the transient
- * "New Plan" chip drops into a space that was already reserved instead of
- * reflowing every chip above it the moment the + button is pressed.
- */
-function PlanPicker({
-  plans,
-  activePlanId,
-  isCreating,
-  currentAllocationByPlanId,
-  onSelect,
-  disabled,
-}: {
-  plans: Plan[];
-  activePlanId: string | null;
-  isCreating: boolean;
-  currentAllocationByPlanId: Map<string, number>;
-  onSelect: (plan: Plan) => void;
-  disabled: boolean;
-}) {
-  const buttonsRef = useRef<(HTMLButtonElement | null)[]>([]);
-
-  const cells = useMemo<PlanPickerCell[]>(() => {
-    const held = (plan: Plan) =>
-      (currentAllocationByPlanId.get(plan.id) ?? 0) > 0;
-    const sorted = [...plans].sort((a, b) => {
-      // Plans you hold nothing of have no slice in the donut and no row in the
-      // allocations list above, so they sort below the ones that do.
-      const heldDiff = Number(held(b)) - Number(held(a));
-      if (heldDiff !== 0) return heldDiff;
-      return (
-        (b.targetAllocationPercent ?? -1) - (a.targetAllocationPercent ?? -1)
-      );
-    });
-    const rows: PlanPickerCell[] = sorted.map((plan) => ({
-      key: plan.id,
-      plan,
-      isHeld: held(plan),
-    }));
-    if (isCreating) {
-      rows.push({ key: "new", plan: null, isHeld: false });
-    }
-    return rows;
-  }, [plans, currentAllocationByPlanId, isCreating]);
-
-  if (cells.length === 0) {
-    return null;
-  }
-
-  const columns = planPickerColumns(plans.length + 1);
-  const activeIndex = cells.findIndex((cell) =>
-    cell.plan ? cell.plan.id === activePlanId : isCreating,
-  );
-
-  function moveFocus(from: number, delta: number) {
-    const next = (from + delta + cells.length) % cells.length;
-    const cell = cells[next];
-    buttonsRef.current[next]?.focus();
-    if (cell?.plan) onSelect(cell.plan);
-  }
-
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    const from = buttonsRef.current.findIndex(
-      (button) => button === document.activeElement,
-    );
-    if (from < 0) return;
-    switch (event.key) {
-      case "ArrowRight":
-      case "ArrowDown":
-        event.preventDefault();
-        moveFocus(from, 1);
-        break;
-      case "ArrowLeft":
-      case "ArrowUp":
-        event.preventDefault();
-        moveFocus(from, -1);
-        break;
-      case "Home":
-        event.preventDefault();
-        moveFocus(0, 0);
-        break;
-      case "End":
-        event.preventDefault();
-        moveFocus(cells.length - 1, 0);
-        break;
-    }
-  }
-
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Plans"
-      onKeyDown={handleKeyDown}
-      // Two columns is the widest a chip stays readable at phone widths; the
-      // balanced column count only applies once there is room for it.
-      className="grid grid-cols-2 gap-2 sm:grid-cols-(--plan-picker-columns)"
-      style={
-        {
-          "--plan-picker-columns": `repeat(${columns}, minmax(0, 1fr))`,
-        } as CSSProperties
-      }
-    >
-      {cells.map((cell, index) => {
-        const isActive = index === activeIndex;
-        return (
-          <button
-            key={cell.key}
-            type="button"
-            role="radio"
-            aria-checked={isActive}
-            // Roving tabindex: the group is a single tab stop and the arrow
-            // keys move within it.
-            tabIndex={isActive || (activeIndex < 0 && index === 0) ? 0 : -1}
-            ref={(node) => {
-              buttonsRef.current[index] = node;
-            }}
-            disabled={disabled}
-            onClick={() => {
-              if (cell.plan) onSelect(cell.plan);
-            }}
-            className={cn(
-              "flex min-w-0 items-center gap-2.5 rounded-md border px-3 py-2.5 text-base transition-colors",
-              "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-              "disabled:pointer-events-none disabled:opacity-50",
-              isActive ? "border-primary bg-accent" : "hover:bg-accent/50",
-              !cell.plan && "border-dashed text-muted-foreground",
-              cell.plan &&
-                !cell.isHeld &&
-                "border-dashed text-muted-foreground",
-            )}
-          >
-            <span
-              aria-hidden="true"
-              className="size-4 shrink-0 rounded-[3px] border"
-              style={{
-                backgroundColor: cell.plan?.color ?? "var(--muted)",
-              }}
-            />
-            <span className="truncate">{cell.plan?.name ?? "New Plan"}</span>
-          </button>
-        );
-      })}
     </div>
   );
 }
@@ -692,6 +526,8 @@ function AllocationProgress({
 
 function PlanForm({
   draft,
+  plans,
+  activePlanId,
   selectableSymbols,
   currentAllocationPercent,
   saveError,
@@ -701,8 +537,11 @@ function PlanForm({
   onTargetAllocationChange,
   onToggleSymbol,
   onDetailChange,
+  onSelectPlan,
 }: {
   draft: PlanDraft;
+  plans: Plan[];
+  activePlanId: string | null;
   selectableSymbols: string[];
   currentAllocationPercent: number;
   saveError: string | null;
@@ -712,6 +551,7 @@ function PlanForm({
   onTargetAllocationChange: (value: string) => void;
   onToggleSymbol: (symbol: string) => void;
   onDetailChange: (field: keyof PlanDetails, value: string) => void;
+  onSelectPlan: (plan: Plan) => void;
 }) {
   const selected = new Set(draft.symbols.map(symbolKey));
   const selectedSymbols = selectableSymbols.filter((symbol) =>
@@ -733,9 +573,9 @@ function PlanForm({
             className="min-w-0"
           >
             <FieldLabel htmlFor="plan-name">Name</FieldLabel>
-            {/* The swatch sits inside the input rather than beside it: a Plan's
-                colour and name are one identity, and the picker chips above
-                already render them fused. */}
+            {/* One control carries the whole identity of a Plan: its colour on
+                the left, its editable name in the middle, and the list of every
+                other Plan behind the chevron on the right. */}
             <div className="relative">
               <ColorPicker
                 value={draft.color}
@@ -753,6 +593,12 @@ function PlanForm({
                 autoComplete="off"
                 disabled={disabled}
                 className="pl-8"
+              />
+              <PlanSwitcher
+                plans={plans}
+                activePlanId={activePlanId}
+                onSelect={onSelectPlan}
+                disabled={disabled}
               />
             </div>
             <FieldError>{saveError}</FieldError>
@@ -817,15 +663,6 @@ function PlanForm({
           targetAllocationValue={draft.targetAllocation}
           disabled={disabled}
           onTargetAllocationChange={onTargetAllocationChange}
-        />
-
-        <PlanTextField
-          id="plan-timeframe"
-          label="Timeframe"
-          placeholder="Expected holding or review horizon."
-          value={draft.details.timeframe}
-          onChange={(value) => onDetailChange("timeframe", value)}
-          disabled={disabled}
         />
       </FieldGroup>
     </div>
@@ -913,6 +750,81 @@ function ColorPicker({
             />
           ))}
         </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * The Plan list, folded into the right edge of the name input so that naming
+ * the current Plan and switching to another one are one control rather than
+ * two. Anchored to the input's field so the popover spans the whole input.
+ */
+function PlanSwitcher({
+  plans,
+  activePlanId,
+  onSelect,
+  disabled,
+}: {
+  plans: Plan[];
+  activePlanId: string | null;
+  onSelect: (plan: Plan) => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  if (plans.length === 0) return null;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label="Switch Plan"
+          disabled={disabled}
+          className={cn(
+            "absolute top-1/2 right-1 flex size-7 -translate-y-1/2 items-center justify-center rounded-sm",
+            "text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+            "focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
+            "disabled:pointer-events-none disabled:opacity-50",
+          )}
+        >
+          <RiArrowDownSLine className="size-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 p-0">
+        <Command>
+          <CommandInput placeholder="Search Plans..." />
+          <CommandList>
+            <CommandEmpty>No matching Plans.</CommandEmpty>
+            {plans.map((plan) => (
+              <CommandItem
+                key={plan.id}
+                value={plan.name}
+                onSelect={() => {
+                  setOpen(false);
+                  onSelect(plan);
+                }}
+              >
+                <RiCheckLine
+                  className={cn(
+                    "size-4",
+                    plan.id === activePlanId ? "opacity-100" : "opacity-0",
+                  )}
+                />
+                <span
+                  aria-hidden="true"
+                  className="size-4 shrink-0 rounded-sm border"
+                  style={{ backgroundColor: plan.color ?? "var(--muted)" }}
+                />
+                <span className="truncate">{plan.name}</span>
+                <span className="ml-auto text-muted-foreground">
+                  {plan.targetAllocationPercent === null
+                    ? "No target"
+                    : `${allocationPercentFormat.format(plan.targetAllocationPercent)}%`}
+                </span>
+              </CommandItem>
+            ))}
+          </CommandList>
+        </Command>
       </PopoverContent>
     </Popover>
   );

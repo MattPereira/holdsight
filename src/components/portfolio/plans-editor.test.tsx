@@ -28,7 +28,6 @@ const EMPTY_DETAILS = {
   invalidation: null,
   entry: null,
   exit: null,
-  timeframe: null,
 };
 
 function plan(overrides: Partial<Plan> = {}): Plan {
@@ -54,6 +53,15 @@ function renderEditor(initialPlans: Plan[] = []) {
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
+  // jsdom implements none of these, and the popover's command list reaches
+  // for all of them the moment it opens.
+  Element.prototype.scrollIntoView = vi.fn();
+  Element.prototype.hasPointerCapture = vi.fn(() => false);
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
 });
 
 afterEach(() => {
@@ -66,14 +74,7 @@ describe("PlansEditor", () => {
   it("shows every section of the form before anything is filled in", () => {
     renderEditor();
 
-    for (const field of [
-      "Name",
-      "Thesis",
-      "Invalidation",
-      "Entry",
-      "Exit",
-      "Timeframe",
-    ]) {
+    for (const field of ["Name", "Thesis", "Invalidation", "Entry", "Exit"]) {
       expect(screen.getByLabelText(field)).toBeTruthy();
     }
     expect(screen.queryByRole("button", { name: "Create Plan" })).toBeNull();
@@ -215,49 +216,28 @@ describe("PlansEditor", () => {
     ).toBeTruthy();
   });
 
-  describe("the Plan picker", () => {
-    it("renders one checked radio per Plan and switches the form on click", async () => {
-      const btc = plan({ id: "plan-1", name: "Future BTC" });
-      const eth = plan({ id: "plan-2", name: "Ethereum" });
-      renderEditor([btc, eth]);
-
-      const group = screen.getByRole("radiogroup", { name: "Plans" });
-      const chips = screen.getAllByRole("radio");
-      expect(group).toBeTruthy();
-      expect(chips.map((chip) => chip.textContent)).toEqual([
-        "Future BTC",
-        "Ethereum",
-      ]);
-      expect(chips[0].getAttribute("aria-checked")).toBe("true");
-      expect(screen.getByLabelText("Name")).toHaveProperty(
-        "value",
-        "Future BTC",
-      );
-
-      fireEvent.click(chips[1]);
-
-      await waitFor(() => {
-        expect(screen.getByLabelText("Name")).toHaveProperty(
-          "value",
-          "Ethereum",
-        );
-      });
-      expect(screen.getAllByRole("radio")[1].getAttribute("aria-checked")).toBe(
-        "true",
-      );
-    });
-
-    it("moves selection with the arrow keys", async () => {
+  describe("the Plan switcher", () => {
+    it("keeps the active Plan's name in the name input", () => {
       renderEditor([
         plan({ id: "plan-1", name: "Future BTC" }),
         plan({ id: "plan-2", name: "Ethereum" }),
       ]);
 
-      const chips = screen.getAllByRole("radio");
-      chips[0].focus();
-      fireEvent.keyDown(screen.getByRole("radiogroup", { name: "Plans" }), {
-        key: "ArrowRight",
-      });
+      expect(screen.getByLabelText("Name")).toHaveProperty(
+        "value",
+        "Future BTC",
+      );
+      expect(screen.getByRole("button", { name: "Switch Plan" })).toBeTruthy();
+    });
+
+    it("switches the form when another Plan is picked", async () => {
+      renderEditor([
+        plan({ id: "plan-1", name: "Future BTC" }),
+        plan({ id: "plan-2", name: "Ethereum" }),
+      ]);
+
+      fireEvent.click(screen.getByRole("button", { name: "Switch Plan" }));
+      fireEvent.click(await screen.findByText("Ethereum"));
 
       await waitFor(() => {
         expect(screen.getByLabelText("Name")).toHaveProperty(
@@ -267,21 +247,10 @@ describe("PlansEditor", () => {
       });
     });
 
-    it("adds a transient New Plan chip while a Plan is being created", async () => {
-      renderEditor([plan({ id: "plan-1", name: "Future BTC" })]);
+    it("hides the switcher until there is a Plan to switch to", () => {
+      renderEditor();
 
-      expect(screen.getAllByRole("radio")).toHaveLength(1);
-
-      fireEvent.click(screen.getByRole("button", { name: "Create" }));
-
-      await waitFor(() => {
-        const chips = screen.getAllByRole("radio");
-        expect(chips.map((chip) => chip.textContent)).toEqual([
-          "Future BTC",
-          "New Plan",
-        ]);
-        expect(chips[1].getAttribute("aria-checked")).toBe("true");
-      });
+      expect(screen.queryByRole("button", { name: "Switch Plan" })).toBeNull();
     });
   });
 });

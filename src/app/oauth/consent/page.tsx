@@ -144,8 +144,8 @@ function OAuthConsentContent() {
                 <span>
                   <span className="font-medium">Plans</span>
                   <span className="block text-muted-foreground">
-                    Your Plans: Thesis, Invalidation, Entry, Exit, Timeframe,
-                    assigned assets, and target allocation.
+                    Your Plans: Thesis, Invalidation, Entry, Exit, assigned
+                    assets, and target allocation.
                   </span>
                 </span>
               </li>

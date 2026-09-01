@@ -23,7 +23,6 @@ export async function getUserPlans(userId: string): Promise<Plan[]> {
       invalidation: plans.invalidation,
       entry: plans.entry,
       exit: plans.exit,
-      timeframe: plans.timeframe,
       targetAllocationPercent: plans.targetAllocationPercent,
       createdAt: plans.createdAt,
       updatedAt: plans.updatedAt,
@@ -47,7 +46,6 @@ export async function getUserPlans(userId: string): Promise<Plan[]> {
           invalidation: row.invalidation,
           entry: row.entry,
           exit: row.exit,
-          timeframe: row.timeframe,
         },
         targetAllocationPercent: row.targetAllocationPercent,
         updatedAt: row.updatedAt.toISOString(),
@@ -97,7 +95,6 @@ export async function createPlan(
       invalidation: plan.details.invalidation,
       entry: plan.details.entry,
       exit: plan.details.exit,
-      timeframe: plan.details.timeframe,
       targetAllocationPercent: plan.targetAllocationPercent,
     });
     if (plan.symbols.length > 0) {
@@ -141,7 +138,6 @@ export async function updatePlan(
         invalidation: plan.details.invalidation,
         entry: plan.details.entry,
         exit: plan.details.exit,
-        timeframe: plan.details.timeframe,
         targetAllocationPercent: plan.targetAllocationPercent,
       })
       .where(and(eq(plans.id, planId), eq(plans.userId, userId)));

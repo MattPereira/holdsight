@@ -41,7 +41,6 @@ const planMissingFieldSchema = z.enum([
   "entry",
   "exit",
   "targetAllocationPercent",
-  "timeframe",
 ]);
 
 export const planDetailsSchema = z.object({
@@ -49,12 +48,11 @@ export const planDetailsSchema = z.object({
   invalidation: z.string().nullable(),
   entry: z.string().nullable(),
   exit: z.string().nullable(),
-  timeframe: z.string().nullable(),
 });
 
 export const planCompletionSchema = z.object({
-  completedFields: z.number().int().min(0).max(6),
-  totalFields: z.literal(6),
+  completedFields: z.number().int().min(0).max(5),
+  totalFields: z.literal(5),
   isComplete: z.boolean(),
   missing: z.array(planMissingFieldSchema),
 });

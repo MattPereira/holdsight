@@ -14,12 +14,11 @@ describe("Plan agent schema", () => {
           invalidation: null,
           entry: null,
           exit: null,
-          timeframe: "Five years",
         },
         targetAllocationPercent: 25,
         completion: {
           completedFields: 3,
-          totalFields: 6,
+          totalFields: 5,
           isComplete: false,
           missing: ["invalidation", "entry", "exit"],
         },

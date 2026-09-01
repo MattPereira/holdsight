@@ -302,6 +302,13 @@
       "when": 1788137873042,
       "tag": "0042_slim_puck",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1788237054199,
+      "tag": "0043_friendly_captain_cross",
+      "breakpoints": true
     }
   ]
 }

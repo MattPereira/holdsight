@@ -28,7 +28,6 @@ export const plans = pgTable(
     invalidation: text("invalidation"),
     entry: text("entry"),
     exit: text("exit"),
-    timeframe: text("timeframe"),
     targetAllocationPercent: numeric("target_allocation_percent", {
       precision: 5,
       scale: 2,

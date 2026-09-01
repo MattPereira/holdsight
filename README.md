@@ -11,7 +11,7 @@ Track portfolio allocations, document Plans, and journal trade decisions.
 
 ### Plans
 
-Define a Thesis, compare target and current allocations, and record Entry, Exit, Invalidation, and Timeframe.
+Define a Thesis, compare target and current allocations, and record Entry, Exit, and Invalidation.
 
 ![Investment Plan tracking in Holdsight](public/screenshots/theses.png)
 

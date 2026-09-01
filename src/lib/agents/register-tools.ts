@@ -192,7 +192,6 @@ function registerPlanTools(server: McpServer, userId: string) {
         invalidation: planSection("What would prove the Thesis wrong."),
         entry: planSection("Conditions for starting or increasing exposure."),
         exit: planSection("Conditions for reducing or closing exposure."),
-        timeframe: planSection("Expected holding or review horizon."),
       },
       outputSchema: planResultSchema.shape,
       annotations: {

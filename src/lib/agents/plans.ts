@@ -17,7 +17,7 @@ export type PlanMissingField =
 
 export type PlanCompletion = {
   completedFields: number;
-  totalFields: 6;
+  totalFields: 5;
   isComplete: boolean;
   missing: PlanMissingField[];
 };
@@ -75,7 +75,6 @@ export function getPlanCompletion(
     "invalidation",
     "entry",
     "exit",
-    "timeframe",
   ] as const) {
     if (details[field]?.trim()) completedFields += 1;
     else missing.push(field);
@@ -84,8 +83,8 @@ export function getPlanCompletion(
   else completedFields += 1;
   return {
     completedFields,
-    totalFields: 6,
-    isComplete: completedFields === 6,
+    totalFields: 5,
+    isComplete: completedFields === 5,
     missing,
   };
 }
@@ -98,7 +97,6 @@ function serializeAgentPlan(
     invalidation: string | null;
     entry: string | null;
     exit: string | null;
-    timeframe: string | null;
     targetAllocationPercent: number | null;
     updatedAt: Date;
   },
@@ -109,7 +107,6 @@ function serializeAgentPlan(
     invalidation: plan.invalidation,
     entry: plan.entry,
     exit: plan.exit,
-    timeframe: plan.timeframe,
   };
   return {
     id: plan.id,
@@ -129,7 +126,6 @@ const planSelection = {
   invalidation: plans.invalidation,
   entry: plans.entry,
   exit: plans.exit,
-  timeframe: plans.timeframe,
   targetAllocationPercent: plans.targetAllocationPercent,
   updatedAt: plans.updatedAt,
 };
@@ -212,7 +208,6 @@ export async function updatePlanForAgent(
     ["invalidation", "Invalidation"],
     ["entry", "Entry"],
     ["exit", "Exit"],
-    ["timeframe", "Timeframe"],
   ] as const) {
     if (patch[field] !== undefined) {
       updates[field] = normalizeSection(patch[field], label);

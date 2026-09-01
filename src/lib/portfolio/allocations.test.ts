@@ -14,7 +14,6 @@ describe("buildPortfolioAllocations", () => {
         invalidation: null,
         entry: null,
         exit: null,
-        timeframe: "Five years",
       },
       targetAllocationPercent: 30,
       updatedAt: "2026-08-30T00:00:00.000Z",

@@ -17,7 +17,7 @@ A user's record of the reasoning, emotions, market bias, notes, and images assoc
 _Avoid_: Transaction journal entry, note
 
 **Plan**:
-A user's strategy for assets connected by one shared reason, which may exist before any asset is acquired. It groups assigned assets for portfolio allocation and records the Thesis, Invalidation, Entry, Exit, target allocation, and Timeframe.
+A user's strategy for assets connected by one shared reason, which may exist before any asset is acquired. It groups assigned assets for portfolio allocation and records the Thesis, Invalidation, Entry, Exit, and target allocation.
 _Avoid_: Thesis (for the whole record), asset group
 
 **Thesis**:
@@ -35,10 +35,6 @@ _Avoid_: Trade, purchase
 **Exit**:
 The conditions for reducing or closing exposure under a Plan.
 _Avoid_: Trade, sale
-
-**Timeframe**:
-The expected holding or review horizon for a Plan.
-_Avoid_: Expiration, deadline
 
 **Target Allocation**:
 The intended percentage of the user's total portfolio assigned to a Plan. Targets across Plans are independent and may total more than 100 percent.
