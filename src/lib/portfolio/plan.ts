@@ -2,6 +2,7 @@ import { ASSET_CHART_COLORS } from "@/lib/portfolio/asset-totals";
 
 export const MAX_PLAN_NAME_LENGTH = 40;
 export const MAX_PLAN_TEXT_LENGTH = 10_000;
+export const MAX_SYMBOL_LENGTH = 12;
 
 /**
  * Field meanings and boundaries live in CONTEXT.md. Order is load-bearing:
@@ -97,18 +98,27 @@ export type NormalizedPlanInput = {
   symbols: string[];
 };
 
-function normalizeSymbols(symbols: string[]): string[] {
+function normalizeSymbols(symbols: string[]): {
+  value: string[];
+  error: string | null;
+} {
   const seen = new Set<string>();
   const result: string[] = [];
   for (const raw of symbols) {
     const symbol = raw.trim();
     if (!symbol) continue;
+    if (symbol.length > MAX_SYMBOL_LENGTH) {
+      return {
+        value: [],
+        error: `Ticker symbols must be ${MAX_SYMBOL_LENGTH} characters or fewer.`,
+      };
+    }
     const key = symbol.toUpperCase();
     if (seen.has(key)) continue;
     seen.add(key);
     result.push(symbol);
   }
-  return result;
+  return { value: result, error: null };
 }
 
 function normalizeText(
@@ -170,6 +180,9 @@ export function normalizePlanInput(
   const target = normalizeTargetAllocation(input.targetAllocationPercent);
   if (target.error) return { value: null, error: target.error };
 
+  const symbols = normalizeSymbols(input.symbols);
+  if (symbols.error) return { value: null, error: symbols.error };
+
   const requestedColor = input.color?.trim() || null;
   const color =
     requestedColor && ASSET_CHART_COLORS.includes(requestedColor)
@@ -182,7 +195,7 @@ export function normalizePlanInput(
       color,
       details,
       targetAllocationPercent: target.value,
-      symbols: normalizeSymbols(input.symbols),
+      symbols: symbols.value,
     },
     error: null,
   };

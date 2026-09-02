@@ -125,6 +125,9 @@ export const ASSET_CHART_COLORS = [
   "var(--chart-6)",
   "var(--chart-7)",
   "var(--chart-8)",
+  "var(--chart-9)",
+  "var(--chart-10)",
+  "var(--chart-11)",
 ];
 
 /**

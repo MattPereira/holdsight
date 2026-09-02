@@ -29,6 +29,15 @@ vi.mock("next/navigation", () => ({
 
 const EMPTY_DETAILS = emptyPlanDetails();
 
+/** The name lives behind the settings button now, so editing it starts there. */
+function openSettings() {
+  fireEvent.click(screen.getByRole("button", { name: "Plan settings" }));
+}
+
+function openAssetSettings() {
+  fireEvent.click(screen.getByRole("button", { name: "Asset settings" }));
+}
+
 function plan(overrides: Partial<Plan> = {}): Plan {
   return {
     id: "plan-1",
@@ -70,12 +79,14 @@ afterEach(() => {
 });
 
 describe("PlansEditor", () => {
-  it("shows every section of the form before anything is filled in", () => {
+  it("shows every section of the form before anything is filled in", async () => {
     renderEditor();
 
     for (const field of ["Plan", ...PLAN_FIELDS.map((f) => f.label)]) {
       expect(screen.getByLabelText(field)).toBeTruthy();
     }
+    openSettings();
+    expect(await screen.findByLabelText("Name")).toBeTruthy();
     // The form autosaves, so it has no submit or cancel of its own.
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
@@ -90,7 +101,8 @@ describe("PlansEditor", () => {
     });
     renderEditor();
 
-    fireEvent.change(screen.getByLabelText("Plan"), {
+    openSettings();
+    fireEvent.change(await screen.findByLabelText("Name"), {
       target: { value: "Future BTC" },
     });
     expect(actions.savePlan).not.toHaveBeenCalled();
@@ -205,7 +217,8 @@ describe("PlansEditor", () => {
     });
     renderEditor();
 
-    fireEvent.change(screen.getByLabelText("Plan"), {
+    openSettings();
+    fireEvent.change(await screen.findByLabelText("Name"), {
       target: { value: "Future BTC" },
     });
     await vi.advanceTimersByTimeAsync(1000);
@@ -216,17 +229,15 @@ describe("PlansEditor", () => {
   });
 
   describe("the Plan switcher", () => {
-    it("keeps the active Plan's name in the name input", () => {
+    it("shows the active Plan's name on the control that opens the list", () => {
       renderEditor([
         plan({ id: "plan-1", name: "Future BTC" }),
         plan({ id: "plan-2", name: "Ethereum" }),
       ]);
 
-      expect(screen.getByLabelText("Plan")).toHaveProperty(
-        "value",
-        "Future BTC",
-      );
-      expect(screen.getByRole("button", { name: "Switch Plan" })).toBeTruthy();
+      const trigger = screen.getByRole("button", { name: "Switch Plan" });
+      expect(trigger.textContent).toContain("Future BTC");
+      expect(screen.getByLabelText("Plan")).toBe(trigger);
     });
 
     it("switches the form when another Plan is picked", async () => {
@@ -239,10 +250,9 @@ describe("PlansEditor", () => {
       fireEvent.click(await screen.findByText("Ethereum"));
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Plan")).toHaveProperty(
-          "value",
-          "Ethereum",
-        );
+        expect(
+          screen.getByRole("button", { name: "Switch Plan" }).textContent,
+        ).toContain("Ethereum");
       });
     });
 
@@ -255,7 +265,10 @@ describe("PlansEditor", () => {
       renderEditor([plan({ symbols: ["BTC", "ETH"] })]);
 
       expect(screen.getByLabelText("Assets").textContent).toContain("BTC");
-      fireEvent.click(screen.getByRole("button", { name: "Clear assets" }));
+      openAssetSettings();
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Clear assets" }),
+      );
 
       await waitFor(() => {
         expect(screen.getByLabelText("Assets").textContent).toContain(
@@ -264,14 +277,88 @@ describe("PlansEditor", () => {
       });
     });
 
-    it("starts a blank Plan from the switcher", async () => {
+    it("edits the target allocation from the settings popover", async () => {
+      const existing = plan({ targetAllocationPercent: null });
+      actions.savePlan.mockResolvedValue({
+        plans: [existing],
+        plan: existing,
+        error: null,
+      });
+      renderEditor([existing]);
+
+      openSettings();
+      const target = await screen.findByLabelText("Target allocation");
+      fireEvent.change(target, { target: { value: "23" } });
+      fireEvent.blur(target);
+
+      expect(target).toHaveProperty("value", "25");
+      await vi.advanceTimersByTimeAsync(1000);
+      await waitFor(() => {
+        expect(actions.savePlan).toHaveBeenCalledWith(
+          "plan-1",
+          expect.objectContaining({ targetAllocationPercent: 25 }),
+        );
+      });
+    });
+
+    it("adds a ticker the portfolio doesn't hold", async () => {
+      const existing = plan({ symbols: [] });
+      actions.savePlan.mockResolvedValue({
+        plans: [existing],
+        plan: existing,
+        error: null,
+      });
+      renderEditor([existing]);
+
+      openAssetSettings();
+      fireEvent.change(await screen.findByLabelText("Add ticker"), {
+        target: { value: "sol" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Assets").textContent).toContain("SOL");
+      });
+      await vi.advanceTimersByTimeAsync(1000);
+      await waitFor(() => {
+        expect(actions.savePlan).toHaveBeenCalledWith(
+          "plan-1",
+          expect.objectContaining({ symbols: ["SOL"] }),
+        );
+      });
+    });
+
+    it("refuses a ticker the Plan already holds", async () => {
+      renderEditor([plan({ symbols: ["BTC"] })]);
+
+      openAssetSettings();
+      fireEvent.change(await screen.findByLabelText("Add ticker"), {
+        target: { value: "btc" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Add" }));
+
+      expect(
+        await screen.findByText("BTC is already in this Plan."),
+      ).toBeTruthy();
+    });
+
+    it("keeps starting a Plan out of the list of Plans", async () => {
       renderEditor([plan({ id: "plan-1", name: "Future BTC" })]);
 
       fireEvent.click(screen.getByRole("button", { name: "Switch Plan" }));
-      fireEvent.click(await screen.findByText("New Plan"));
+      await screen.findByPlaceholderText("Search Plans...");
+
+      expect(screen.queryByText("New Plan")).toBeNull();
+    });
+
+    it("starts a blank Plan from the settings popover", async () => {
+      renderEditor([plan({ id: "plan-1", name: "Future BTC" })]);
+
+      openSettings();
+      fireEvent.click(await screen.findByRole("button", { name: "New Plan" }));
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Plan")).toHaveProperty("value", "");
+        expect(screen.getByLabelText("Name")).toHaveProperty("value", "");
       });
     });
   });
