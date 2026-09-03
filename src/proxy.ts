@@ -10,6 +10,8 @@ const MCP_AUTHORIZATION_SERVER_METADATA_PATH =
 const MCP_PROTECTED_RESOURCE_METADATA_PREFIX =
   "/.well-known/oauth-protected-resource";
 const AUTH_ERROR_PATH = "/auth/error";
+// Link-preview crawlers are never signed in, so the OG image has to stay public.
+const OPENGRAPH_IMAGE_PATH = "/opengraph-image";
 const SIGN_IN_PATH = "/";
 
 function isAuthApiRoute(pathname: string): boolean {
@@ -28,6 +30,10 @@ export async function proxy(request: NextRequest) {
   }
 
   if (pathname === AUTH_ERROR_PATH) {
+    return NextResponse.next();
+  }
+
+  if (pathname === OPENGRAPH_IMAGE_PATH) {
     return NextResponse.next();
   }
 

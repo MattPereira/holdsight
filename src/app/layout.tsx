@@ -29,9 +29,24 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteUrl = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Holdsight",
   description: "Universal portfolio tracker",
+  openGraph: {
+    type: "website",
+    siteName: "Holdsight",
+    title: "Holdsight",
+    description: "Universal portfolio tracker",
+    url: siteUrl,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Holdsight",
+    description: "Universal portfolio tracker",
+  },
 };
 
 export default async function RootLayout({

@@ -1,7 +1,4 @@
-# HoldSight
-
-<img width="1174" height="442" alt="image" src="https://github.com/user-attachments/assets/a6b5ce5a-781f-4297-8a2b-49e957c6af2f" />
-
+![Holdsight](public/thumbnail.png)
 
 Track portfolio allocations, document Plans, and journal trade decisions.
 
