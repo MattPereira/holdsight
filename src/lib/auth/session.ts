@@ -21,21 +21,16 @@ export const getCurrentSession = cache(async () => {
 });
 
 /**
- * The signed-in user, ignoring View As and grants. Only for things that belong
- * to the session itself — signing out, or answering "who am I really?".
- */
-export async function getSessionUserId(): Promise<string | null> {
-  const session = await getCurrentSession();
-  return session?.user.id ?? null;
-}
-
-/**
  * The signed-in user *and* the authority their grant carries, or `null` if the
  * grant is gone. Checked per request rather than at sign-in, so deleting a
  * grant cuts off an existing session immediately (ADR 0005).
+ *
+ * The bare session id is deliberately not exported alongside it: an identity
+ * with no grant attached is one a call site could act on without ever asking
+ * whether it still may.
  */
 export const getCurrentActor = cache(async (): Promise<AccessGrantee | null> => {
-  const sessionUserId = await getSessionUserId();
+  const sessionUserId = (await getCurrentSession())?.user.id;
   if (!sessionUserId) return null;
 
   const actor = (await getGrantedUsers()).find(

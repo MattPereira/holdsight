@@ -52,7 +52,6 @@ const adminUser: GrantedUser = {
   role: "admin",
 };
 
-/** Signs in as `user` and, when `viewing` differs, switches the account on screen. */
 function signedInAs(user: GrantedUser, viewing: GrantedUser = user) {
   getSession.mockResolvedValue({ user: { id: user.id } });
   cookieValue.mockReturnValue(
@@ -203,7 +202,6 @@ describe("getViewedAccountCapabilities", () => {
 
     await expect(getViewedAccountCapabilities()).resolves.toEqual({
       canWrite: false,
-      canRefresh: true,
       canManageConnections: false,
     });
   });
@@ -213,7 +211,6 @@ describe("getViewedAccountCapabilities", () => {
 
     await expect(getViewedAccountCapabilities()).resolves.toEqual({
       canWrite: true,
-      canRefresh: true,
       canManageConnections: true,
     });
   });
@@ -225,7 +222,6 @@ describe("getViewedAccountCapabilities", () => {
 
     await expect(getViewedAccountCapabilities()).resolves.toEqual({
       canWrite: false,
-      canRefresh: false,
       canManageConnections: false,
     });
   });

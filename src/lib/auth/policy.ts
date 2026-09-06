@@ -53,18 +53,21 @@ export function can(
 
 export type ViewedAccountCapabilities = {
   canWrite: boolean;
-  canRefresh: boolean;
   canManageConnections: boolean;
 };
 
-/** The capability summary the UI needs to render the account on screen. */
+/**
+ * The capability summary the UI needs to render the account on screen: only
+ * what changes the rendering. Refreshing is absent on purpose — every viewer of
+ * a granted account may do it, so a control gated on it would look guarded
+ * while never denying anything.
+ */
 export function viewedAccountCapabilities(grantees: {
   actor: AccessGrantee | null;
   target: AccessGrantee | null;
 }): ViewedAccountCapabilities {
   return {
     canWrite: can("write", grantees),
-    canRefresh: can("refresh", grantees),
     canManageConnections: can("manageConnections", grantees),
   };
 }

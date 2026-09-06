@@ -25,7 +25,7 @@ const TRANSACTION = {
 function renderForm(canWrite: boolean) {
   return render(
     <ViewedAccountProvider
-      capabilities={{ canWrite, canRefresh: true, canManageConnections: false }}
+      capabilities={{ canWrite, canManageConnections: false }}
     >
       <TransactionJournalForm transaction={TRANSACTION} onBack={() => {}} />
     </ViewedAccountProvider>,

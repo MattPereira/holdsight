@@ -55,6 +55,8 @@ delete from access_grants where email = lower(btrim('member@example.com'));
 
 Revocation takes effect on that user's next request, including one with a live session: their existing session stops passing the grant check, so protected pages, account switching, reads, and writes all deny. It does not delete their data or their user row.
 
+Revoking the account someone else is *viewing* is different, and deliberately so: the stale View As cookie stops resolving, so that device drops back to its own signed-in account rather than being stranded. The banner and the sidebar change with it, and the account whose grant went away is neither readable nor writable from anywhere.
+
 ## Migrating an existing deployment
 
 Migration `0047_backfill_access_grants` inserts every existing user as a `member`, so nobody loses access when the `ALLOWED_EMAILS` environment variable goes away. Order matters:

@@ -9,8 +9,9 @@ import { RiEyeLine } from "@remixicon/react";
  * is on every page rather than only the ones with something to edit.
  *
  * `viewingAs` is the other account's name while View As is active, and `null`
- * when the signed-in user is looking at their own account — which can still be
- * read-only, if their grant was demoted mid-session.
+ * on the signed-in user's own account, which stays quiet: their own account is
+ * writable for as long as they hold any grant at all, and losing the grant
+ * replaces the whole app with the revoked notice.
  */
 export function ViewingAsBanner({
   viewingAs,
@@ -19,11 +20,9 @@ export function ViewingAsBanner({
   viewingAs: string | null;
   canWrite: boolean;
 }) {
-  if (!viewingAs && canWrite) return null;
+  if (!viewingAs) return null;
 
-  const label = viewingAs
-    ? `Viewing as ${viewingAs}${canWrite ? "" : " — read only"}`
-    : "Read only";
+  const label = `Viewing as ${viewingAs}${canWrite ? "" : " — read only"}`;
 
   return (
     <div

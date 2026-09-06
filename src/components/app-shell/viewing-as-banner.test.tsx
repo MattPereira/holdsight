@@ -22,17 +22,9 @@ describe("ViewingAsBanner", () => {
     );
   });
 
-  it("stays quiet when the signed-in user is writing their own account", () => {
+  it("stays quiet on the signed-in user's own account", () => {
     render(<ViewingAsBanner viewingAs={null} canWrite />);
 
     expect(screen.queryByRole("status")).toBeNull();
-  });
-
-  // An account switch is not the only way to lose write authority: a demoted
-  // actor looking at their own account still needs to be told.
-  it("reports read only on the signed-in user's own account", () => {
-    render(<ViewingAsBanner viewingAs={null} canWrite={false} />);
-
-    expect(screen.getByRole("status").textContent).toBe("Read only");
   });
 });

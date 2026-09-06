@@ -35,12 +35,13 @@ export type ViewedAccountAuthorization =
  * call site can scope to it without naming what it means to do.
  */
 const viewedAccount = cache(async (): Promise<AccessGrantee | null> => {
-  const [actor, users] = await Promise.all([
-    getCurrentActor(),
-    getGrantedUsers(),
-  ]);
+  // Nothing is on screen for a signed-out request, so it never reaches the
+  // grants query — `getCurrentActor` has already made and cached that call for
+  // every request that does.
+  const actor = await getCurrentActor();
   if (!actor) return null;
 
+  const users = await getGrantedUsers();
   const targetUserId = resolveEffectiveUserId({
     sessionUserId: actor.userId,
     cookieValue: (await cookies()).get(VIEW_AS_COOKIE)?.value,

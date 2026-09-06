@@ -48,7 +48,7 @@ const connections: AccountConnectionsResult = {
 function renderView(canManageConnections: boolean) {
   return render(
     <ViewedAccountProvider
-      capabilities={{ canWrite: false, canRefresh: true, canManageConnections }}
+      capabilities={{ canWrite: false, canManageConnections }}
     >
       <AccountConnectView connections={connections} />
     </ViewedAccountProvider>,

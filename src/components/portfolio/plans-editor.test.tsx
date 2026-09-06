@@ -55,7 +55,7 @@ function plan(overrides: Partial<Plan> = {}): Plan {
 function renderEditor(initialPlans: Plan[] = [], canWrite = true) {
   return render(
     <ViewedAccountProvider
-      capabilities={{ canWrite, canRefresh: true, canManageConnections: false }}
+      capabilities={{ canWrite, canManageConnections: false }}
     >
       <PlansProvider initialPlans={initialPlans}>
         <PlansEditor portfolioSummary={{ grandTotalValue: 0, totals: [] }} />

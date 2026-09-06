@@ -50,7 +50,6 @@ describe("viewedAccountCapabilities", () => {
   it("reports full authority for an admin viewing a member", () => {
     expect(viewedAccountCapabilities({ actor: admin, target: member })).toEqual({
       canWrite: true,
-      canRefresh: true,
       canManageConnections: true,
     });
   });
@@ -58,7 +57,6 @@ describe("viewedAccountCapabilities", () => {
   it("reports read-only, refreshable state for a member viewing an admin", () => {
     expect(viewedAccountCapabilities({ actor: member, target: admin })).toEqual({
       canWrite: false,
-      canRefresh: true,
       canManageConnections: false,
     });
   });
@@ -66,7 +64,6 @@ describe("viewedAccountCapabilities", () => {
   it("reports nothing when the actor's grant is gone", () => {
     expect(viewedAccountCapabilities({ actor: null, target: admin })).toEqual({
       canWrite: false,
-      canRefresh: false,
       canManageConnections: false,
     });
   });
