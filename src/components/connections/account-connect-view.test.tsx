@@ -62,6 +62,7 @@ describe("connections for an account the viewer may not configure", () => {
     renderView(false);
 
     expect(screen.getByText("Cold wallet")).toBeDefined();
+    expect(screen.getByText("0xabc")).toBeDefined();
     expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
     expect(screen.queryByRole("button", { name: /Remove 0xabc/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Rename 0xabc/ })).toBeNull();

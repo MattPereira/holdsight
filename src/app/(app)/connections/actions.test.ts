@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { AccessAction } from "@/lib/auth/policy";
+
 const authorizedViewedAccountId =
-  vi.fn<(action: string) => Promise<string | null>>();
+  vi.fn<(action: AccessAction) => Promise<string | null>>();
 const getCurrentUserId = vi.fn<() => Promise<string | null>>();
 
 const evm = vi.hoisted(() => ({
@@ -27,7 +29,7 @@ const plaidItems = vi.hoisted(() => ({
 // import time; the seam under test is the authorization call, not the queries.
 vi.mock("@/db", () => ({ db: {} }));
 vi.mock("@/lib/auth/authorize", () => ({
-  authorizedViewedAccountId: (action: string) =>
+  authorizedViewedAccountId: (action: AccessAction) =>
     authorizedViewedAccountId(action),
 }));
 vi.mock("@/lib/auth/session", () => ({
