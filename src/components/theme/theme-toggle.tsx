@@ -5,19 +5,22 @@ import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
 
+// Both icons ship and CSS picks: the resolved theme is unknowable on the
+// server, so branching on it here would mismatch on hydration.
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
 
   return (
     <Button
       type="button"
       variant="ghost"
       size="icon"
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      onClick={() => setTheme(isDark ? "light" : "dark")}
+      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
     >
-      {isDark ? <RiSunLine /> : <RiMoonLine />}
+      <RiMoonLine className="dark:hidden" />
+      <RiSunLine className="hidden dark:block" />
+      <span className="sr-only dark:hidden">Switch to dark mode</span>
+      <span className="sr-only hidden dark:inline">Switch to light mode</span>
     </Button>
   );
 }
