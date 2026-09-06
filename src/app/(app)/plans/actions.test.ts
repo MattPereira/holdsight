@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ViewedAccountAuthorization } from "@/lib/auth/authorize";
-
-const authorizeViewedAccount =
-  vi.fn<() => Promise<ViewedAccountAuthorization>>();
+const writableViewedAccountId = vi.fn<() => Promise<string | null>>();
 const plans = vi.hoisted(() => ({
   createPlan: vi.fn(),
   getUserPlans: vi.fn(),
@@ -12,17 +9,10 @@ const plans = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/authorize", () => ({
-  authorizeViewedAccount: () => authorizeViewedAccount(),
+  writableViewedAccountId: () => writableViewedAccountId(),
 }));
 vi.mock("@/lib/portfolio/plans", () => plans);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-// Next's real `forbidden()` throws an HTTP-access-fallback error the framework
-// turns into a 403; the throw is what the action's callers must not swallow.
-vi.mock("next/navigation", () => ({
-  forbidden: () => {
-    throw new Error("FORBIDDEN");
-  },
-}));
 
 const { deletePlan, savePlan } = await import("@/app/(app)/plans/actions");
 
@@ -42,11 +32,9 @@ beforeEach(() => {
 });
 
 describe("Plan writes against a foreign account", () => {
+  // A refused write never returns: the seam answers 403 via `forbidden()`.
   beforeEach(() => {
-    authorizeViewedAccount.mockResolvedValue({
-      status: "forbidden",
-      userId: "admin",
-    });
+    writableViewedAccountId.mockRejectedValue(new Error("FORBIDDEN"));
   });
 
   it("refuses to delete", async () => {
@@ -67,10 +55,7 @@ describe("Plan writes against a foreign account", () => {
 
 describe("Plan writes the policy allows", () => {
   beforeEach(() => {
-    authorizeViewedAccount.mockResolvedValue({
-      status: "authorized",
-      userId: "member",
-    });
+    writableViewedAccountId.mockResolvedValue("member");
   });
 
   it("deletes against the viewed account", async () => {
@@ -91,7 +76,7 @@ describe("Plan writes the policy allows", () => {
 
 describe("Plan writes without a session", () => {
   it("refuses to save", async () => {
-    authorizeViewedAccount.mockResolvedValue({ status: "unauthenticated" });
+    writableViewedAccountId.mockResolvedValue(null);
 
     const result = await savePlan(null, PLAN_INPUT);
 

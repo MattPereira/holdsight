@@ -1,9 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { forbidden } from "next/navigation";
 
-import { authorizeViewedAccount } from "@/lib/auth/authorize";
+import { writableViewedAccountId } from "@/lib/auth/authorize";
 import type { Plan, PlanInput } from "@/lib/portfolio/plan";
 import {
   createPlan as createPlanRecord,
@@ -19,24 +18,6 @@ export type PlanActionResult = {
 
 const SIGNED_OUT_MESSAGE = "You must be signed in to manage Plans.";
 
-/**
- * The account a Plan write may touch, or the signed-out result. A member aiming
- * at the other account gets `forbidden()` — a real 403 — rather than a value,
- * so no caller below can fall back to writing the actor's own account instead
- * (ADR 0005).
- */
-async function writableAccount(): Promise<
-  { writable: true; userId: string } | { writable: false; result: PlanActionResult }
-> {
-  const authorization = await authorizeViewedAccount("write");
-  if (authorization.status === "forbidden") forbidden();
-  if (authorization.status === "unauthenticated") {
-    return { writable: false, result: { plans: [], error: SIGNED_OUT_MESSAGE } };
-  }
-
-  return { writable: true, userId: authorization.userId };
-}
-
 function revalidatePlanPaths(): void {
   revalidatePath("/");
   revalidatePath("/wallets");
@@ -45,11 +26,11 @@ function revalidatePlanPaths(): void {
 }
 
 export async function deletePlan(planId: string): Promise<PlanActionResult> {
-  const account = await writableAccount();
-  if (!account.writable) return account.result;
+  const userId = await writableViewedAccountId();
+  if (!userId) return { plans: [], error: SIGNED_OUT_MESSAGE };
 
-  await removePlan(account.userId, planId);
-  const plans = await getUserPlans(account.userId);
+  await removePlan(userId, planId);
+  const plans = await getUserPlans(userId);
   revalidatePlanPaths();
   return { plans, error: null };
 }
@@ -70,10 +51,9 @@ export async function savePlan(
   planId: string | null,
   input: PlanInput,
 ): Promise<PlanSaveResult> {
-  const account = await writableAccount();
-  if (!account.writable) return { ...account.result, plan: null };
+  const userId = await writableViewedAccountId();
+  if (!userId) return { plans: [], plan: null, error: SIGNED_OUT_MESSAGE };
 
-  const userId = account.userId;
   const knownIds = planId
     ? null
     : new Set((await getUserPlans(userId)).map((plan) => plan.id));

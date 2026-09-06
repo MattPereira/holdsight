@@ -1,5 +1,7 @@
 import "server-only";
 
+import { forbidden } from "next/navigation";
+
 import { getGrantedUsers } from "@/lib/auth/granted-users";
 import {
   can,
@@ -51,6 +53,18 @@ export async function authorizeViewedAccount(
   return can(action, { actor, target })
     ? { status: "authorized", userId: target.userId }
     : { status: "forbidden", userId: target.userId };
+}
+
+/**
+ * The viewed account when the signed-in user may write it, or `null` when
+ * nobody is signed in. A member aiming at the other account never gets a value
+ * back: `forbidden()` answers 403, so no caller can fall back to writing the
+ * actor's own account instead (ADR 0005).
+ */
+export async function writableViewedAccountId(): Promise<string | null> {
+  const authorization = await authorizeViewedAccount("write");
+  if (authorization.status === "forbidden") forbidden();
+  return authorization.status === "authorized" ? authorization.userId : null;
 }
 
 /** What the client may render for the account on screen. Server checks stand. */

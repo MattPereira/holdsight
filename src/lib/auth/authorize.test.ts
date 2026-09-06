@@ -13,10 +13,19 @@ vi.mock("@/lib/auth/session", () => ({
 vi.mock("@/lib/auth/granted-users", () => ({
   getGrantedUsers: () => getGrantedUsers(),
 }));
+// Next's real `forbidden()` throws an HTTP-access-fallback error the framework
+// turns into a 403; the throw is what callers must not be able to swallow.
+vi.mock("next/navigation", () => ({
+  forbidden: () => {
+    throw new Error("FORBIDDEN");
+  },
+}));
 
-const { authorizeViewedAccount, getViewedAccountCapabilities } = await import(
-  "@/lib/auth/authorize"
-);
+const {
+  authorizeViewedAccount,
+  getViewedAccountCapabilities,
+  writableViewedAccountId,
+} = await import("@/lib/auth/authorize");
 
 const memberUser: GrantedUser = {
   id: "member",
@@ -96,6 +105,29 @@ describe("authorizeViewedAccount", () => {
     await expect(authorizeViewedAccount("write")).resolves.toEqual({
       status: "unauthenticated",
     });
+  });
+});
+
+describe("writableViewedAccountId", () => {
+  it("hands back the viewed account an admin may write", async () => {
+    signedInAs(adminUser, memberUser);
+
+    await expect(writableViewedAccountId()).resolves.toBe("member");
+  });
+
+  // 403 rather than a value: a caller that got the actor's own id back would
+  // write the wrong account.
+  it("answers 403 rather than an id a member may not write", async () => {
+    signedInAs(memberUser, adminUser);
+
+    await expect(writableViewedAccountId()).rejects.toThrow("FORBIDDEN");
+  });
+
+  it("hands back nothing when nobody is signed in", async () => {
+    getCurrentActor.mockResolvedValue(null);
+    getCurrentUserId.mockResolvedValue(null);
+
+    await expect(writableViewedAccountId()).resolves.toBeNull();
   });
 });
 

@@ -4,6 +4,7 @@ import type { ViewedAccountAuthorization } from "@/lib/auth/authorize";
 
 const authorizeViewedAccount =
   vi.fn<() => Promise<ViewedAccountAuthorization>>();
+const writableViewedAccountId = vi.fn<() => Promise<string | null>>();
 const journal = vi.hoisted(() => ({
   getUserInvestmentTransactionJournalEntry: vi.fn(),
   removeUserInvestmentTransactionJournalEntry: vi.fn(),
@@ -13,16 +14,10 @@ const journal = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth/authorize", () => ({
   authorizeViewedAccount: () => authorizeViewedAccount(),
+  writableViewedAccountId: () => writableViewedAccountId(),
 }));
 vi.mock("@/lib/journal/transaction-entry", () => journal);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-// Next's real `forbidden()` throws an HTTP-access-fallback error the framework
-// turns into a 403; the throw is what the action's callers must not swallow.
-vi.mock("next/navigation", () => ({
-  forbidden: () => {
-    throw new Error("FORBIDDEN");
-  },
-}));
 
 const {
   getTransactionJournalEntry,
@@ -47,11 +42,9 @@ beforeEach(() => {
 });
 
 describe("Trade Journal Entry writes against a foreign account", () => {
+  // A refused write never returns: the seam answers 403 via `forbidden()`.
   beforeEach(() => {
-    authorizeViewedAccount.mockResolvedValue({
-      status: "forbidden",
-      userId: "admin",
-    });
+    writableViewedAccountId.mockRejectedValue(new Error("FORBIDDEN"));
   });
 
   it("refuses to save without falling back to the actor's account", async () => {
@@ -92,10 +85,7 @@ describe("Trade Journal Entry writes against a foreign account", () => {
 
 describe("Trade Journal Entry writes the policy allows", () => {
   beforeEach(() => {
-    authorizeViewedAccount.mockResolvedValue({
-      status: "authorized",
-      userId: "member",
-    });
+    writableViewedAccountId.mockResolvedValue("member");
   });
 
   it("saves against the viewed account", async () => {
@@ -118,7 +108,7 @@ describe("Trade Journal Entry writes the policy allows", () => {
 
 describe("Trade Journal Entry writes without a session", () => {
   it("refuses to save", async () => {
-    authorizeViewedAccount.mockResolvedValue({ status: "unauthenticated" });
+    writableViewedAccountId.mockResolvedValue(null);
 
     const result = await saveTransactionJournalEntry("trade-1", INPUT, null);
 

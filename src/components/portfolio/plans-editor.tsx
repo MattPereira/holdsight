@@ -102,6 +102,16 @@ type EditorSession = {
   plan: Plan | null;
 };
 
+/**
+ * The two reasons a Plan control can't be used. They are not the same thing —
+ * `disabled` is transient (a delete in flight), `readOnly` is authority — and
+ * they render differently, so every control needs both rather than one flag.
+ */
+type PlanEditability = {
+  disabled: boolean;
+  readOnly: boolean;
+};
+
 const EMPTY_DRAFT: PlanDraft = {
   name: "",
   color: null,
@@ -390,8 +400,7 @@ export function PlansEditor({
             activePlan ? (currentAllocationByPlanId.get(activePlan.id) ?? 0) : 0
           }
           saveError={saveError}
-          disabled={isPending}
-          readOnly={readOnly}
+          editability={{ disabled: isPending, readOnly }}
           settingsOpen={settingsOpen}
           onSettingsOpenChange={setSettingsOpen}
           onNameChange={updateName}
@@ -420,18 +429,17 @@ function AllocationProgress({
   currentAllocationPercent,
   targetAllocationPercent,
   targetAllocationValue,
-  disabled,
-  readOnly,
+  editability,
   onTargetAllocationChange,
 }: {
   color: string | null;
   currentAllocationPercent: number;
   targetAllocationPercent: number | null;
   targetAllocationValue: string;
-  disabled: boolean;
-  readOnly: boolean;
+  editability: PlanEditability;
   onTargetAllocationChange: (value: string) => void;
 }) {
+  const { disabled, readOnly } = editability;
   const [isEditingTarget, setIsEditingTarget] = useState(false);
   const hasTarget = targetAllocationPercent !== null;
   const isOverTarget =
@@ -541,8 +549,7 @@ function PlanForm({
   selectableSymbols,
   currentAllocationPercent,
   saveError,
-  disabled,
-  readOnly,
+  editability,
   settingsOpen,
   onSettingsOpenChange,
   onNameChange,
@@ -563,8 +570,7 @@ function PlanForm({
   selectableSymbols: string[];
   currentAllocationPercent: number;
   saveError: string | null;
-  disabled: boolean;
-  readOnly: boolean;
+  editability: PlanEditability;
   settingsOpen: boolean;
   onSettingsOpenChange: (open: boolean) => void;
   onNameChange: (value: string) => void;
@@ -579,6 +585,7 @@ function PlanForm({
   onDelete: () => void;
   canDelete: boolean;
 }) {
+  const { disabled, readOnly } = editability;
   const selected = new Set(draft.symbols.map(symbolKey));
   const selectedSymbols = selectableSymbols.filter((symbol) =>
     selected.has(symbolKey(symbol)),
@@ -621,8 +628,7 @@ function PlanForm({
                 name={draft.name}
                 color={draft.color}
                 targetAllocation={draft.targetAllocation}
-                disabled={disabled}
-                readOnly={readOnly}
+                editability={editability}
                 canDelete={canDelete}
                 onNameChange={onNameChange}
                 onColorChange={onColorChange}
@@ -653,8 +659,7 @@ function PlanForm({
               placeholder={field.prompt}
               value={draft.details[field.key]}
               onChange={(value) => onDetailChange(field.key, value)}
-              disabled={disabled}
-              readOnly={readOnly}
+              editability={editability}
             />
           ))}
         </div>
@@ -664,8 +669,7 @@ function PlanForm({
           currentAllocationPercent={currentAllocationPercent}
           targetAllocationPercent={targetAllocationPercent}
           targetAllocationValue={draft.targetAllocation}
-          disabled={disabled}
-          readOnly={readOnly}
+          editability={editability}
           onTargetAllocationChange={onTargetAllocationChange}
         />
       </FieldGroup>
@@ -679,16 +683,14 @@ function PlanTextField({
   placeholder,
   value,
   onChange,
-  disabled,
-  readOnly,
+  editability: { disabled, readOnly },
 }: {
   id: string;
   label: string;
   placeholder: string;
   value: string | null;
   onChange: (value: string) => void;
-  disabled: boolean;
-  readOnly: boolean;
+  editability: PlanEditability;
 }) {
   return (
     <Field data-disabled={disabled}>
@@ -724,8 +726,7 @@ function PlanSettings({
   name,
   color,
   targetAllocation,
-  disabled,
-  readOnly,
+  editability: { disabled, readOnly },
   canDelete,
   onNameChange,
   onColorChange,
@@ -738,8 +739,7 @@ function PlanSettings({
   name: string;
   color: string | null;
   targetAllocation: string;
-  disabled: boolean;
-  readOnly: boolean;
+  editability: PlanEditability;
   canDelete: boolean;
   onNameChange: (value: string) => void;
   onColorChange: (value: string | null) => void;
