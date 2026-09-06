@@ -1,6 +1,10 @@
 import { z } from "zod";
 
-import { getCurrentUserId } from "@/lib/auth/session";
+import {
+  authorizeViewedAccount,
+  type ViewedAccountAuthorization,
+} from "@/lib/auth/authorize";
+import { deniedResponse } from "@/lib/auth/denied-response";
 import {
   getUserInvestmentTransactionJournalImages,
   MAX_JOURNAL_IMAGE_COUNT,
@@ -21,10 +25,14 @@ const uploadErrorResponse = (
   });
 
 async function requestContext(
+  action: "read" | "write",
   params: Promise<{ transactionId: string }>,
-): Promise<{ userId: string | null; transactionId: string | null }> {
-  const [userId, routeParams] = await Promise.all([
-    getCurrentUserId(),
+): Promise<{
+  authorization: ViewedAccountAuthorization;
+  transactionId: string | null;
+}> {
+  const [authorization, routeParams] = await Promise.all([
+    authorizeViewedAccount(action),
     params,
   ]);
   const parsedTransactionId = transactionIdSchema.safeParse(
@@ -32,7 +40,7 @@ async function requestContext(
   );
 
   return {
-    userId,
+    authorization,
     transactionId: parsedTransactionId.success
       ? parsedTransactionId.data
       : null,
@@ -43,16 +51,16 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ transactionId: string }> },
 ): Promise<Response> {
-  const { userId, transactionId } = await requestContext(params);
-  if (!userId) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const { authorization, transactionId } = await requestContext("read", params);
+  if (authorization.status !== "authorized") {
+    return deniedResponse(authorization);
   }
   if (!transactionId) {
     return Response.json({ error: "Invalid transaction ID." }, { status: 400 });
   }
 
   const images = await getUserInvestmentTransactionJournalImages(
-    userId,
+    authorization.userId,
     transactionId,
   );
   if (!images) {
@@ -73,16 +81,22 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ transactionId: string }> },
 ): Promise<Response> {
-  const { userId, transactionId } = await requestContext(params);
-  if (!userId) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const { authorization, transactionId } = await requestContext(
+    "write",
+    params,
+  );
+  if (authorization.status !== "authorized") {
+    return deniedResponse(authorization);
   }
   if (!transactionId) {
     return Response.json({ error: "Invalid transaction ID." }, { status: 400 });
   }
 
   const contentLength = Number(request.headers.get("content-length"));
-  if (Number.isFinite(contentLength) && contentLength > MAX_MULTIPART_BODY_BYTES) {
+  if (
+    Number.isFinite(contentLength) &&
+    contentLength > MAX_MULTIPART_BODY_BYTES
+  ) {
     return uploadErrorResponse("image_too_large");
   }
 
@@ -97,7 +111,7 @@ export async function POST(
   if (!(file instanceof File)) return uploadErrorResponse("invalid_file");
 
   const result = await uploadUserInvestmentTransactionJournalImage(
-    userId,
+    authorization.userId,
     transactionId,
     file,
   );

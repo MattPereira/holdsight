@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { EMAIL_NOT_ALLOWED } from "@/lib/auth/access-error";
+import { EMAIL_NOT_ALLOWED } from "@/lib/auth/access-error-code";
 import {
   normalizeEmail,
   requireAccessGrant,

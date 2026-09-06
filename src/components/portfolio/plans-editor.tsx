@@ -12,6 +12,7 @@ import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { deletePlan, savePlan } from "@/app/(app)/plans/actions";
+import { useViewedAccount } from "@/components/auth/viewed-account-context";
 import { usePlans } from "@/components/portfolio/plans-context";
 import {
   AlertDialog,
@@ -161,6 +162,9 @@ export function PlansEditor({
   portfolioSummary: PortfolioAssetSummary;
 }) {
   const { plans, setPlans } = usePlans();
+  // A member reading the other granted account sees the Plans and none of the
+  // controls the server would refuse (ADR 0005).
+  const readOnly = !useViewedAccount().canWrite;
   const allSymbols = portfolioSummary.totals.map((total) => total.symbol);
   const currentAllocationByPlanId = useMemo(() => {
     const allocations = buildPortfolioAllocations({
@@ -230,7 +234,9 @@ export function PlansEditor({
   const autosave = useAutosaveEntry<PlanDraft, Plan>({
     key: session.key,
     initialEntry: session.plan,
-    enabled: nameFilled,
+    // Parked outright on an account this user may only read, so no stray edit
+    // path can queue a save the server would refuse.
+    enabled: nameFilled && !readOnly,
     draftFromEntry: draftFromPlan,
     sameDraft,
     save: async (snapshot, currentEntry) => {
@@ -385,6 +391,7 @@ export function PlansEditor({
           }
           saveError={saveError}
           disabled={isPending}
+          readOnly={readOnly}
           settingsOpen={settingsOpen}
           onSettingsOpenChange={setSettingsOpen}
           onNameChange={updateName}
@@ -414,6 +421,7 @@ function AllocationProgress({
   targetAllocationPercent,
   targetAllocationValue,
   disabled,
+  readOnly,
   onTargetAllocationChange,
 }: {
   color: string | null;
@@ -421,6 +429,7 @@ function AllocationProgress({
   targetAllocationPercent: number | null;
   targetAllocationValue: string;
   disabled: boolean;
+  readOnly: boolean;
   onTargetAllocationChange: (value: string) => void;
 }) {
   const [isEditingTarget, setIsEditingTarget] = useState(false);
@@ -446,6 +455,14 @@ function AllocationProgress({
   const currentLabel = `${allocationPercentFormat.format(
     currentAllocationPercent,
   )}${hasTarget ? "" : "%"}`;
+
+  // Read-only accounts show the target as plain text, and show nothing at all
+  // where a writer would see the "Set target" button.
+  const targetLabel = hasTarget ? (
+    <span className="px-1 text-base font-semibold tabular-nums tracking-tight">
+      {`${targetAllocationPercent}%`}
+    </span>
+  ) : null;
 
   return (
     <Field data-disabled={disabled}>
@@ -482,6 +499,8 @@ function AllocationProgress({
               autoFocus
               disabled={disabled}
             />
+          ) : readOnly ? (
+            targetLabel
           ) : (
             <Button
               type="button"
@@ -523,6 +542,7 @@ function PlanForm({
   currentAllocationPercent,
   saveError,
   disabled,
+  readOnly,
   settingsOpen,
   onSettingsOpenChange,
   onNameChange,
@@ -544,6 +564,7 @@ function PlanForm({
   currentAllocationPercent: number;
   saveError: string | null;
   disabled: boolean;
+  readOnly: boolean;
   settingsOpen: boolean;
   onSettingsOpenChange: (open: boolean) => void;
   onNameChange: (value: string) => void;
@@ -601,6 +622,7 @@ function PlanForm({
                 color={draft.color}
                 targetAllocation={draft.targetAllocation}
                 disabled={disabled}
+                readOnly={readOnly}
                 canDelete={canDelete}
                 onNameChange={onNameChange}
                 onColorChange={onColorChange}
@@ -618,7 +640,7 @@ function PlanForm({
             onToggle={onToggleSymbol}
             onClear={onClearSymbols}
             onAdd={onAddSymbol}
-            disabled={disabled}
+            disabled={disabled || readOnly}
           />
         </div>
 
@@ -632,6 +654,7 @@ function PlanForm({
               value={draft.details[field.key]}
               onChange={(value) => onDetailChange(field.key, value)}
               disabled={disabled}
+              readOnly={readOnly}
             />
           ))}
         </div>
@@ -642,6 +665,7 @@ function PlanForm({
           targetAllocationPercent={targetAllocationPercent}
           targetAllocationValue={draft.targetAllocation}
           disabled={disabled}
+          readOnly={readOnly}
           onTargetAllocationChange={onTargetAllocationChange}
         />
       </FieldGroup>
@@ -656,6 +680,7 @@ function PlanTextField({
   value,
   onChange,
   disabled,
+  readOnly,
 }: {
   id: string;
   label: string;
@@ -663,6 +688,7 @@ function PlanTextField({
   value: string | null;
   onChange: (value: string) => void;
   disabled: boolean;
+  readOnly: boolean;
 }) {
   return (
     <Field data-disabled={disabled}>
@@ -678,6 +704,9 @@ function PlanTextField({
         maxLength={MAX_PLAN_TEXT_LENGTH}
         rows={3}
         disabled={disabled}
+        // Read-only rather than disabled: someone reading the other account
+        // still has to be able to read the prose.
+        readOnly={readOnly}
       />
     </Field>
   );
@@ -696,6 +725,7 @@ function PlanSettings({
   color,
   targetAllocation,
   disabled,
+  readOnly,
   canDelete,
   onNameChange,
   onColorChange,
@@ -709,6 +739,7 @@ function PlanSettings({
   color: string | null;
   targetAllocation: string;
   disabled: boolean;
+  readOnly: boolean;
   canDelete: boolean;
   onNameChange: (value: string) => void;
   onColorChange: (value: string | null) => void;
@@ -748,6 +779,7 @@ function PlanSettings({
                 required
                 autoComplete="off"
                 disabled={disabled}
+                readOnly={readOnly}
               />
             </Field>
 
@@ -774,6 +806,7 @@ function PlanSettings({
                     )
                   }
                   disabled={disabled}
+                  readOnly={readOnly}
                 />
                 <InputGroupAddon align="inline-end">%</InputGroupAddon>
               </InputGroup>
@@ -793,7 +826,7 @@ function PlanSettings({
                     style={{ backgroundColor: option }}
                     aria-label={`Use color ${index + 1}`}
                     aria-pressed={color === option}
-                    disabled={disabled}
+                    disabled={disabled || readOnly}
                     onClick={() => onColorChange(option)}
                   />
                 ))}
@@ -802,33 +835,36 @@ function PlanSettings({
 
             {/* The two Plan-level actions share the bottom row, pushed to
                 opposite ends: deleting is the one thing here you can't take
-                back, so it never sits next to the button beside it. */}
-            <div className="-mx-3 -mb-3 flex items-center justify-between gap-2 border-t bg-muted/40 px-2 py-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                disabled={disabled || !canDelete}
-                onClick={() => {
-                  onOpenChange(false);
-                  setConfirmingDelete(true);
-                }}
-              >
-                <RiDeleteBinLine />
-                Delete Plan
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={disabled}
-                onClick={() => onNewPlan()}
-              >
-                <RiAddLine />
-                New Plan
-              </Button>
-            </div>
+                back, so it never sits next to the button beside it. Neither is
+                offered on an account this user may only read. */}
+            {readOnly ? null : (
+              <div className="-mx-3 -mb-3 flex items-center justify-between gap-2 border-t bg-muted/40 px-2 py-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  disabled={disabled || !canDelete}
+                  onClick={() => {
+                    onOpenChange(false);
+                    setConfirmingDelete(true);
+                  }}
+                >
+                  <RiDeleteBinLine />
+                  Delete Plan
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={disabled}
+                  onClick={() => onNewPlan()}
+                >
+                  <RiAddLine />
+                  New Plan
+                </Button>
+              </div>
+            )}
           </div>
         </PopoverContent>
       </Popover>

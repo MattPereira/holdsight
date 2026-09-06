@@ -12,6 +12,10 @@ _Avoid_: Personal-only instance, single-user instance, public instance
 An event where a user exchanged one asset for another — a buy, sell, or swap. A Trade is one kind of Investment Transaction; transfers, deposits, withdrawals, fees, dividends, and interest are not Trades. Trades are the decisions the app helps users reflect on.
 _Avoid_: Transaction (for the swap event itself), order, position
 
+**Viewed Account**:
+The granted user whose data is currently on screen. Account switching chooses it; it is separate from the signed-in actor, and choosing it confers no authority to change it.
+_Avoid_: Current user, active account, Investment Account
+
 **Trade Journal Entry**:
 A user's record of the reasoning, emotions, market bias, notes, and images associated with one specific Trade.
 _Avoid_: Transaction journal entry, note

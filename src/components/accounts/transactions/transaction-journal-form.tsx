@@ -14,6 +14,7 @@ import {
   Leg,
   transactionLegs,
 } from "@/components/accounts/transactions/transaction-legs";
+import { useViewedAccount } from "@/components/auth/viewed-account-context";
 import { SaveIndicator } from "@/components/forms/save-indicator";
 import { Button } from "@/components/ui/button";
 import {
@@ -108,6 +109,9 @@ export function TransactionJournalForm({
   onBack: () => void;
 }) {
   const router = useRouter();
+  // A member reading the other granted account keeps the entry visible and
+  // loses every control the server would refuse (ADR 0005).
+  const readOnly = !useViewedAccount().canWrite;
   const [loading, setLoading] = useState(true);
   const [imageMutationPending, setImageMutationPending] = useState(false);
 
@@ -116,7 +120,9 @@ export function TransactionJournalForm({
   const autosave = useAutosaveEntry<FormState, TransactionJournalEntry>({
     key: transactionId,
     initialEntry: null,
-    enabled: !loading,
+    // Parked outright on a read-only account, so no stray edit path can queue
+    // a save the server would refuse.
+    enabled: !loading && !readOnly,
     draftFromEntry: formFromEntry,
     sameDraft: sameForm,
     save: (snapshot, currentEntry, overwrite) =>
@@ -263,7 +269,7 @@ export function TransactionJournalForm({
           <Label htmlFor="journal-reason">Reason</Label>
           <Select
             value={form.tradeReason ?? NONE_VALUE}
-            disabled={loading}
+            disabled={loading || readOnly}
             onValueChange={(value) =>
               updateImmediately((prev) => ({
                 ...prev,
@@ -299,7 +305,7 @@ export function TransactionJournalForm({
                 <button
                   key={value}
                   type="button"
-                  disabled={loading}
+                  disabled={loading || readOnly}
                   aria-pressed={selected}
                   onClick={() =>
                     updateImmediately((prev) => ({
@@ -331,7 +337,7 @@ export function TransactionJournalForm({
           <Slider
             id="journal-market-bias"
             className="w-full"
-            disabled={loading}
+            disabled={loading || readOnly}
             min={MARKET_BIAS_MIN}
             max={MARKET_BIAS_MAX}
             step={1}
@@ -368,7 +374,7 @@ export function TransactionJournalForm({
                 <button
                   key={value}
                   type="button"
-                  disabled={loading}
+                  disabled={loading || readOnly}
                   aria-pressed={selected}
                   onClick={() => toggleEmotion(value)}
                   className={cn(
@@ -393,6 +399,9 @@ export function TransactionJournalForm({
             placeholder="What was the thinking behind this trade?"
             value={form.note}
             disabled={loading}
+            // Read-only rather than disabled: the note still has to be legible
+            // to whoever is reading the account.
+            readOnly={readOnly}
             onChange={(event) =>
               autosave.setDraft((prev) => ({
                 ...prev,
@@ -406,6 +415,7 @@ export function TransactionJournalForm({
           endpoint={`/api/investment-transactions/${transactionId}/journal-images`}
           open
           disabled={loading}
+          readOnly={readOnly}
           onEntryVersionChanged={handleEntryVersionChanged}
           onPendingChange={setImageMutationPending}
           beforeMutation={autosave.flushBeforeMutation}

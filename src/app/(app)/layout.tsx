@@ -4,12 +4,14 @@ import { AppSidebar } from "@/components/app-shell/app-sidebar";
 import { AccessRevoked } from "@/components/auth/access-revoked";
 import { LoginForm } from "@/components/auth/login-form";
 import { PlansProvider } from "@/components/portfolio/plans-context";
+import { ViewedAccountProvider } from "@/components/auth/viewed-account-context";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { getViewedAccountCapabilities } from "@/lib/auth/authorize";
 import { getCurrentSession, getCurrentUserId } from "@/lib/auth/session";
 import { getGrantedUsers } from "@/lib/auth/granted-users";
 import {
@@ -56,7 +58,12 @@ export default async function AppLayout({
     );
   }
 
-  const plans = await getUserPlans(activeUser.id);
+  const [plans, capabilities] = await Promise.all([
+    getUserPlans(activeUser.id),
+    // What the signed-in user may do *to this account* — a member looking at
+    // the other one reads it without the controls that would be refused.
+    getViewedAccountCapabilities(),
+  ]);
   // The root layout already applied the mask; the sidebar needs the same value
   // so its menu item opens with the label that matches what is on screen.
   const cookieStore = await cookies();
@@ -66,24 +73,26 @@ export default async function AppLayout({
 
   return (
     <SidebarProvider>
-      <PlansProvider initialPlans={plans}>
-        <AppSidebar
-          name={activeUser.name}
-          email={activeUser.email}
-          hiddenAmounts={hiddenAmounts}
-          users={users}
-          activeUserId={activeUser.id}
-        />
-        <SidebarInset>
-          <header className="flex h-14 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-            <div className="ml-auto">
-              <ThemeToggle />
-            </div>
-          </header>
-          <div className="p-6 md:p-10">{children}</div>
-        </SidebarInset>
-      </PlansProvider>
+      <ViewedAccountProvider capabilities={capabilities}>
+        <PlansProvider initialPlans={plans}>
+          <AppSidebar
+            name={activeUser.name}
+            email={activeUser.email}
+            hiddenAmounts={hiddenAmounts}
+            users={users}
+            activeUserId={activeUser.id}
+          />
+          <SidebarInset>
+            <header className="flex h-14 items-center gap-2 border-b px-4">
+              <SidebarTrigger className="-ml-1" />
+              <div className="ml-auto">
+                <ThemeToggle />
+              </div>
+            </header>
+            <div className="p-6 md:p-10">{children}</div>
+          </SidebarInset>
+        </PlansProvider>
+      </ViewedAccountProvider>
     </SidebarProvider>
   );
 }

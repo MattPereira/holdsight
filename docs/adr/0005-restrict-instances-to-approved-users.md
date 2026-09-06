@@ -8,6 +8,6 @@ Admission was originally configured through an `ALLOWED_EMAILS` environment vari
 
 - A grant exists per normalized email and does not require a user row, so an instance can be bootstrapped before its first sign-in.
 - User creation, session creation, and every protected render re-check the grant, so deleting a row revokes access immediately rather than at the next login.
-- Account switching lists only granted users, and the authorization matrix is expressed once in `src/lib/auth/policy.ts`. Mutation sites are being moved onto it incrementally.
+- Account switching lists only granted users, and the authorization matrix is expressed once in `src/lib/auth/policy.ts`. Mutation sites are being moved onto it incrementally: Plans, Trade Journal Entries, and journal images check it now; provider configuration does not yet.
 
 Grant administration is manual database work; see `docs/access-grants.md`.

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { authClient } from "@/lib/auth/client";
-import { EMAIL_NOT_ALLOWED } from "@/lib/auth/access-error";
+import { EMAIL_NOT_ALLOWED } from "@/lib/auth/access-error-code";
 import { authErrorMessage } from "@/lib/auth/error-message";
 import { Button } from "@/components/ui/button";
 import {

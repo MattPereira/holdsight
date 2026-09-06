@@ -14,7 +14,9 @@ Emails must be stored lowercase and trimmed. A check constraint rejects anything
 
 The database does not enforce that exactly one admin exists.
 
-The matrix lives in `src/lib/auth/policy.ts` and nowhere else. Admission, revocation, and account switching enforce it today; the write and connection-management rules are stated there but are not yet checked at individual mutations — that enforcement lands with issues #50 and #51. Until then, any granted user can still write any granted account.
+The matrix lives in `src/lib/auth/policy.ts` and nowhere else. Server code asks it through `src/lib/auth/authorize.ts`, which pairs the signed-in actor with the account currently being viewed; a refused mutation answers `403` rather than falling back to the actor's own account.
+
+Enforced today: admission, revocation, account switching, and the user-maintained investment records — Plans, Trade Journal Entries, and journal images. Provider configuration (wallets, exchanges, brokerages, manual accounts, credentials, and connections) still scopes to the viewed account without checking write authority; that enforcement lands with issue #51. Until then, a member viewing the other account can still change its connections.
 
 ## Bootstrap a fresh database
 

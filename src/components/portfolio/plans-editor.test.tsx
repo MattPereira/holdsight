@@ -7,6 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ViewedAccountProvider } from "@/components/auth/viewed-account-context";
 import { PlansEditor } from "@/components/portfolio/plans-editor";
 import { PlansProvider } from "@/components/portfolio/plans-context";
 import {
@@ -51,11 +52,15 @@ function plan(overrides: Partial<Plan> = {}): Plan {
   };
 }
 
-function renderEditor(initialPlans: Plan[] = []) {
+function renderEditor(initialPlans: Plan[] = [], canWrite = true) {
   return render(
-    <PlansProvider initialPlans={initialPlans}>
-      <PlansEditor portfolioSummary={{ grandTotalValue: 0, totals: [] }} />
-    </PlansProvider>,
+    <ViewedAccountProvider
+      capabilities={{ canWrite, canRefresh: true, canManageConnections: false }}
+    >
+      <PlansProvider initialPlans={initialPlans}>
+        <PlansEditor portfolioSummary={{ grandTotalValue: 0, totals: [] }} />
+      </PlansProvider>
+    </ViewedAccountProvider>,
   );
 }
 
@@ -361,5 +366,42 @@ describe("PlansEditor", () => {
         expect(screen.getByLabelText("Name")).toHaveProperty("value", "");
       });
     });
+  });
+});
+
+/** A member looking at the other granted account (ADR 0005). */
+describe("PlansEditor on a read-only account", () => {
+  it("keeps the Plan's prose readable but not editable", async () => {
+    renderEditor([plan()], false);
+
+    const thesis = screen.getByLabelText("Thesis") as HTMLTextAreaElement;
+    expect(thesis.readOnly).toBe(true);
+
+    fireEvent.change(thesis, { target: { value: "Not mine to write." } });
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(actions.savePlan).not.toHaveBeenCalled();
+  });
+
+  it("offers no way to create or delete a Plan", async () => {
+    renderEditor([plan()], false);
+
+    openSettings();
+    await screen.findByLabelText("Name");
+    expect(screen.queryByRole("button", { name: /New Plan/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Delete Plan/ })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Edit target allocation" }),
+    ).toBeNull();
+  });
+
+  // Reading the other account is the point of switching to it.
+  it("still lets the reader switch between Plans", () => {
+    renderEditor([plan()], false);
+
+    expect(
+      (screen.getByRole("button", { name: "Switch Plan" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
   });
 });

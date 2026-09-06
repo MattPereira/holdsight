@@ -2,7 +2,7 @@ import "server-only";
 
 import { APIError } from "better-auth";
 
-export const EMAIL_NOT_ALLOWED = "EMAIL_NOT_ALLOWED";
+import { EMAIL_NOT_ALLOWED } from "@/lib/auth/access-error-code";
 
 export function emailNotAllowedError(): APIError {
   // Better Auth's first-time OAuth path converts `error.message` into the

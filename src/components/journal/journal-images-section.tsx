@@ -54,6 +54,7 @@ export function JournalImagesSection({
   endpoint,
   open,
   disabled,
+  readOnly,
   onEntryMaterialized,
   onEntryVersionChanged,
   onPendingChange,
@@ -62,6 +63,8 @@ export function JournalImagesSection({
   endpoint: string | null;
   open: boolean;
   disabled: boolean;
+  /** Existing screenshots stay visible; adding and removing them does not. */
+  readOnly: boolean;
   onEntryMaterialized?: () => void;
   onEntryVersionChanged?: (updatedAt: string, entryId?: string) => void;
   onPendingChange?: (pending: boolean) => void;
@@ -201,7 +204,8 @@ export function JournalImagesSection({
   // A document-level paste listener means the user can take a screenshot and
   // hit Ctrl+V anywhere in the sheet without first focusing a field.
   useEffect(() => {
-    if (!open || !endpoint || disabled || loading || mutationPending) return;
+    if (!open || !endpoint || disabled || readOnly || loading || mutationPending)
+      return;
 
     function handlePaste(event: ClipboardEvent) {
       const files = imagesFromDataTransfer(event.clipboardData?.items);
@@ -212,7 +216,7 @@ export function JournalImagesSection({
 
     document.addEventListener("paste", handlePaste);
     return () => document.removeEventListener("paste", handlePaste);
-  }, [open, endpoint, disabled, loading, mutationPending, upload]);
+  }, [open, endpoint, disabled, readOnly, loading, mutationPending, upload]);
 
   async function remove(image: JournalImageView) {
     if (!endpoint) return;
@@ -279,31 +283,33 @@ export function JournalImagesSection({
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <h2 className="font-medium">Screenshots</h2>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="text-muted-foreground"
-            disabled={interactionDisabled}
-            aria-label="Add screenshots"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <RiImageAddLine />
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPT_ATTR}
-            multiple
-            className="hidden"
-            onChange={(event) => {
-              const files = Array.from(event.target.files ?? []);
-              event.target.value = "";
-              void upload(files);
-            }}
-          />
-        </div>
+        {readOnly ? null : (
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground"
+              disabled={interactionDisabled}
+              aria-label="Add screenshots"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <RiImageAddLine />
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPT_ATTR}
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                const files = Array.from(event.target.files ?? []);
+                event.target.value = "";
+                void upload(files);
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {loading ? (
@@ -333,15 +339,17 @@ export function JournalImagesSection({
                   className="size-full object-cover transition-opacity group-hover:opacity-90"
                 />
               </button>
-              <button
-                type="button"
-                disabled={disabled || mutationPending}
-                onClick={() => void remove(image)}
-                aria-label="Remove screenshot"
-                className="absolute right-1 top-1 inline-flex size-5 items-center justify-center rounded-full bg-background/80 text-foreground opacity-0 transition-opacity hover:bg-background focus-visible:opacity-100 group-hover:opacity-100 disabled:pointer-events-none"
-              >
-                <RiCloseLine className="size-3.5" />
-              </button>
+              {readOnly ? null : (
+                <button
+                  type="button"
+                  disabled={disabled || mutationPending}
+                  onClick={() => void remove(image)}
+                  aria-label="Remove screenshot"
+                  className="absolute right-1 top-1 inline-flex size-5 items-center justify-center rounded-full bg-background/80 text-foreground opacity-0 transition-opacity hover:bg-background focus-visible:opacity-100 group-hover:opacity-100 disabled:pointer-events-none"
+                >
+                  <RiCloseLine className="size-3.5" />
+                </button>
+              )}
             </div>
           ))}
           {pending.map((item) => (
