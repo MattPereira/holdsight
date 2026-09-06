@@ -4,9 +4,8 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { approvedEmails } from "@/lib/auth/approved-emails";
+import { getGrantedUsers } from "@/lib/auth/granted-users";
 import { getSessionUserId } from "@/lib/auth/session";
-import { getSwitchableUsers } from "@/lib/auth/switchable-users";
 import {
   resolveEffectiveUserId,
   serializeViewAs,
@@ -24,8 +23,7 @@ export async function switchViewAs(targetUserId: string): Promise<void> {
   const effectiveUserId = resolveEffectiveUserId({
     sessionUserId,
     cookieValue,
-    users: await getSwitchableUsers(),
-    allowedEmails: approvedEmails,
+    users: await getGrantedUsers(),
   });
 
   const cookieStore = await cookies();

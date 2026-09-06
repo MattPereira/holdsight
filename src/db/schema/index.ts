@@ -1,3 +1,4 @@
+export * from "./access-grants";
 export * from "./auth";
 export * from "./credit-accounts";
 export * from "./depository-accounts";

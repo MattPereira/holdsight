@@ -7,8 +7,8 @@ import { oauthProvider } from "@better-auth/oauth-provider";
 import { db } from "@/db/index";
 import * as schema from "@/db/schema";
 import { emailNotAllowedError } from "@/lib/auth/access-error";
-import { isEmailAllowed } from "@/lib/auth/allowed-emails";
-import { approvedEmails } from "@/lib/auth/approved-emails";
+import { requireAccessGrant } from "@/lib/auth/access-grants";
+import { findAccessGrant } from "@/lib/auth/granted-users";
 import { withoutPersistedIdToken } from "@/lib/auth/token-storage";
 
 const baseURL = process.env.BETTER_AUTH_URL;
@@ -56,9 +56,7 @@ export const auth = betterAuth({
     user: {
       create: {
         async before(user) {
-          if (!isEmailAllowed(user.email, approvedEmails)) {
-            throw emailNotAllowedError();
-          }
+          await requireAccessGrant(findAccessGrant, user.email);
 
           return { data: user };
         },
@@ -73,9 +71,9 @@ export const auth = betterAuth({
             .where(eq(schema.user.id, session.userId))
             .limit(1);
 
-          if (!user || !isEmailAllowed(user.email, approvedEmails)) {
-            throw emailNotAllowedError();
-          }
+          if (!user) throw emailNotAllowedError();
+
+          await requireAccessGrant(findAccessGrant, user.email);
 
           return { data: session };
         },

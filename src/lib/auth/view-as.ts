@@ -1,15 +1,17 @@
 import "server-only";
 
-import { isEmailAllowed } from "@/lib/auth/allowed-emails";
-import type { UserSummary } from "@/lib/auth/user-summary";
+import type { GrantedUser } from "@/lib/auth/user-summary";
 
 /**
- * View As: which approved user's data the current device is looking at.
+ * View As: which granted user's data the current device is looking at.
  *
- * Holdsight instances are shared by a handful of approved users who keep their
- * finances separate (ADR 0005). This lets one of them look at another's
- * portfolio without signing out, so the selection is an access decision, not a
- * display preference: the cookie is httpOnly and only a server action sets it.
+ * Holdsight instances are shared by a handful of granted users (ADR 0005). This
+ * lets one of them look at another's portfolio without signing out, so the
+ * selection is an access decision, not a display preference: the cookie is
+ * httpOnly and only a server action sets it.
+ *
+ * It selects *which* account is on screen. What may be done to that account is
+ * decided separately, by `@/lib/auth/policy`.
  *
  * It lives in a cookie rather than on the user row because it is a property of
  * the device, not the account.
@@ -55,29 +57,27 @@ export function parseViewAs(value: string | undefined): ViewAs | null {
 }
 
 /**
- * Re-checks the allowlist on every render rather than trusting the cookie.
- * The allowlist is only enforced when a user signs up or opens a session, so a
- * user removed from `ALLOWED_EMAILS` keeps their row — and switching creates no
- * session that would catch them. This is where that gap closes.
+ * Re-resolves the switch against live grants on every render rather than
+ * trusting the cookie. Switching creates no session, so nothing else would
+ * notice that the target's grant was deleted since the cookie was written.
+ *
+ * `users` must already be grant-filtered: an account that is not on that list
+ * is not viewable, which is what makes revocation immediate.
  */
 export function resolveEffectiveUserId({
   sessionUserId,
   cookieValue,
   users,
-  allowedEmails,
 }: {
   sessionUserId: string;
   cookieValue: string | undefined;
-  users: readonly UserSummary[];
-  allowedEmails: ReadonlySet<string>;
+  users: readonly GrantedUser[];
 }): string {
   const viewAs = parseViewAs(cookieValue);
   if (!viewAs) return sessionUserId;
   if (viewAs.sessionUserId !== sessionUserId) return sessionUserId;
   if (viewAs.targetUserId === sessionUserId) return sessionUserId;
-
-  const target = users.find((user) => user.id === viewAs.targetUserId);
-  if (!target || !isEmailAllowed(target.email, allowedEmails)) {
+  if (!users.some((user) => user.id === viewAs.targetUserId)) {
     return sessionUserId;
   }
 

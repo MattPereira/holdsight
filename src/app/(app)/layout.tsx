@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
+import { AccessRevoked } from "@/components/auth/access-revoked";
 import { LoginForm } from "@/components/auth/login-form";
 import { PlansProvider } from "@/components/portfolio/plans-context";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
@@ -10,7 +11,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { getCurrentSession, getCurrentUserId } from "@/lib/auth/session";
-import { getSwitchableUsers } from "@/lib/auth/switchable-users";
+import { getGrantedUsers } from "@/lib/auth/granted-users";
 import {
   HIDDEN_AMOUNTS_COOKIE,
   isHiddenAmountsValue,
@@ -41,10 +42,19 @@ export default async function AppLayout({
   // it must never show the signed-in user's name instead.
   const [effectiveUserId, users] = await Promise.all([
     getCurrentUserId(),
-    getSwitchableUsers(),
+    getGrantedUsers(),
   ]);
-  const activeUser =
-    users.find((user) => user.id === effectiveUserId) ?? session.user;
+  const activeUser = users.find((user) => user.id === effectiveUserId);
+
+  // A live session is not admission: the grant behind it can be deleted at any
+  // time, and this is the request that notices.
+  if (!activeUser) {
+    return (
+      <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted p-6 md:p-10">
+        <AccessRevoked />
+      </div>
+    );
+  }
 
   const plans = await getUserPlans(activeUser.id);
   // The root layout already applied the mask; the sidebar needs the same value

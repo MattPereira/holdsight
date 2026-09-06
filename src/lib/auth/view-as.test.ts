@@ -1,18 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { parseAllowedEmails } from "@/lib/auth/allowed-emails";
 import {
   parseViewAs,
   resolveEffectiveUserId,
   serializeViewAs,
 } from "@/lib/auth/view-as";
+import type { GrantedUser } from "@/lib/auth/user-summary";
 
-const allowedEmails = parseAllowedEmails("me@example.com,dad@example.com");
-
-const users = [
-  { id: "me", name: "Me", email: "me@example.com" },
-  { id: "dad", name: "Dad", email: "dad@example.com" },
-  { id: "revoked", name: "Revoked", email: "revoked@example.com" },
+// Grant-filtered, as `getGrantedUsers` returns it: "revoked" still has a user
+// row, but its grant was deleted, so it never appears here.
+const users: GrantedUser[] = [
+  { id: "me", name: "Me", email: "me@example.com", role: "member" },
+  { id: "dad", name: "Dad", email: "dad@example.com", role: "admin" },
 ];
 
 function resolve(cookieValue: string | undefined) {
@@ -20,7 +19,6 @@ function resolve(cookieValue: string | undefined) {
     sessionUserId: "me",
     cookieValue,
     users,
-    allowedEmails,
   });
 }
 
@@ -52,7 +50,7 @@ describe("resolveEffectiveUserId", () => {
     expect(resolve(undefined)).toBe("me");
   });
 
-  it("returns the requested user when they are still approved", () => {
+  it("returns the requested user when their grant is still active", () => {
     expect(resolve(viewing("dad"))).toBe("dad");
   });
 
@@ -60,7 +58,7 @@ describe("resolveEffectiveUserId", () => {
     expect(resolve(viewing("deleted"))).toBe("me");
   });
 
-  it("falls back when the requested user is no longer approved", () => {
+  it("falls back when the requested user's grant was deleted", () => {
     expect(resolve(viewing("revoked"))).toBe("me");
   });
 
