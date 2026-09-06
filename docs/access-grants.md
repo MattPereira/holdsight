@@ -14,7 +14,9 @@ Emails must be stored lowercase and trimmed. A check constraint rejects anything
 
 The database does not enforce that exactly one admin exists.
 
-The matrix lives in `src/lib/auth/policy.ts` and nowhere else. Server code asks it through `src/lib/auth/authorize.ts`, which pairs the signed-in actor with the account currently being viewed; a refused mutation answers `403` rather than falling back to the actor's own account.
+The matrix lives in `src/lib/auth/policy.ts` and nowhere else. Server code asks it through `src/lib/auth/authorize.ts`, which pairs the signed-in actor with the account currently being viewed; a refused mutation answers `403` rather than falling back to the actor's own account. `src/lib/auth/session.ts` knows only who is signed in — there is no helper anywhere that hands back the viewed account without an action to authorize it against, so reads are as explicit as writes.
+
+The app header says which of these applies: `Viewing as … — read only` while a member looks at the other account, `Viewing as …` when they may still write it. Surfaces drop the controls the server would refuse; the banner is what explains their absence.
 
 Enforced at every mutation: admission, revocation, account switching, the user-maintained investment records (Plans, Trade Journal Entries, journal images), and provider configuration — wallets, exchanges, brokerages, manual accounts, credentials, connections, and the Schwab OAuth and Plaid Link completions that create them.
 

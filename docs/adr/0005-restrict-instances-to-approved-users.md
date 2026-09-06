@@ -10,5 +10,8 @@ Admission was originally configured through an `ALLOWED_EMAILS` environment vari
 - User creation, session creation, and every protected render re-check the grant, so deleting a row revokes access immediately rather than at the next login.
 - Account switching lists only granted users, and the authorization matrix is expressed once in `src/lib/auth/policy.ts`. Every mutation site asks it: Plans, Trade Journal Entries, journal images, and provider configuration — wallets, exchanges, brokerages, manual accounts, credentials, and connections.
 - Refreshing and synchronizing are separated from writing. Either role may bring either granted account current, because a refresh only re-reads what a provider already holds; changing what an account syncs from is persistent state and follows ownership.
+- Reads are authorized too, rather than merely scoped. `src/lib/auth/session.ts` answers only "who is signed in"; `src/lib/auth/authorize.ts` is the sole module that pairs that actor with the account View As put on screen, and it hands out that account's id only for a named action. There is no helper that returns an identity without one, so a call site cannot read, write, or refresh by accident.
+- The app header states the resulting permission — `Viewing as … — read only` while a member looks at the other account — so the mutation controls each surface already drops are explained rather than silently missing. It is a report of the server's answer; the server re-checks every action regardless.
+- MCP and other token-authenticated clients stay outside this entirely: their identity is the token's subject, and the View As cookie never reaches them.
 
-Grant administration is manual database work; see `docs/access-grants.md`.
+Grant administration, including roles, is manual database work — SQL or Drizzle Studio, with no management UI or invitation flow. See `docs/access-grants.md`.

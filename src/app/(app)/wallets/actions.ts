@@ -9,7 +9,6 @@ import {
   type BalancesView
 } from "@/lib/accounts/balances-view";
 import { authorizedViewedAccountId } from "@/lib/auth/authorize";
-import { getCurrentUserId } from "@/lib/auth/session";
 import {
   getUserEvmAccounts,
   validateUserEvmAccounts
@@ -282,7 +281,7 @@ export async function pollWalletTransactions(
   knownTransactionCount = 0,
   knownLatestTransactionUpdatedAt: string | null = null,
 ): Promise<WalletTransactionsActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("read");
   if (!userId) {
     return {
       transactions: null,

@@ -16,9 +16,10 @@ const AGENTS_DIR = path.join(process.cwd(), "src/lib/agents");
 const MCP_ROUTE = path.join(process.cwd(), "src/app/api/[transport]/route.ts");
 
 const BROWSER_IDENTITY = [
-  "getCurrentUserId",
   "getCurrentActor",
+  "authorizedViewedAccountId",
   "@/lib/auth/session",
+  "@/lib/auth/authorize",
   "@/lib/auth/view-as",
   "next/headers",
 ];

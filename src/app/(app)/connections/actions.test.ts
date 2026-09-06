@@ -4,7 +4,6 @@ import type { AccessAction } from "@/lib/auth/policy";
 
 const authorizedViewedAccountId =
   vi.fn<(action: AccessAction) => Promise<string | null>>();
-const getCurrentUserId = vi.fn<() => Promise<string | null>>();
 
 const evm = vi.hoisted(() => ({
   addUserEvmAccount: vi.fn(),
@@ -31,9 +30,6 @@ vi.mock("@/db", () => ({ db: {} }));
 vi.mock("@/lib/auth/authorize", () => ({
   authorizedViewedAccountId: (action: AccessAction) =>
     authorizedViewedAccountId(action),
-}));
-vi.mock("@/lib/auth/session", () => ({
-  getCurrentUserId: () => getCurrentUserId(),
 }));
 vi.mock("@/lib/evm/accounts", () => evm);
 vi.mock("@/lib/exchange/kraken/accounts", () => kraken);
@@ -142,8 +138,11 @@ describe("reading connections", () => {
   // Listing what is connected is a read, so it must not ask for configuration
   // authority the viewer may not have.
   it("lists the viewed account's connections without write authority", async () => {
-    getCurrentUserId.mockResolvedValue("admin");
-    authorizedViewedAccountId.mockRejectedValue(new Error("FORBIDDEN"));
+    // "read" resolves; anything stronger would be refused for this viewer.
+    authorizedViewedAccountId.mockImplementation(async (action) => {
+      if (action !== "read") throw new Error("FORBIDDEN");
+      return "admin";
+    });
     kraken.getUserKrakenAccounts.mockResolvedValue([]);
 
     const result = await getAccountConnections();

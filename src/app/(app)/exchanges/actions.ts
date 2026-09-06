@@ -9,7 +9,6 @@ import {
   type BalancesView
 } from "@/lib/accounts/balances-view";
 import { authorizedViewedAccountId } from "@/lib/auth/authorize";
-import { getCurrentUserId } from "@/lib/auth/session";
 import {
   ensureUserKrakenAccount,
   getUserKrakenAccounts
@@ -141,7 +140,7 @@ export async function loadKrakenTransactions(): Promise<KrakenTransactionsAction
 
 /** Read-only snapshot of Kraken transactions for polling an in-progress sync. */
 export async function pollKrakenTransactions(): Promise<KrakenTransactionsActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("read");
   if (!userId) {
     return {
       transactions: [],

@@ -1,12 +1,12 @@
 import { TradesPage } from "@/components/trades/trades-page";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { authorizedViewedAccountId } from "@/lib/auth/authorize";
 import {
   emptyPortfolioTransactionsSnapshot,
   getCurrentPortfolioTransactions,
 } from "@/lib/portfolio/transactions";
 
 export default async function Trades() {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("read");
   const snapshot = userId
     ? await getCurrentPortfolioTransactions(userId)
     : emptyPortfolioTransactionsSnapshot();

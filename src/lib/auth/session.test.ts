@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GrantedUser } from "@/lib/auth/user-summary";
-import { serializeViewAs } from "@/lib/auth/view-as";
 
 const getSession = vi.fn();
 const getGrantedUsers = vi.fn<() => Promise<GrantedUser[]>>();
-const cookieValue = vi.fn<() => string | undefined>();
 
 vi.mock("@/lib/auth/server", () => ({
   auth: { api: { getSession: () => getSession() } },
@@ -13,14 +11,9 @@ vi.mock("@/lib/auth/server", () => ({
 vi.mock("@/lib/auth/granted-users", () => ({
   getGrantedUsers: () => getGrantedUsers(),
 }));
-vi.mock("next/headers", () => ({
-  headers: async () => new Headers(),
-  cookies: async () => ({ get: () => ({ value: cookieValue() }) }),
-}));
+vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 
-const { getCurrentActor, getCurrentUserId } = await import(
-  "@/lib/auth/session"
-);
+const { getCurrentActor } = await import("@/lib/auth/session");
 
 const me: GrantedUser = {
   id: "me",
@@ -42,7 +35,6 @@ function signedInAs(userId: string) {
 beforeEach(() => {
   vi.clearAllMocks();
   getGrantedUsers.mockResolvedValue([me, dad]);
-  cookieValue.mockReturnValue(undefined);
 });
 
 describe("getCurrentActor", () => {
@@ -68,43 +60,5 @@ describe("getCurrentActor", () => {
     getGrantedUsers.mockResolvedValue([dad]);
 
     await expect(getCurrentActor()).resolves.toBeNull();
-  });
-});
-
-describe("getCurrentUserId", () => {
-  it("scopes to the signed-in user by default", async () => {
-    signedInAs("me");
-
-    await expect(getCurrentUserId()).resolves.toBe("me");
-  });
-
-  it("scopes to the viewed account while View As is active", async () => {
-    signedInAs("me");
-    cookieValue.mockReturnValue(
-      serializeViewAs({ sessionUserId: "me", targetUserId: "dad" }),
-    );
-
-    await expect(getCurrentUserId()).resolves.toBe("dad");
-  });
-
-  // Every read and write scopes by this, so denying here denies all of them.
-  it("scopes to nobody once the actor's grant is deleted", async () => {
-    signedInAs("me");
-    getGrantedUsers.mockResolvedValue([dad]);
-    cookieValue.mockReturnValue(
-      serializeViewAs({ sessionUserId: "me", targetUserId: "dad" }),
-    );
-
-    await expect(getCurrentUserId()).resolves.toBeNull();
-  });
-
-  it("falls back to the actor once the viewed account's grant is deleted", async () => {
-    signedInAs("me");
-    getGrantedUsers.mockResolvedValue([me]);
-    cookieValue.mockReturnValue(
-      serializeViewAs({ sessionUserId: "me", targetUserId: "dad" }),
-    );
-
-    await expect(getCurrentUserId()).resolves.toBe("me");
   });
 });

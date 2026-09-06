@@ -1,12 +1,20 @@
 import "server-only";
 
 import { cache } from "react";
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
 
 import { auth } from "@/lib/auth/server";
 import { getGrantedUsers } from "@/lib/auth/granted-users";
 import type { AccessGrantee } from "@/lib/auth/policy";
-import { resolveEffectiveUserId, VIEW_AS_COOKIE } from "@/lib/auth/view-as";
+
+/**
+ * Who is signed in, and nothing else.
+ *
+ * The account whose data is on screen lives in `@/lib/auth/authorize`, which is
+ * the only module that pairs the two. Keeping them apart is what stops a call
+ * site from reaching for an identity without saying what it intends to do with
+ * it (ADR 0005).
+ */
 
 export const getCurrentSession = cache(async () => {
   return auth.api.getSession({ headers: await headers() });
@@ -35,26 +43,4 @@ export const getCurrentActor = cache(async (): Promise<AccessGrantee | null> => 
   );
 
   return actor ? { userId: actor.id, role: actor.role } : null;
-});
-
-/**
- * The account whose data is on screen: the signed-in user unless View As points
- * at another granted account. This is the default on purpose — a caller that
- * forgets View As exists still scopes to the account the sidebar claims to be
- * showing. It says nothing about what may be done to that account; ask
- * `@/lib/auth/policy` for that.
- */
-export const getCurrentUserId = cache(async (): Promise<string | null> => {
-  const actor = await getCurrentActor();
-  if (!actor) return null;
-
-  const cookieStore = await cookies();
-  const cookieValue = cookieStore.get(VIEW_AS_COOKIE)?.value;
-  if (!cookieValue) return actor.userId;
-
-  return resolveEffectiveUserId({
-    sessionUserId: actor.userId,
-    cookieValue,
-    users: await getGrantedUsers(),
-  });
 });

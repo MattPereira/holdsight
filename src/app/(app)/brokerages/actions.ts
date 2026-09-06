@@ -13,7 +13,6 @@ import {
   type BalancesView
 } from "@/lib/accounts/balances-view";
 import { authorizedViewedAccountId } from "@/lib/auth/authorize";
-import { getCurrentUserId } from "@/lib/auth/session";
 import {
   getUserBrokerageAccounts
 } from "@/lib/brokerage/accounts";
@@ -202,7 +201,7 @@ export async function loadBrokerageTransactions(): Promise<TransactionsView> {
 
 /** Read-only snapshot of brokerage transactions for polling an in-progress sync. */
 export async function pollBrokerageTransactions(): Promise<TransactionsView> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("read");
   if (!userId) {
     return {
       transactions: [],

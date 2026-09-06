@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { start } from "workflow/api";
 
 import { authorizedViewedAccountId } from "@/lib/auth/authorize";
-import { getCurrentUserId } from "@/lib/auth/session";
 import {
   saveBrokerageAccounts
 } from "@/lib/brokerage/accounts";
@@ -537,7 +536,7 @@ function schwabConnectionSummary(
  * Fetched lazily when the sheet opens rather than on every page render.
  */
 export async function getAccountConnections(): Promise<AccountConnectionsResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("read");
   if (!userId) {
     return {
       wallets: [],

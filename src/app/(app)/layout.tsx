@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 
 import { AppSidebar } from "@/components/app-shell/app-sidebar";
+import { ViewingAsBanner } from "@/components/app-shell/viewing-as-banner";
 import { AccessRevoked } from "@/components/auth/access-revoked";
 import { LoginForm } from "@/components/auth/login-form";
 import { PlansProvider } from "@/components/portfolio/plans-context";
@@ -11,8 +12,11 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { getViewedAccountCapabilities } from "@/lib/auth/authorize";
-import { getCurrentSession, getCurrentUserId } from "@/lib/auth/session";
+import {
+  authorizedViewedAccountId,
+  getViewedAccountCapabilities,
+} from "@/lib/auth/authorize";
+import { getCurrentSession } from "@/lib/auth/session";
 import { getGrantedUsers } from "@/lib/auth/granted-users";
 import {
   HIDDEN_AMOUNTS_COOKIE,
@@ -40,10 +44,10 @@ export default async function AppLayout({
   }
 
   // Everything below renders the *effective* user: while View As is active the
-  // sidebar is the only signal that the numbers on screen are not your own, so
-  // it must never show the signed-in user's name instead.
+  // sidebar and the header banner are the only signals that the numbers on
+  // screen are not your own, so neither may show the signed-in user instead.
   const [effectiveUserId, users] = await Promise.all([
-    getCurrentUserId(),
+    authorizedViewedAccountId("read"),
     getGrantedUsers(),
   ]);
   const activeUser = users.find((user) => user.id === effectiveUserId);
@@ -85,7 +89,13 @@ export default async function AppLayout({
           <SidebarInset>
             <header className="flex h-14 items-center gap-2 border-b px-4">
               <SidebarTrigger className="-ml-1" />
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-3">
+                <ViewingAsBanner
+                  viewingAs={
+                    activeUser.id === session.user.id ? null : activeUser.name
+                  }
+                  canWrite={capabilities.canWrite}
+                />
                 <ThemeToggle />
               </div>
             </header>

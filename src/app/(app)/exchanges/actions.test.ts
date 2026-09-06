@@ -28,7 +28,6 @@ vi.mock("@/lib/auth/authorize", () => ({
   authorizedViewedAccountId: (action: AccessAction) =>
     authorizedViewedAccountId(action),
 }));
-vi.mock("@/lib/auth/session", () => ({ getCurrentUserId: vi.fn() }));
 vi.mock("@/lib/exchange/kraken/accounts", () => accounts);
 vi.mock("@/lib/exchange/kraken/balances", () => balances);
 vi.mock("@/lib/exchange/kraken/transactions", () => transactions);

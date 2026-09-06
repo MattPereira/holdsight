@@ -6,7 +6,7 @@ import {
 import { AccountDetailsView } from "@/components/accounts/account-details-view";
 import { WALLET_SECONDARY_COLUMN } from "@/components/accounts/balances/groups";
 import { investmentBalancesView } from "@/lib/accounts/balances-view";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { authorizedViewedAccountId } from "@/lib/auth/authorize";
 import { getUserKrakenAccounts } from "@/lib/exchange/kraken/accounts";
 import { getCurrentKrakenBalances } from "@/lib/exchange/kraken/balances";
 import {
@@ -15,7 +15,7 @@ import {
 } from "@/lib/exchange/kraken/transactions";
 
 export default async function ExchangePage() {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("read");
   const krakenAccounts = userId ? await getUserKrakenAccounts(userId) : [];
   const [balanceResults, transactions, historyStatus] = await Promise.all([
     getCurrentKrakenBalances(krakenAccounts),

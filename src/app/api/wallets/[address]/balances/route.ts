@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { getWalletBalances } from "@/lib/evm/client";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { authorizedViewedAccountId } from "@/lib/auth/authorize";
 import type { BalancesResult } from "@/lib/portfolio/types";
 import {
   isValidEvmAddress,
@@ -27,7 +27,7 @@ export async function GET(
   { params }: { params: Promise<{ address: string }> },
 ) {
   // Privacy-first: no portfolio data leaves the server without a valid session.
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("read");
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

@@ -6,7 +6,7 @@ import {
 import { AccountDetailsView } from "@/components/accounts/account-details-view";
 import { BROKERAGE_SECONDARY_COLUMN } from "@/components/accounts/balances/groups";
 import { brokerageBalancesView } from "@/lib/accounts/balances-view";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { authorizedViewedAccountId } from "@/lib/auth/authorize";
 import { getCurrentBrokerageBalances } from "@/lib/brokerage/balances";
 import {
   getBrokerageTransactionImportStatus,
@@ -14,7 +14,7 @@ import {
 } from "@/lib/brokerage/transactions";
 
 export default async function BrokeragePage() {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("read");
   const [accounts, transactions, transactionImportStatus] = userId
     ? await Promise.all([
         getCurrentBrokerageBalances(userId),

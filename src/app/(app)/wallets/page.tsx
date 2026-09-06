@@ -6,13 +6,13 @@ import {
 import { AccountDetailsView } from "@/components/accounts/account-details-view";
 import { WALLET_SECONDARY_COLUMN } from "@/components/accounts/balances/groups";
 import { investmentBalancesView } from "@/lib/accounts/balances-view";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { authorizedViewedAccountId } from "@/lib/auth/authorize";
 import { portfolioProviderRegistry } from "@/lib/portfolio/providers/registry";
 import { getCurrentWalletBalances } from "@/lib/wallets/balances";
 import { toWalletTransactionHistoryStatus } from "@/lib/wallets/transactions";
 
 export default async function WalletsPage() {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("read");
   const [balanceResults, transactionsSnapshot] = userId
     ? await Promise.all([
         getCurrentWalletBalances(userId),

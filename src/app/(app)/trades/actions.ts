@@ -4,7 +4,7 @@
 import type {
   TransactionsView
 } from "@/components/accounts/transactions/types";
-import { getCurrentUserId } from "@/lib/auth/session";
+import { authorizedViewedAccountId } from "@/lib/auth/authorize";
 import type { InvestmentTransactionListItem } from "@/lib/investment-transactions/list-item";
 import { withTransactionJournalSummaries } from "@/lib/journal/transaction-entry";
 import {
@@ -116,7 +116,7 @@ function combinePortfolioTransactionResults(
 async function attachJournalSummaries(
   result: PortfolioTransactionsActionResult,
 ): Promise<PortfolioTransactionsActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("read");
   if (!userId) return result;
   return {
     ...result,

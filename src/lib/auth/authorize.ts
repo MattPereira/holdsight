@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cache } from "react";
+import { cookies } from "next/headers";
 import { forbidden } from "next/navigation";
 
 import { getGrantedUsers } from "@/lib/auth/granted-users";
@@ -10,7 +12,8 @@ import {
   type AccessGrantee,
   type ViewedAccountCapabilities,
 } from "@/lib/auth/policy";
-import { getCurrentActor, getCurrentUserId } from "@/lib/auth/session";
+import { getCurrentActor } from "@/lib/auth/session";
+import { resolveEffectiveUserId, VIEW_AS_COOKIE } from "@/lib/auth/view-as";
 
 /**
  * The one place a server mutation asks "may the signed-in user do this to the
@@ -25,21 +28,39 @@ export type ViewedAccountAuthorization =
   | { status: "unauthenticated" }
   | { status: "forbidden"; userId: string };
 
+/**
+ * The account whose data is on screen: the signed-in user unless View As points
+ * at another still-granted account. Deliberately not exported — a viewed
+ * account is only ever handed out through an authorized action below, so no
+ * call site can scope to it without naming what it means to do.
+ */
+const viewedAccount = cache(async (): Promise<AccessGrantee | null> => {
+  const [actor, users] = await Promise.all([
+    getCurrentActor(),
+    getGrantedUsers(),
+  ]);
+  if (!actor) return null;
+
+  const targetUserId = resolveEffectiveUserId({
+    sessionUserId: actor.userId,
+    cookieValue: (await cookies()).get(VIEW_AS_COOKIE)?.value,
+    users,
+  });
+  const target = users.find((user) => user.id === targetUserId);
+
+  return target ? { userId: target.id, role: target.role } : null;
+});
+
 async function grantees(): Promise<{
   actor: AccessGrantee | null;
   target: AccessGrantee | null;
 }> {
-  const [actor, targetUserId, users] = await Promise.all([
+  const [actor, target] = await Promise.all([
     getCurrentActor(),
-    getCurrentUserId(),
-    getGrantedUsers(),
+    viewedAccount(),
   ]);
-  const target = users.find((user) => user.id === targetUserId);
 
-  return {
-    actor,
-    target: target ? { userId: target.id, role: target.role } : null,
-  };
+  return { actor, target };
 }
 
 export async function authorizeViewedAccount(
