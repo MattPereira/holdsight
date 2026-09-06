@@ -11,3 +11,7 @@ The canonical default triage labels are used. See `docs/agents/triage-labels.md`
 ### Domain docs
 
 This repository uses a single-context layout. See `docs/agents/domain.md`.
+
+### Database operations
+
+Use the Neon MCP server for database work rather than a script wired to `DATABASE_URL`.
