@@ -15,6 +15,8 @@ import {
 import { Button } from "@/components/ui/button";
 
 import type { AccountConnectionsResult } from "@/app/(app)/connections/actions";
+import { useViewedAccount } from "@/components/auth/viewed-account-context";
+import { ConnectionsReadOnlyList } from "@/components/connections/connections-read-only-list";
 import { KrakenConnectPanel } from "@/components/connections/connect-panels/kraken-connect-panel";
 import { LighterConnectPanel } from "@/components/connections/connect-panels/lighter-connect-panel";
 import { ManualConnectPanel } from "@/components/connections/connect-panels/manual-connect-panel";
@@ -82,6 +84,7 @@ export function AccountConnectView({
   connections: AccountConnectionsResult;
 }) {
   const router = useRouter();
+  const { canManageConnections } = useViewedAccount();
   const [mode, setMode] = useState<"manage" | "add">("manage");
   const [provider, setProvider] = useState<Provider>("plaid");
 
@@ -103,6 +106,24 @@ export function AccountConnectView({
 
   if (connections.error) {
     return <p className="text-sm text-destructive">{connections.error}</p>;
+  }
+
+  // A member looking at the other account may read what it is connected to and
+  // refresh it, but not change it. Every control below would be refused, so
+  // none of them is rendered (ADR 0005).
+  if (!canManageConnections) {
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-0.5">
+          <h1 className="text-xl font-medium">Connections</h1>
+          <p className="text-sm text-muted-foreground">
+            Read-only: you can view and refresh this account&apos;s connections,
+            but only its owner can change them.
+          </p>
+        </div>
+        <ConnectionsReadOnlyList connections={connections} />
+      </div>
+    );
   }
 
   // Add flow: provider picker + the selected provider's add form. Reached from

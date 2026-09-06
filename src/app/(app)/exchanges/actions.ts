@@ -8,6 +8,7 @@ import {
   investmentBalancesView,
   type BalancesView
 } from "@/lib/accounts/balances-view";
+import { authorizedViewedAccountId } from "@/lib/auth/authorize";
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
   ensureUserKrakenAccount,
@@ -44,7 +45,7 @@ function unauthorizedBalancesResult(): BalancesResult[] {
 
 
 export async function loadKrakenBalances(): Promise<BalancesView> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("refresh");
   if (!userId) return investmentBalancesView(unauthorizedBalancesResult());
 
   const krakenAccounts = await ensureUserKrakenAccount(userId);
@@ -61,7 +62,7 @@ export type KrakenTransactionsActionResult = {
 };
 
 export async function loadKrakenTransactions(): Promise<KrakenTransactionsActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("refresh");
   if (!userId) {
     return {
       transactions: [],

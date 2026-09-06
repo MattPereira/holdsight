@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { start } from "workflow/api";
 
+import { authorizedViewedAccountId } from "@/lib/auth/authorize";
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
   saveBrokerageAccounts
@@ -103,7 +104,7 @@ export async function addWallets(
   address: string,
   label: string,
 ): Promise<WalletActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) return unauthorizedWalletResult();
 
   const result = await addUserEvmAccount(userId, address, label);
@@ -124,7 +125,7 @@ export async function renameWallet(
   address: string,
   label: string,
 ): Promise<WalletActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) return unauthorizedWalletResult();
 
   const result = await renameUserEvmAccount(userId, address, label);
@@ -140,7 +141,7 @@ export async function renameWallet(
 export async function removeWallet(
   address: string,
 ): Promise<WalletActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) return unauthorizedWalletResult();
 
   await removeUserEvmAccount(userId, address);
@@ -163,7 +164,7 @@ export async function saveKrakenCredentials(input: {
   apiKey: string;
   apiSecret: string;
 }): Promise<KrakenCredentialsActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) {
     return { message: "", error: "You must be signed in to add credentials." };
   }
@@ -197,7 +198,7 @@ export async function saveKrakenCredentials(input: {
 export async function removeKrakenAccount(
   investmentAccountId: string,
 ): Promise<{ error: string | null; }> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) {
     return { error: "You must be signed in to remove an account." };
   }
@@ -212,7 +213,7 @@ export async function saveLighterConnection(input: {
   evmInvestmentAccountId: string;
   readOnlyToken: string;
 }): Promise<{ message: string; error: string | null; }> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) return { message: "", error: "You must be signed in to add credentials." };
   if (!input.evmInvestmentAccountId || !input.readOnlyToken.trim()) {
     return { message: "", error: "Select a wallet and enter a Lighter read-only token." };
@@ -256,7 +257,7 @@ export async function saveLighterConnection(input: {
 export async function removeLighterConnection(
   investmentAccountId: string,
 ): Promise<{ error: string | null; }> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) return { error: "You must be signed in to remove an account." };
   await removeLighterAccount(userId, investmentAccountId);
   revalidatePath("/");
@@ -340,7 +341,7 @@ function plaidResultError(
 async function createPlaidLinkTokenForFamilies(
   familiesInput: readonly string[],
 ): Promise<PlaidLinkTokenActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) {
     return {
       linkToken: null,
@@ -381,7 +382,7 @@ async function linkPlaidAccountsForFamilies({
   familiesInput: readonly string[];
   errorFamiliesInput?: readonly string[];
 }): Promise<PlaidAccountsActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) {
     return {
       brokerageAccounts: [],
@@ -586,7 +587,7 @@ export async function getAccountConnections(): Promise<AccountConnectionsResult>
 export async function removePlaidItem(
   plaidItemId: string,
 ): Promise<{ plaidItems: PlaidConnectionSummary[]; error: string | null; }> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) {
     return {
       plaidItems: [],
@@ -618,7 +619,7 @@ export async function removeSchwabConnection(
   schwabConnections: SchwabConnectionSummary[];
   error: string | null;
 }> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) {
     return {
       schwabConnections: [],
@@ -654,7 +655,7 @@ async function unauthorizedManualBalanceResult(): Promise<ManualBalanceActionRes
 export async function addManualBalanceItem(
   input: ManualBalanceItemInput,
 ): Promise<ManualBalanceActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) return unauthorizedManualBalanceResult();
 
   const result = await createManualBalanceItem(userId, input);
@@ -669,7 +670,7 @@ export async function updateManualBalanceItem(
   itemId: string,
   input: ManualBalanceItemInput,
 ): Promise<ManualBalanceActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) return unauthorizedManualBalanceResult();
 
   const result = await updateUserManualBalanceItem(userId, itemId, input);
@@ -683,7 +684,7 @@ export async function updateManualBalanceItem(
 export async function removeManualBalanceItem(
   itemId: string,
 ): Promise<ManualBalanceActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) return unauthorizedManualBalanceResult();
 
   await removeUserManualBalanceItem(userId, itemId);
@@ -706,7 +707,7 @@ const PLAID_REVOKE_RETRY_MESSAGE =
 export async function removeBrokerage(
   plaidItemId: string,
 ): Promise<BrokerageActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) {
     return {
       accounts: [],
@@ -736,7 +737,7 @@ export async function removeBrokerage(
 export async function removeDepository(
   plaidItemId: string,
 ): Promise<DepositoryActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) {
     return {
       accounts: [],
@@ -766,7 +767,7 @@ export async function removeDepository(
 export async function removeCreditCard(
   plaidItemId: string,
 ): Promise<CreditCardActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) {
     return {
       accounts: [],

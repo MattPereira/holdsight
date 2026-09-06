@@ -16,7 +16,11 @@ The database does not enforce that exactly one admin exists.
 
 The matrix lives in `src/lib/auth/policy.ts` and nowhere else. Server code asks it through `src/lib/auth/authorize.ts`, which pairs the signed-in actor with the account currently being viewed; a refused mutation answers `403` rather than falling back to the actor's own account.
 
-Enforced today: admission, revocation, account switching, and the user-maintained investment records — Plans, Trade Journal Entries, and journal images. Provider configuration (wallets, exchanges, brokerages, manual accounts, credentials, and connections) still scopes to the viewed account without checking write authority; that enforcement lands with issue #51. Until then, a member viewing the other account can still change its connections.
+Enforced everywhere a request is scoped to an account: admission, revocation, account switching, the user-maintained investment records (Plans, Trade Journal Entries, journal images), and provider configuration — wallets, exchanges, brokerages, manual accounts, credentials, connections, and the Schwab OAuth and Plaid Link completions that create them.
+
+Refreshing balances and starting a Transaction History Sync stay open to either role for either account: they re-read what a provider already holds. Only persisting something asks for write authority, so a member viewing the other account sees its connections and can bring them current, but cannot change what it syncs from.
+
+MCP and other token-authenticated clients are outside all of this. Their identity is the token's subject; the View As cookie is a browser concern and never reaches them.
 
 ## Bootstrap a fresh database
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const writableViewedAccountId = vi.fn<() => Promise<string | null>>();
+const authorizedViewedAccountId = vi.fn<() => Promise<string | null>>();
 const plans = vi.hoisted(() => ({
   createPlan: vi.fn(),
   getUserPlans: vi.fn(),
@@ -9,7 +9,7 @@ const plans = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth/authorize", () => ({
-  writableViewedAccountId: () => writableViewedAccountId(),
+  authorizedViewedAccountId: () => authorizedViewedAccountId(),
 }));
 vi.mock("@/lib/portfolio/plans", () => plans);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -34,7 +34,7 @@ beforeEach(() => {
 describe("Plan writes against a foreign account", () => {
   // A refused write never returns: the seam answers 403 via `forbidden()`.
   beforeEach(() => {
-    writableViewedAccountId.mockRejectedValue(new Error("FORBIDDEN"));
+    authorizedViewedAccountId.mockRejectedValue(new Error("FORBIDDEN"));
   });
 
   it("refuses to delete", async () => {
@@ -55,7 +55,7 @@ describe("Plan writes against a foreign account", () => {
 
 describe("Plan writes the policy allows", () => {
   beforeEach(() => {
-    writableViewedAccountId.mockResolvedValue("member");
+    authorizedViewedAccountId.mockResolvedValue("member");
   });
 
   it("deletes against the viewed account", async () => {
@@ -76,7 +76,7 @@ describe("Plan writes the policy allows", () => {
 
 describe("Plan writes without a session", () => {
   it("refuses to save", async () => {
-    writableViewedAccountId.mockResolvedValue(null);
+    authorizedViewedAccountId.mockResolvedValue(null);
 
     const result = await savePlan(null, PLAN_INPUT);
 

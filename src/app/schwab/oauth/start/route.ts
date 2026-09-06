@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getCurrentUserId } from "@/lib/auth/session";
+import { authorizedViewedAccountId } from "@/lib/auth/authorize";
 import {
   buildSchwabAuthorizationUrl,
   createSchwabOAuthState,
@@ -16,8 +16,11 @@ function connectRedirect(request: NextRequest, error: string): NextResponse {
   return NextResponse.redirect(url);
 }
 
+// Connecting a brokerage configures the account on screen, so it needs write
+// authority over that account, not merely a session: a member who switched to
+// the other account gets 403 rather than a Schwab authorization bound to it.
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) return connectRedirect(request, "auth_required");
   if (!isSchwabConfigured()) return connectRedirect(request, "not_configured");
 

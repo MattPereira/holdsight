@@ -56,13 +56,19 @@ export async function authorizeViewedAccount(
 }
 
 /**
- * The viewed account when the signed-in user may write it, or `null` when
- * nobody is signed in. A member aiming at the other account never gets a value
- * back: `forbidden()` answers 403, so no caller can fall back to writing the
- * actor's own account instead (ADR 0005).
+ * The viewed account when the signed-in user may take `action` on it, or `null`
+ * when nobody is signed in. A member aiming at the other account never gets a
+ * value back: `forbidden()` answers 403, so no caller can fall back to acting
+ * on the actor's own account instead (ADR 0005).
+ *
+ * Refreshing and starting a Transaction History Sync pass "refresh", which any
+ * granted user may do to either account; persisting anything — including the
+ * connections and credentials that decide what gets synced — does not.
  */
-export async function writableViewedAccountId(): Promise<string | null> {
-  const authorization = await authorizeViewedAccount("write");
+export async function authorizedViewedAccountId(
+  action: AccessAction,
+): Promise<string | null> {
+  const authorization = await authorizeViewedAccount(action);
   if (authorization.status === "forbidden") forbidden();
   return authorization.status === "authorized" ? authorization.userId : null;
 }

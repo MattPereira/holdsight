@@ -12,6 +12,7 @@ import {
   brokerageBalancesView,
   type BalancesView
 } from "@/lib/accounts/balances-view";
+import { authorizedViewedAccountId } from "@/lib/auth/authorize";
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
   getUserBrokerageAccounts
@@ -66,7 +67,7 @@ function plaidActionErrorMessage(error: unknown, fallback: string): string {
  * Refresh brokerage holdings for every linked Plaid Item.
  */
 export async function loadBrokerageBalances(): Promise<BalancesView> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("refresh");
   if (!userId) {
     return {
       ...brokerageBalancesView([]),
@@ -94,7 +95,7 @@ export async function loadBrokerageBalances(): Promise<BalancesView> {
  * Refresh brokerage investment transactions separately from brokerage balances.
  */
 export async function loadBrokerageTransactions(): Promise<TransactionsView> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("refresh");
   if (!userId) {
     return {
       transactions: [],

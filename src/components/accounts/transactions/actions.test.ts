@@ -4,7 +4,7 @@ import type { ViewedAccountAuthorization } from "@/lib/auth/authorize";
 
 const authorizeViewedAccount =
   vi.fn<() => Promise<ViewedAccountAuthorization>>();
-const writableViewedAccountId = vi.fn<() => Promise<string | null>>();
+const authorizedViewedAccountId = vi.fn<() => Promise<string | null>>();
 const journal = vi.hoisted(() => ({
   getUserInvestmentTransactionJournalEntry: vi.fn(),
   removeUserInvestmentTransactionJournalEntry: vi.fn(),
@@ -14,7 +14,7 @@ const journal = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth/authorize", () => ({
   authorizeViewedAccount: () => authorizeViewedAccount(),
-  writableViewedAccountId: () => writableViewedAccountId(),
+  authorizedViewedAccountId: () => authorizedViewedAccountId(),
 }));
 vi.mock("@/lib/journal/transaction-entry", () => journal);
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
@@ -44,7 +44,7 @@ beforeEach(() => {
 describe("Trade Journal Entry writes against a foreign account", () => {
   // A refused write never returns: the seam answers 403 via `forbidden()`.
   beforeEach(() => {
-    writableViewedAccountId.mockRejectedValue(new Error("FORBIDDEN"));
+    authorizedViewedAccountId.mockRejectedValue(new Error("FORBIDDEN"));
   });
 
   it("refuses to save without falling back to the actor's account", async () => {
@@ -85,7 +85,7 @@ describe("Trade Journal Entry writes against a foreign account", () => {
 
 describe("Trade Journal Entry writes the policy allows", () => {
   beforeEach(() => {
-    writableViewedAccountId.mockResolvedValue("member");
+    authorizedViewedAccountId.mockResolvedValue("member");
   });
 
   it("saves against the viewed account", async () => {
@@ -108,7 +108,7 @@ describe("Trade Journal Entry writes the policy allows", () => {
 
 describe("Trade Journal Entry writes without a session", () => {
   it("refuses to save", async () => {
-    writableViewedAccountId.mockResolvedValue(null);
+    authorizedViewedAccountId.mockResolvedValue(null);
 
     const result = await saveTransactionJournalEntry("trade-1", INPUT, null);
 

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getCurrentUserId } from "@/lib/auth/session";
+import { authorizedViewedAccountId } from "@/lib/auth/authorize";
 import {
   getUserCreditCardAccounts,
   type CreditCardAccountRow,
@@ -30,7 +30,7 @@ export type CreditCardActionResult = {
 };
 
 export async function loadAccountsPageData(): Promise<PortfolioAccountsData> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("refresh");
   if (!userId) return emptyPortfolioAccountsData();
 
   const { accountData } = await refreshPortfolioForUser(userId);
@@ -41,7 +41,7 @@ export async function loadAccountsPageData(): Promise<PortfolioAccountsData> {
  * Refresh depository (checking/savings) balances for every linked Plaid Item.
  */
 export async function loadDepositoryBalances(): Promise<DepositoryActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("refresh");
   if (!userId) {
     return { accounts: [], error: "You must be signed in to view balances." };
   }
@@ -55,7 +55,7 @@ export async function loadDepositoryBalances(): Promise<DepositoryActionResult> 
  * Refresh credit-card balances and liability details for every linked Plaid Item.
  */
 export async function loadCreditCardAccounts(): Promise<CreditCardActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("refresh");
   if (!userId) {
     return { accounts: [], error: "You must be signed in to view balances." };
   }

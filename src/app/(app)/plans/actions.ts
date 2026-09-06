@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { writableViewedAccountId } from "@/lib/auth/authorize";
+import { authorizedViewedAccountId } from "@/lib/auth/authorize";
 import type { Plan, PlanInput } from "@/lib/portfolio/plan";
 import {
   createPlan as createPlanRecord,
@@ -26,7 +26,7 @@ function revalidatePlanPaths(): void {
 }
 
 export async function deletePlan(planId: string): Promise<PlanActionResult> {
-  const userId = await writableViewedAccountId();
+  const userId = await authorizedViewedAccountId("write");
   if (!userId) return { plans: [], error: SIGNED_OUT_MESSAGE };
 
   await removePlan(userId, planId);
@@ -51,7 +51,7 @@ export async function savePlan(
   planId: string | null,
   input: PlanInput,
 ): Promise<PlanSaveResult> {
-  const userId = await writableViewedAccountId();
+  const userId = await authorizedViewedAccountId("write");
   if (!userId) return { plans: [], plan: null, error: SIGNED_OUT_MESSAGE };
 
   const knownIds = planId

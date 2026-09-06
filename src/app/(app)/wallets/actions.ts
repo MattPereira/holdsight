@@ -8,6 +8,7 @@ import {
   investmentBalancesView,
   type BalancesView
 } from "@/lib/accounts/balances-view";
+import { authorizedViewedAccountId } from "@/lib/auth/authorize";
 import { getCurrentUserId } from "@/lib/auth/session";
 import {
   getUserEvmAccounts,
@@ -65,7 +66,7 @@ function unauthorizedBalancesResult(): BalancesResult[] {
  */
 export async function loadEvmBalances(): Promise<BalancesResult[]> {
   // Privacy-first: no portfolio data leaves the server without a valid session.
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("refresh");
   if (!userId) return unauthorizedBalancesResult();
 
   const walletConfigError = await validateUserEvmAccounts(userId);
@@ -87,7 +88,7 @@ export async function loadEvmBalances(): Promise<BalancesResult[]> {
 }
 
 export async function loadHyperCoreBalances(): Promise<BalancesResult[]> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("refresh");
   if (!userId) return unauthorizedBalancesResult();
 
   const walletConfigError = await validateUserEvmAccounts(userId);
@@ -110,7 +111,7 @@ export async function loadHyperCoreBalances(): Promise<BalancesResult[]> {
 }
 
 export async function loadWalletBalances(): Promise<BalancesView> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("refresh");
   if (!userId) return investmentBalancesView(unauthorizedBalancesResult());
 
   const walletConfigError = await validateUserEvmAccounts(userId);
@@ -151,7 +152,7 @@ export type WalletTransactionsActionResult = {
 };
 
 export async function loadWalletTransactions(): Promise<WalletTransactionsActionResult> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("refresh");
   if (!userId) {
     return {
       transactions: [],

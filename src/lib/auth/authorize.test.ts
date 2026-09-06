@@ -24,7 +24,7 @@ vi.mock("next/navigation", () => ({
 const {
   authorizeViewedAccount,
   getViewedAccountCapabilities,
-  writableViewedAccountId,
+  authorizedViewedAccountId,
 } = await import("@/lib/auth/authorize");
 
 const memberUser: GrantedUser = {
@@ -108,11 +108,11 @@ describe("authorizeViewedAccount", () => {
   });
 });
 
-describe("writableViewedAccountId", () => {
+describe("authorizedViewedAccountId", () => {
   it("hands back the viewed account an admin may write", async () => {
     signedInAs(adminUser, memberUser);
 
-    await expect(writableViewedAccountId()).resolves.toBe("member");
+    await expect(authorizedViewedAccountId("write")).resolves.toBe("member");
   });
 
   // 403 rather than a value: a caller that got the actor's own id back would
@@ -120,14 +120,38 @@ describe("writableViewedAccountId", () => {
   it("answers 403 rather than an id a member may not write", async () => {
     signedInAs(memberUser, adminUser);
 
-    await expect(writableViewedAccountId()).rejects.toThrow("FORBIDDEN");
+    await expect(authorizedViewedAccountId("write")).rejects.toThrow("FORBIDDEN");
   });
 
   it("hands back nothing when nobody is signed in", async () => {
     getCurrentActor.mockResolvedValue(null);
     getCurrentUserId.mockResolvedValue(null);
 
-    await expect(writableViewedAccountId()).resolves.toBeNull();
+    await expect(authorizedViewedAccountId("write")).resolves.toBeNull();
+  });
+
+  // Configuration is not refresh: permission to bring an account current says
+  // nothing about changing what that account syncs from.
+  it("answers 403 when a member configures a foreign connection", async () => {
+    signedInAs(memberUser, adminUser);
+
+    await expect(
+      authorizedViewedAccountId("manageConnections"),
+    ).rejects.toThrow("FORBIDDEN");
+  });
+
+  it("lets an admin configure a foreign connection", async () => {
+    signedInAs(adminUser, memberUser);
+
+    await expect(
+      authorizedViewedAccountId("manageConnections"),
+    ).resolves.toBe("member");
+  });
+
+  it("lets a member refresh the foreign account they are viewing", async () => {
+    signedInAs(memberUser, adminUser);
+
+    await expect(authorizedViewedAccountId("refresh")).resolves.toBe("admin");
   });
 });
 

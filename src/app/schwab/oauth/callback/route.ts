@@ -1,7 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { getCurrentUserId } from "@/lib/auth/session";
+import { authorizedViewedAccountId } from "@/lib/auth/authorize";
 import { getUserSchwabConnections } from "@/lib/brokerage/connections";
 import { syncSchwabConnection } from "@/lib/brokerage/balances";
 import {
@@ -23,7 +23,7 @@ function clearStateCookie(response: NextResponse): NextResponse {
 }
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const userId = await getCurrentUserId();
+  const userId = await authorizedViewedAccountId("manageConnections");
   if (!userId) {
     return clearStateCookie(connectRedirect(request, "auth_required"));
   }

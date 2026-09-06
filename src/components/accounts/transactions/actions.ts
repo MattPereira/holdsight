@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import {
   authorizeViewedAccount,
-  writableViewedAccountId,
+  authorizedViewedAccountId,
 } from "@/lib/auth/authorize";
 import {
   getUserInvestmentTransactionJournalEntry,
@@ -58,7 +58,7 @@ export async function saveTransactionJournalEntry(
   expectedUpdatedAt: string | null,
   overwrite = false,
 ): Promise<SaveTransactionJournalActionResult> {
-  const userId = await writableViewedAccountId();
+  const userId = await authorizedViewedAccountId("write");
   if (!userId) {
     return { status: "error" as const, message: SIGNED_OUT_MESSAGE };
   }
@@ -85,7 +85,7 @@ export async function saveTransactionJournalEntry(
 export async function removeTransactionJournalEntry(
   transactionId: string,
 ): Promise<TransactionJournalActionResult> {
-  const userId = await writableViewedAccountId();
+  const userId = await authorizedViewedAccountId("write");
   if (!userId) return { entry: null, error: SIGNED_OUT_MESSAGE };
 
   await removeUserInvestmentTransactionJournalEntry(userId, transactionId);
