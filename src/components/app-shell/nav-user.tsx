@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   RiExpandUpDownLine,
@@ -12,14 +12,18 @@ import {
 } from "@remixicon/react";
 import { useTheme } from "next-themes";
 
+import { switchViewAs } from "@/components/app-shell/actions";
 import { useHiddenAmounts } from "@/hooks/use-hidden-amounts";
 import { authClient } from "@/lib/auth/client";
+import type { UserSummary } from "@/lib/auth/user-summary";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
@@ -44,10 +48,14 @@ export function NavUser({
   name,
   email,
   hiddenAmounts,
+  users,
+  activeUserId,
 }: {
   name: string;
   email: string;
   hiddenAmounts: boolean;
+  users: UserSummary[];
+  activeUserId: string;
 }) {
   const { isMobile } = useSidebar();
   const router = useRouter();
@@ -56,6 +64,7 @@ export function NavUser({
   const { hidden, toggle: toggleHiddenAmounts } =
     useHiddenAmounts(hiddenAmounts);
   const [isPending, setIsPending] = useState(false);
+  const [isSwitching, startSwitching] = useTransition();
 
   async function handleSignOut() {
     setIsPending(true);
@@ -108,6 +117,29 @@ export function NavUser({
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {users.length > 1 ? (
+              <>
+                <DropdownMenuRadioGroup
+                  value={activeUserId}
+                  onValueChange={(userId) => {
+                    if (userId === activeUserId) return;
+                    startSwitching(() => switchViewAs(userId));
+                  }}
+                >
+                  {users.map((user) => (
+                    <DropdownMenuRadioItem
+                      key={user.id}
+                      value={user.id}
+                      disabled={isSwitching}
+                      className="pl-2"
+                    >
+                      <span className="truncate">{user.name}</span>
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+                <DropdownMenuSeparator />
+              </>
+            ) : null}
             <DropdownMenuItem
               onSelect={(event) => {
                 // Keep the menu open so toggling theme feels immediate.

@@ -8,6 +8,7 @@ import {
 } from "@remixicon/react";
 
 import { NavUser } from "@/components/app-shell/nav-user";
+import type { UserSummary } from "@/lib/auth/user-summary";
 import {
   Sidebar,
   SidebarContent,
@@ -38,10 +39,14 @@ export function AppSidebar({
   name,
   email,
   hiddenAmounts,
+  users,
+  activeUserId,
 }: {
   name: string;
   email: string;
   hiddenAmounts: boolean;
+  users: UserSummary[];
+  activeUserId: string;
 }) {
   return (
     <Sidebar collapsible="offcanvas">
@@ -104,7 +109,13 @@ export function AppSidebar({
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser name={name} email={email} hiddenAmounts={hiddenAmounts} />
+        <NavUser
+          name={name}
+          email={email}
+          hiddenAmounts={hiddenAmounts}
+          users={users}
+          activeUserId={activeUserId}
+        />
       </SidebarFooter>
     </Sidebar>
   );
